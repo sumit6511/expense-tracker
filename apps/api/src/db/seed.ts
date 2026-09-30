@@ -2,6 +2,8 @@ import {
   addDays,
   getMonthPeriod,
   listMonthPeriods,
+  RecurringBodySchema,
+  type RecurringInput,
   shiftMonthPeriod,
   todayIn,
   uuidv7,
@@ -12,6 +14,7 @@ import type { WorkspaceCtx } from '../context';
 import { setBudgets } from '../services/budgets';
 import { findOrCreatePayee } from '../services/payees';
 import { setManualRate } from '../services/rates';
+import { createRecurring } from '../services/recurring';
 import { createTag } from '../services/tags';
 import { createTransfer, insertTransaction } from '../services/transactions';
 import { createWorkspace } from '../services/workspaces';
@@ -259,5 +262,97 @@ export async function seedDemo(db: Db, auth: Auth, options: { months?: number } 
       budgetItems.map(([name, amountMinor]) => ({ categoryId: cat[name]!, amountMinor })),
     );
   }
+
+  // Bills and income that repeat every Bikram Sambat month (plus a yearly premium).
+  const nextMonth = shiftMonthPeriod(current, 1, settings);
+  const nextOn = (offset: number) => {
+    const d = addDays(current.start, offset);
+    return d >= today ? d : addDays(nextMonth.start, offset);
+  };
+  const series: RecurringInput[] = [
+    {
+      name: 'Salary',
+      kind: 'income',
+      accountId: acct['Nabil Bank']!.id,
+      amountMinor: 12_500_000,
+      payee: 'Employer Pvt. Ltd.',
+      categoryId: cat.Salary!,
+      frequency: 'monthly',
+      calendar: 'bs',
+      nextDate: nextOn(0),
+      mode: 'auto',
+    },
+    {
+      name: 'Rent',
+      kind: 'expense',
+      accountId: acct['Nabil Bank']!.id,
+      amountMinor: 2_500_000,
+      payee: 'Landlord',
+      categoryId: cat.Rent!,
+      frequency: 'monthly',
+      calendar: 'bs',
+      nextDate: nextOn(2),
+    },
+    {
+      name: 'Electricity',
+      kind: 'expense',
+      accountId: acct.eSewa!.id,
+      amountMinor: 250_000,
+      variableAmount: true,
+      payee: 'NEA',
+      categoryId: cat.Utilities!,
+      frequency: 'monthly',
+      calendar: 'bs',
+      nextDate: today,
+    },
+    {
+      name: 'Internet',
+      kind: 'expense',
+      accountId: acct.Khalti!.id,
+      amountMinor: 70_000,
+      payee: 'Worldlink',
+      categoryId: cat.Utilities!,
+      frequency: 'monthly',
+      calendar: 'bs',
+      nextDate: nextOn(5),
+      mode: 'auto',
+    },
+    {
+      name: 'Scooter EMI',
+      kind: 'expense',
+      accountId: acct['Nabil Bank']!.id,
+      amountMinor: 1_150_000,
+      payee: 'Global IME Bank',
+      categoryId: cat['Loan / EMI']!,
+      frequency: 'monthly',
+      calendar: 'bs',
+      nextDate: nextOn(12),
+      remaining: 18,
+      mode: 'auto',
+    },
+    {
+      name: 'eSewa top-up',
+      kind: 'transfer',
+      accountId: acct['Nabil Bank']!.id,
+      toAccountId: acct.eSewa!.id,
+      amountMinor: 2_000_000,
+      frequency: 'monthly',
+      calendar: 'bs',
+      nextDate: nextOn(3),
+    },
+    {
+      name: 'Health insurance',
+      kind: 'expense',
+      accountId: acct['Nabil Bank']!.id,
+      amountMinor: 1_800_000,
+      payee: 'Nepal Life',
+      categoryId: cat.Insurance!,
+      frequency: 'yearly',
+      calendar: 'bs',
+      nextDate: addDays(today, 20),
+    },
+  ];
+  for (const item of series) await createRecurring(db, ws, RecurringBodySchema.parse(item));
+
   return { created: true as const, email: DEMO_EMAIL, workspaceId: ws.id };
 }

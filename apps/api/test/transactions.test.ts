@@ -486,6 +486,24 @@ describe('accounts', () => {
     expect((await g.client.delete(`${g.base}/accounts/${g.accounts.Cash}`)).status).toBe(204);
   });
 
+  it('partial updates leave other fields alone', async () => {
+    const g = await setupWorkspace();
+    await g.client.patch(`${g.base}/accounts/${g.accounts.Cash}`, { onBudget: false });
+    const archived = await g.client.patch(`${g.base}/accounts/${g.accounts.Cash}`, {
+      archived: true,
+    });
+    expect(archived.body).toMatchObject({
+      archived: true,
+      openingBalanceMinor: 1_000_000,
+      balanceMinor: 1_000_000,
+      onBudget: false,
+    });
+    const tag = await g.client.post(`${g.base}/tags`, { name: 'trip', color: '#dc2626' });
+    await g.client.patch(`${g.base}/tags/${tag.body.id}`, { name: 'travel' });
+    const [renamed] = (await g.client.get(`${g.base}/tags`)).body;
+    expect(renamed).toMatchObject({ name: 'travel', color: '#dc2626' });
+  });
+
   it('reports balances converted to the base currency', async () => {
     const g = await setupWorkspace();
     await g.client.post(`${g.base}/transactions`, {

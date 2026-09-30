@@ -77,6 +77,7 @@ export const transactionsSearch = z.object({
   q: z.string().optional(),
   needsReview: z.enum(['true', 'false']).optional(),
   importBatchId: z.string().optional(),
+  recurringId: z.string().optional(),
   deleted: z.enum(['true', 'false']).optional(),
 });
 export type TransactionsSearch = z.infer<typeof transactionsSearch>;
@@ -131,6 +132,15 @@ const importRoute = createRoute({
   component: lazyRouteComponent(() => import('./features/import/import-page'), 'ImportPage'),
 });
 
+const recurringRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/recurring',
+  component: lazyRouteComponent(
+    () => import('./features/recurring/recurring-page'),
+    'RecurringPage',
+  ),
+});
+
 const inboxRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/inbox',
@@ -162,6 +172,7 @@ const routeTree = rootRoute.addChildren([
     accountRoute,
     importRoute,
     inboxRoute,
+    recurringRoute,
     settingsRoute,
   ]),
 ]);

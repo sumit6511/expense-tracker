@@ -184,6 +184,29 @@ test.describe('everyday use', () => {
     await expect(page.getByRole('switch', { name: /enabled/ })).not.toBeChecked();
   });
 
+  test('set up a monthly bill and record it when due', async ({ signedIn: page }) => {
+    await page.goto('/recurring');
+    await page.getByRole('button', { name: 'New recurring' }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'New recurring' });
+    await dialog.getByLabel('Amount', { exact: true }).fill('1,500');
+    await dialog.getByLabel('Payee').fill('WorldLink');
+    await dialog.getByRole('button', { name: 'Choose category' }).click();
+    await page.keyboard.type('Utilities');
+    await page.keyboard.press('Enter');
+    await expect(dialog.getByText('Monthly on the')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Set up' }).click();
+    await expect(page.getByText('“WorldLink” set up')).toBeVisible();
+
+    // Due today, so it waits under "Due now" until recorded.
+    await expect(page.getByText('Due now')).toBeVisible();
+    await page.getByRole('button', { name: 'Record', exact: true }).click();
+    await expect(page.getByText('WorldLink recorded')).toBeVisible();
+    await expect(page.getByText('Due now')).toBeHidden();
+
+    await page.goto('/transactions');
+    await expect(page.getByRole('button', { name: /WorldLink/ })).toContainText('-Rs. 1,500.00');
+  });
+
   test('reports and settings pages load', async ({ signedIn: page }) => {
     await page.goto('/reports?tab=cashflow');
     await expect(page.getByText('Income and spending per month')).toBeVisible();

@@ -4,11 +4,13 @@ import type { Db } from '../db/client';
 import type { Env } from '../env';
 import type { Logger } from '../logger';
 import { fetchNrbRates, storePublishedRates } from '../services/rates';
+import { postDueRecurring } from '../services/recurring';
 import { purgeTrash } from '../services/transactions';
 
 export const QUEUES = {
   fxRefresh: 'fx-refresh',
   purgeTrash: 'purge-trash',
+  recurring: 'recurring-post',
 } as const;
 
 /** Fetches the last `days` days of NRB rates and stores them. */
@@ -41,6 +43,14 @@ export async function startJobs(db: Db, env: Env, logger: Logger) {
     const purged = await purgeTrash(db, 30);
     logger.info({ purged }, 'purged old transactions from trash');
   });
+
+  // Hourly, so each workspace's items are recorded soon after midnight in its own time zone.
+  await boss.createQueue(QUEUES.recurring);
+  await boss.schedule(QUEUES.recurring, '7 * * * *');
+  await boss.work(QUEUES.recurring, async () => {
+    await postDueRecurring(db, logger);
+  });
+  await boss.send(QUEUES.recurring, null, { singletonKey: 'startup', singletonSeconds: 300 });
 
   if (env.FX_NRB_ENABLED) {
     await boss.createQueue(QUEUES.fxRefresh, {

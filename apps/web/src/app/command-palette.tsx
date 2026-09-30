@@ -10,6 +10,7 @@ import {
   Keyboard,
   Landmark,
   Moon,
+  Repeat,
   Search,
   Settings,
   Sun,
@@ -20,6 +21,7 @@ import {
 import { useState } from 'react';
 import { CategoryIcon } from '@/components/icons';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { useRecurringDialog } from '@/features/recurring/recurring-dialog';
 import { useTransactionDialog } from '@/features/transactions/transaction-dialog';
 import { useAccounts, useCategories } from '@/lib/queries';
 import { useCanWrite } from '@/lib/session';
@@ -41,6 +43,7 @@ export function CommandPalette({
 }) {
   const navigate = useNavigate();
   const { openNew } = useTransactionDialog();
+  const { openRecurring } = useRecurringDialog();
   const canWrite = useCanWrite();
   const { preference, setPreference } = useTheme();
   const { data: accounts = [] } = useAccounts();
@@ -110,6 +113,13 @@ export function CommandPalette({
                 >
                   <ArrowLeftRight /> New transfer
                 </Command.Item>
+                <Command.Item
+                  value="new recurring bill subscription"
+                  onSelect={() => run(() => openRecurring())}
+                  className={item}
+                >
+                  <Repeat /> New recurring bill or income
+                </Command.Item>
               </Command.Group>
             )}
             <Command.Group heading="Go to">
@@ -117,6 +127,7 @@ export function CommandPalette({
                 { to: '/', label: 'Home', icon: House },
                 { to: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
                 { to: '/budgets', label: 'Budgets', icon: Target },
+                { to: '/recurring', label: 'Recurring & bills', icon: Repeat },
                 { to: '/reports', label: 'Reports', icon: ChartPie },
                 { to: '/accounts', label: 'Accounts', icon: Landmark },
                 { to: '/import', label: 'Import statement', icon: Upload },

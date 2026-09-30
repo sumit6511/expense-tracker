@@ -310,6 +310,8 @@ export const transactions = pgTable(
     /** Both legs of a transfer share this id. Transfers have no splits. */
     transferGroupId: uuid(),
     importBatchId: uuid().references(() => importBatches.id, { onDelete: 'set null' }),
+    /** The recurring series this was recorded from. */
+    recurringId: uuid().references(() => recurring.id, { onDelete: 'set null' }),
     externalId: text(),
     createdBy: text().references(() => user.id, { onDelete: 'set null' }),
     updatedBy: text().references(() => user.id, { onDelete: 'set null' }),
@@ -323,6 +325,7 @@ export const transactions = pgTable(
     index().on(t.payeeId),
     index().on(t.transferGroupId),
     index().on(t.importBatchId),
+    index().on(t.recurringId),
     uniqueIndex()
       .on(t.accountId, t.externalId)
       .where(sql`${t.externalId} is not null and ${t.deletedAt} is null`),
@@ -391,6 +394,62 @@ export const rules = pgTable(
     ...timestamps,
   },
   (t) => [index().on(t.workspaceId, t.priority)],
+);
+
+// ---------------------------------------------------------------------------------------------
+// Recurring transactions
+// ---------------------------------------------------------------------------------------------
+
+export const recurringKindEnum = pgEnum('recurring_kind', ['expense', 'income', 'transfer']);
+export const frequencyEnum = pgEnum('recurring_frequency', [
+  'daily',
+  'weekly',
+  'monthly',
+  'yearly',
+]);
+export const recurringModeEnum = pgEnum('recurring_mode', ['auto', 'remind']);
+
+/**
+ * A repeating transaction. The schedule is anchored at `startDate`; `nextIndex` is the next
+ * occurrence to record and `nextDate` caches its date (null once the series has ended).
+ */
+export const recurring = pgTable(
+  'recurring',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    kind: recurringKindEnum().notNull(),
+    accountId: uuid()
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    toAccountId: uuid().references(() => accounts.id, { onDelete: 'cascade' }),
+    /** Positive; the kind decides the sign. */
+    amountMinor: money().notNull(),
+    toAmountMinor: money(),
+    variableAmount: boolean().notNull().default(false),
+    payeeId: uuid().references(() => payees.id, { onDelete: 'set null' }),
+    categoryId: uuid().references(() => categories.id, { onDelete: 'set null' }),
+    notes: text().notNull().default(''),
+    tagIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    frequency: frequencyEnum().notNull(),
+    interval: integer().notNull().default(1),
+    calendar: calendarEnum().notNull(),
+    startDate: date({ mode: 'string' }).notNull(),
+    lastDayOfMonth: boolean().notNull().default(false),
+    nextIndex: integer().notNull().default(0),
+    nextDate: date({ mode: 'string' }),
+    endDate: date({ mode: 'string' }),
+    remaining: integer(),
+    mode: recurringModeEnum().notNull().default('remind'),
+    remindDaysBefore: integer().notNull().default(3),
+    active: boolean().notNull().default(true),
+    lastPostedDate: date({ mode: 'string' }),
+    ...timestamps,
+  },
+  (t) => [index().on(t.workspaceId, t.nextDate)],
 );
 
 // ---------------------------------------------------------------------------------------------

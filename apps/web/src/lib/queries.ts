@@ -23,6 +23,10 @@ import type {
   ListTransactionsQuery,
   Me,
   Payee,
+  RecordRecurringInput,
+  Recurring,
+  RecurringInput,
+  RecurringSuggestion,
   Rule,
   RuleInput,
   RulePreview,
@@ -30,6 +34,7 @@ import type {
   Tag,
   Transaction,
   TransactionPage,
+  UpcomingItem,
   UpdateAccountInput,
   UpdateCategoryInput,
   UpdateMeInput,
@@ -525,3 +530,54 @@ export function useReviewCounts() {
     staleTime: 30_000,
   });
 }
+
+// ---------------------------------------------------------------------------------------------
+// Recurring
+// ---------------------------------------------------------------------------------------------
+
+export function useRecurring() {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'recurring'],
+    queryFn: () => api<Recurring[]>(`${base}/recurring`),
+  });
+}
+
+export function useUpcoming(days = 30) {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'recurring-upcoming', days],
+    queryFn: () => api<UpcomingItem[]>(`${base}/recurring/upcoming`, { query: { days } }),
+  });
+}
+
+export function useRecurringSuggestions() {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'recurring-suggestions'],
+    queryFn: () => api<RecurringSuggestion[]>(`${base}/recurring/suggestions`),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export const useCreateRecurring = () =>
+  useWsMutation((base, input: RecurringInput) =>
+    api<Recurring>(`${base}/recurring`, { method: 'POST', body: input }),
+  );
+export const useUpdateRecurring = () =>
+  useWsMutation((base, { id, ...input }: Partial<RecurringInput> & { id: string }) =>
+    api<Recurring>(`${base}/recurring/${id}`, { method: 'PATCH', body: input }),
+  );
+export const useDeleteRecurring = () =>
+  useWsMutation((base, id: string) => api<void>(`${base}/recurring/${id}`, { method: 'DELETE' }));
+export const useRecordRecurring = () =>
+  useWsMutation((base, { id, ...input }: RecordRecurringInput & { id: string }) =>
+    api<{ transaction: Transaction; recurring: Recurring }>(`${base}/recurring/${id}/record`, {
+      method: 'POST',
+      body: input,
+    }),
+  );
+export const useSkipRecurring = () =>
+  useWsMutation((base, id: string) =>
+    api<Recurring>(`${base}/recurring/${id}/skip`, { method: 'POST' }),
+  );

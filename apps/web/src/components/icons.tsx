@@ -46,6 +46,7 @@ import {
   Pizza,
   Plane,
   Receipt,
+  Repeat,
   Scissors,
   ShieldCheck,
   Shirt,
@@ -140,6 +141,7 @@ export const ICONS: Record<string, LucideIcon> = {
   wallet: Wallet,
   'piggy-bank': PiggyBank,
   'credit-card': CreditCard,
+  repeat: Repeat,
   tag: Tag,
 };
 

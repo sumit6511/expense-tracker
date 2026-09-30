@@ -145,9 +145,14 @@ export const CreateAccountSchema = z.object({
 });
 export type CreateAccountInput = z.input<typeof CreateAccountSchema>;
 
+// Zod 4 applies field defaults even inside .partial(), so fields with defaults are redeclared
+// as plain optionals: otherwise a PATCH that leaves them out would reset them.
 export const UpdateAccountSchema = CreateAccountSchema.omit({ currency: true })
   .partial()
   .extend({
+    openingBalanceMinor: MinorAmount.optional(),
+    onBudget: z.boolean().optional(),
+    inNetWorth: z.boolean().optional(),
     archived: z.boolean().optional(),
     sortOrder: z.number().int().min(0).max(10_000).optional(),
   });
@@ -259,7 +264,7 @@ export const CreateTagSchema = z.object({
     .pipe(Name(40)),
   color: Color.default('#64748b'),
 });
-export const UpdateTagSchema = CreateTagSchema.partial();
+export const UpdateTagSchema = CreateTagSchema.partial().extend({ color: Color.optional() });
 
 // ---------------------------------------------------------------------------------------------
 // Transactions
@@ -351,6 +356,8 @@ export const TransactionSchema = z.object({
   tagIds: z.array(Id),
   original: z.object({ amountMinor: MinorAmount, currency: z.string() }).nullable(),
   importBatchId: Id.nullable(),
+  /** The recurring series this was recorded from. */
+  recurringId: Id.nullable(),
   deleted: z.boolean(),
   version: z.number(),
   createdAt: z.string(),
@@ -374,6 +381,7 @@ export const ListTransactionsQuerySchema = z.object({
   maxAmount: z.coerce.number().int().min(0).optional(),
   needsReview: z.enum(['true', 'false']).optional(),
   importBatchId: Id.optional(),
+  recurringId: Id.optional(),
   deleted: z.enum(['true', 'false']).optional(),
   cursor: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(500).default(100),

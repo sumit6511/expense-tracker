@@ -1,5 +1,5 @@
 import type { Transaction } from '@et/shared';
-import { ArrowLeftRight, Inbox, Split } from 'lucide-react';
+import { ArrowLeftRight, Inbox, Repeat, Split } from 'lucide-react';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
 import { Checkbox } from '@/components/ui/menu';
@@ -92,6 +92,9 @@ export function TransactionRow({
             <span className="truncate text-sm font-medium">{title}</span>
             {tx.needsReview && (
               <Inbox className="size-3.5 shrink-0 text-primary" aria-label="Needs review" />
+            )}
+            {tx.recurringId && (
+              <Repeat className="size-3.5 shrink-0 text-muted-foreground" aria-label="Recurring" />
             )}
           </span>
           <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">

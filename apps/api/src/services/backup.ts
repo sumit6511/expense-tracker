@@ -22,6 +22,7 @@ import {
   importProfiles,
   manualRates,
   payees,
+  recurring,
   rules,
   tags,
   transactionSplits,
@@ -242,6 +243,7 @@ export const BackupSchema = z.object({
       needsReview: z.boolean(),
       transferGroupId: id.nullable(),
       externalId: z.string().nullable(),
+      recurringId: id.nullable().default(null),
       splits: z.array(
         z.object({ categoryId: id.nullable(), amountMinor: z.number().int(), memo: z.string() }),
       ),
@@ -255,6 +257,37 @@ export const BackupSchema = z.object({
   importProfiles: z.array(z.object({ name: z.string(), mapping: z.unknown() })),
   // Added after the first release, so older backups without them still restore.
   rules: z.array(RuleBodySchema).default([]),
+  recurring: z
+    .array(
+      z.object({
+        id,
+        name: z.string(),
+        kind: z.enum(['expense', 'income', 'transfer']),
+        accountId: id,
+        toAccountId: id.nullable(),
+        amountMinor: z.number().int(),
+        toAmountMinor: z.number().int().nullable(),
+        variableAmount: z.boolean(),
+        payeeId: id.nullable(),
+        categoryId: id.nullable(),
+        notes: z.string(),
+        tagIds: z.array(id),
+        frequency: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
+        interval: z.number().int().min(1),
+        calendar: z.enum(['bs', 'ad']),
+        startDate: date,
+        lastDayOfMonth: z.boolean(),
+        nextIndex: z.number().int().min(0),
+        nextDate: date.nullable(),
+        endDate: date.nullable(),
+        remaining: z.number().int().nullable(),
+        mode: z.enum(['auto', 'remind']),
+        remindDaysBefore: z.number().int(),
+        active: z.boolean(),
+        lastPostedDate: date.nullable(),
+      }),
+    )
+    .default([]),
 });
 export type Backup = z.infer<typeof BackupSchema>;
 
@@ -273,6 +306,7 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
     rateRows,
     profileRows,
     ruleRows,
+    recurringRows,
   ] = await Promise.all([
     db.select().from(accounts).where(eq(accounts.workspaceId, w)).orderBy(asc(accounts.sortOrder)),
     db
@@ -306,6 +340,7 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
     db.select().from(manualRates).where(eq(manualRates.workspaceId, w)),
     db.select().from(importProfiles).where(eq(importProfiles.workspaceId, w)),
     listRules(db, w),
+    db.select().from(recurring).where(eq(recurring.workspaceId, w)),
   ]);
   const splitsByTx = Map.groupBy(splitRows, (s) => s.transactionId);
   const tagsByTx = Map.groupBy(txTagRows, (t) => t.transactionId);
@@ -376,6 +411,7 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
         needsReview: t.needsReview,
         transferGroupId: t.transferGroupId,
         externalId: t.externalId,
+        recurringId: t.recurringId,
         splits: (splitsByTx.get(t.id) ?? []).map((s) => ({
           categoryId: s.categoryId,
           amountMinor: s.amountMinor,
@@ -403,6 +439,7 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
       actions: r.actions,
       stopProcessing: r.stopProcessing,
     })),
+    recurring: recurringRows.map(({ workspaceId: _, createdAt, updatedAt, ...r }) => r),
   };
 }
 
@@ -524,6 +561,21 @@ export async function restoreBackup(
         .insert(tags)
         .values(part.map((t) => ({ id: newId(t.id), workspaceId, name: t.name, color: t.color }))),
     );
+    // Tags deleted from a series are simply left out of the restored copy.
+    await chunk(b.recurring, (part) =>
+      tx.insert(recurring).values(
+        part.map((r) => ({
+          ...r,
+          id: newId(r.id),
+          workspaceId,
+          accountId: ref(r.accountId, 'account')!,
+          toAccountId: ref(r.toAccountId, 'account'),
+          payeeId: ref(r.payeeId, 'payee'),
+          categoryId: ref(r.categoryId, 'category'),
+          tagIds: r.tagIds.flatMap((t) => remap.get(t) ?? []),
+        })),
+      ),
+    );
     await chunk(b.transactions, async (part) => {
       await tx.insert(transactions).values(
         part.map((t) => ({
@@ -541,6 +593,7 @@ export async function restoreBackup(
           needsReview: t.needsReview,
           transferGroupId: t.transferGroupId ? newId(`transfer:${t.transferGroupId}`) : null,
           externalId: t.externalId,
+          recurringId: t.recurringId ? (remap.get(t.recurringId) ?? null) : null,
           createdBy: userId,
           updatedBy: userId,
         })),

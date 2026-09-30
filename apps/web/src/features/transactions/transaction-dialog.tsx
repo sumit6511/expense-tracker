@@ -6,7 +6,7 @@ import {
   toDecimalString,
   uuidv7,
 } from '@et/shared';
-import { Loader2, Plus, Split, Trash2, X } from 'lucide-react';
+import { Loader2, Plus, Repeat, Split, Trash2, X } from 'lucide-react';
 import {
   createContext,
   type FormEvent,
@@ -41,6 +41,10 @@ import {
 } from '@/components/ui/dialog';
 import { Field, Input, Textarea } from '@/components/ui/input';
 import { Segmented } from '@/components/ui/menu';
+import {
+  recurringFromTransaction,
+  useRecurringDialog,
+} from '@/features/recurring/recurring-dialog';
 import { canMakeRule, ruleFromTransaction, useRuleDialog } from '@/features/rules/rule-dialog';
 import { ApiError, errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
@@ -189,6 +193,7 @@ function EditorForm({
   const accountMap = useAccountMap();
   const categoryMap = useCategoryMap();
   const { data: groups = [] } = useCategories();
+  const { openRecurring } = useRecurringDialog();
 
   const isEdit = existing !== null;
   const isTransfer = existing?.transfer != null;
@@ -744,6 +749,23 @@ function EditorForm({
             {isEdit && (
               <Button variant="ghost" className="text-destructive sm:mr-auto" onClick={remove}>
                 <Trash2 /> Delete
+              </Button>
+            )}
+            {existing && !existing.recurringId && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  onDone();
+                  const single =
+                    existing.splits.length === 1 ? existing.splits[0]!.categoryId : null;
+                  openRecurring(
+                    recurringFromTransaction(existing, f.calendar, {
+                      category: single ? categoryMap.get(single)?.name : undefined,
+                    }),
+                  );
+                }}
+              >
+                <Repeat /> Make recurring
               </Button>
             )}
             {!isEdit && (

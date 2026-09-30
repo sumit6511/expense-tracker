@@ -26,10 +26,17 @@ import { Money } from '@/components/money';
 import { EmptyState, ErrorState } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, Progress, Skeleton } from '@/components/ui/card';
+import { dueLabel } from '@/features/recurring/recurring-dialog';
 import { useTransactionDialog } from '@/features/transactions/transaction-dialog';
 import { TransactionRow } from '@/features/transactions/transaction-row';
 import { useFormat } from '@/lib/format';
-import { useAccounts, useCategoryMap, useDashboard, useTransactions } from '@/lib/queries';
+import {
+  useAccounts,
+  useCategoryMap,
+  useDashboard,
+  useTransactions,
+  useUpcoming,
+} from '@/lib/queries';
 import { useCanWrite, useWorkspace } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
@@ -282,6 +289,7 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
           </CardContent>
         </Card>
         <AttentionCard data={data} />
+        {isCurrent && <UpcomingCard />}
       </div>
 
       {/* Top categories */}
@@ -421,6 +429,53 @@ function Stat({
       </div>
       <p className="text-lg font-semibold">{value}</p>
     </div>
+  );
+}
+
+/** Bills and income due in the next three weeks, overdue reminders first. */
+function UpcomingCard() {
+  const f = useFormat();
+  const { data: items = [] } = useUpcoming(21);
+  const next = items.filter((i) => i.isNext || i.date >= f.today).slice(0, 5);
+  if (next.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Coming up</CardTitle>
+        <Link to="/recurring" className="text-xs font-medium text-primary hover:underline">
+          Recurring
+        </Link>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 gap-1">
+        {next.map((i) => (
+          <Link
+            key={`${i.recurringId}-${i.date}`}
+            to="/recurring"
+            className="-mx-2 flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-muted/60"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm">{i.name}</span>
+              <span
+                className={cn(
+                  'block text-xs text-muted-foreground',
+                  i.overdue && 'font-medium text-destructive',
+                )}
+              >
+                {dueLabel(i.date, f)}
+              </span>
+            </span>
+            <Money
+              minor={i.amountMinor}
+              currency={i.currency}
+              signed={i.amountMinor > 0}
+              colored={i.kind !== 'transfer'}
+              className="text-sm"
+              trimZero
+            />
+          </Link>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 

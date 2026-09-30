@@ -116,6 +116,7 @@ async function hydrate(
           ? { amountMinor: r.originalAmountMinor, currency: r.originalCurrency }
           : null,
       importBatchId: r.importBatchId,
+      recurringId: r.recurringId,
       deleted: r.deletedAt !== null,
       version: r.version,
       createdAt: r.createdAt.toISOString(),
@@ -228,6 +229,7 @@ export function transactionFilters(
   if (q.maxAmount !== undefined) where.push(sql`abs(${t.amountMinor}) <= ${q.maxAmount}`);
   if (q.needsReview) where.push(eq(t.needsReview, q.needsReview === 'true'));
   if (q.importBatchId) where.push(eq(t.importBatchId, q.importBatchId));
+  if (q.recurringId) where.push(eq(t.recurringId, q.recurringId));
   if (q.q) {
     const pattern = `%${escapeLike(q.q)}%`;
     where.push(sql`(
@@ -405,6 +407,7 @@ export type CreateTransactionData = z.output<typeof CreateTransactionSchema> & {
   rawDescription?: string;
   externalId?: string | null;
   importBatchId?: string | null;
+  recurringId?: string | null;
 };
 
 /** Inserts a regular (non-transfer) transaction. Assumes validation of references is done. */
@@ -433,6 +436,7 @@ export async function insertTransaction(
     needsReview: input.needsReview ?? false,
     externalId: input.externalId ?? null,
     importBatchId: input.importBatchId ?? null,
+    recurringId: input.recurringId ?? null,
     createdBy: userId,
     updatedBy: userId,
     ...normalizedOriginal(input.original, accountCurrency),
@@ -876,23 +880,34 @@ export async function createTransfer(
   userId: string,
   input: z.output<typeof CreateTransferSchema>,
 ): Promise<TransferResult> {
-  const groupId = uuidv7();
-  await db.transaction(async (tx) => {
-    const { from, to, toAmount } = await resolveTransferAmounts(tx, ws.id, input);
-    const common = {
-      workspaceId: ws.id,
-      date: input.date,
-      notes: input.notes ?? '',
-      transferGroupId: groupId,
-      createdBy: userId,
-      updatedBy: userId,
-    };
-    await tx.insert(transactions).values([
-      { ...common, id: uuidv7(), accountId: from.id, amountMinor: -input.amountMinor },
-      { ...common, id: uuidv7(), accountId: to.id, amountMinor: toAmount },
-    ]);
-  });
+  const groupId = await db.transaction((tx) => insertTransfer(tx, ws.id, userId, input));
   return transferLegs(db, ws.id, groupId);
+}
+
+/** Inserts both legs of a transfer and returns their group id. */
+export async function insertTransfer(
+  db: Executor,
+  workspaceId: string,
+  userId: string | null,
+  input: z.output<typeof CreateTransferSchema>,
+  extra: { recurringId?: string } = {},
+): Promise<string> {
+  const groupId = uuidv7();
+  const { from, to, toAmount } = await resolveTransferAmounts(db, workspaceId, input);
+  const common = {
+    workspaceId,
+    date: input.date,
+    notes: input.notes ?? '',
+    transferGroupId: groupId,
+    recurringId: extra.recurringId ?? null,
+    createdBy: userId,
+    updatedBy: userId,
+  };
+  await db.insert(transactions).values([
+    { ...common, id: uuidv7(), accountId: from.id, amountMinor: -input.amountMinor },
+    { ...common, id: uuidv7(), accountId: to.id, amountMinor: toAmount },
+  ]);
+  return groupId;
 }
 
 export async function updateTransfer(

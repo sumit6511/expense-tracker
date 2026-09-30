@@ -12,6 +12,7 @@ import {
   type LucideIcon,
   Menu,
   Plus,
+  Repeat,
   Search,
   Settings,
   Target,
@@ -34,6 +35,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/menu';
+import { RecurringDialogProvider } from '@/features/recurring/recurring-dialog';
 import { RuleDialogProvider } from '@/features/rules/rule-dialog';
 import {
   TransactionDialogProvider,
@@ -62,6 +64,7 @@ const NAV: NavItem[] = [
   { to: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
   { to: '/inbox', label: 'Review', icon: Inbox },
   { to: '/budgets', label: 'Budgets', icon: Target },
+  { to: '/recurring', label: 'Recurring', icon: Repeat },
   { to: '/reports', label: 'Reports', icon: ChartPie },
   { to: '/accounts', label: 'Accounts', icon: Landmark },
   { to: '/import', label: 'Import', icon: Upload },
@@ -117,9 +120,11 @@ export function AppLayout() {
   return (
     <SessionProvider me={data} workspace={workspace} onSwitch={switchWorkspace}>
       <RuleDialogProvider>
-        <TransactionDialogProvider>
-          <Shell />
-        </TransactionDialogProvider>
+        <RecurringDialogProvider>
+          <TransactionDialogProvider>
+            <Shell />
+          </TransactionDialogProvider>
+        </RecurringDialogProvider>
       </RuleDialogProvider>
     </SessionProvider>
   );

@@ -17,6 +17,7 @@ import { budgetsRouter } from './routes/budgets';
 import { labelsRouter } from './routes/categories';
 import { importsRouter } from './routes/imports';
 import { meRouter } from './routes/me';
+import { recurringRouter } from './routes/recurring';
 import { rulesRouter } from './routes/rules';
 import { transactionsRouter } from './routes/transactions';
 import { workspaceRouter } from './routes/workspace';
@@ -93,6 +94,7 @@ export function createApp(deps: Deps) {
     budgetsRouter,
     importsRouter,
     rulesRouter,
+    recurringRouter,
   ]) {
     api.route('/', router);
   }
