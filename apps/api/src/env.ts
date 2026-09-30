@@ -37,7 +37,7 @@ const EnvSchema = z.object({
     .default('true')
     .transform((v) => v === 'true'),
   /** SMTP server for email notifications, e.g. smtp://user:pass@smtp.example.com:587. */
-  SMTP_URL: z.string().url().optional(),
+  SMTP_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
   /** Sender address for email, e.g. "Expense Tracker <money@example.com>". */
   MAIL_FROM: z.string().default('Expense Tracker <no-reply@localhost>'),
   /** Allow new sign-ups. Set to false on a personal server once your account exists. */

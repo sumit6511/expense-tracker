@@ -1,6 +1,6 @@
 # Expense Tracker: Research & Product/Technical Plan
 
-> Status: **Approved on 30 Sep 2026** with the decisions in [§0.1](#01-decisions-approved-30-sep-2026). **Phase 0 and Phase 1 are implemented** (see [§12.1](#121-implementation-notes-phase-0--1)); Phase 2 is next.
+> Status: **Approved on 30 Sep 2026** with the decisions in [§0.1](#01-decisions-approved-30-sep-2026). **Phases 0, 1 and 2 are implemented** (see [§12.1](#121-implementation-notes-phase-0--1) and [§12.2](#122-implementation-notes-phase-2)); Phase 3 is next.
 > Research date: September 2026.
 
 ---
@@ -611,12 +611,43 @@ Built as planned, with these differences:
   (a service container in CI) rather than Testcontainers, so no Docker is needed locally.
 - **Workspace creation** happens in onboarding (after sign-up) rather than automatically, so the
   user picks the currency, calendar and accounts first.
-- **Docker Compose** has no MinIO yet: attachments are Phase 2. It includes a nightly `pg_dump` backup service.
+- **Docker Compose** has no MinIO (attachments ended up in PostgreSQL, see §12.2). It includes a nightly `pg_dump` backup service.
 - **Charts** use a validated colour-blind-safe palette (blue/orange series) with every chart
   also available as a table.
 - **Refunds** are recorded as money in against a spending category (Income mode lets you pick one).
 - **Hardening found by the end-to-end tests:** sign-in/sign-up rate limiting (configurable only for
   automated tests), and static-file serving limited to real files.
+
+### 12.2 Implementation notes (Phase 2)
+
+Built in eight slices, each with unit, API integration and end-to-end tests. Differences from the plan:
+
+- **Recurring schedules** use a small schedule model (frequency, interval, start date, "last day of
+  the month") instead of RRULE, because RRULE can't express **Bikram Sambat months**. Occurrences are
+  computed from their index, so skipping or editing one never drifts the rest. Automatic items are
+  recorded hourly, each workspace in its own time zone.
+- **Rules** run when transactions are added or imported (not when edited, so a manual fix is never
+  overwritten). "Always do this" after changing a category proposes a rule based on a keyword from
+  the bank description, which matches future imports better than the payee name.
+- **Attachments live in PostgreSQL** (`bytea`, 5 MB each, 10 per transaction, 1 GB per workspace)
+  instead of S3/MinIO: one less service to run, and the nightly dump backs them up. Photos are
+  resized and stripped of EXIF (location) data on the device before upload; file types are checked
+  by content. The storage layer can move to S3 later without changing the API.
+- **Reconciled transactions** can still be edited, but only after an explicit confirmation, and
+  every change to a transaction is recorded in its history (who, when, before → after).
+- **Import formats:** OFX/QFX (SGML and XML), QIF and CAMT.053, plus **pasted SMS alerts** from
+  Nepali banks and wallets, which cover the gap left by the lack of bank APIs.
+- **Offline quick add** keeps a queue in local storage; each queued transaction carries an id chosen
+  on the device, so re-sending after a flaky connection can't create duplicates. Accounts and
+  categories are cached by the service worker so the form works offline.
+- **Notifications** are in-app plus optional email (SMTP). Budget warnings fire at 90% and when over,
+  but not at exactly 100% (usually a fixed bill paid as planned). **Web push moved to Phase 3**: it
+  needs VAPID keys and per-device subscriptions, and email covers the "tell me when I'm not in the
+  app" need for now.
+- **Two-step sign-in** uses Better Auth's TOTP plugin with 10 single-use backup codes, optional
+  "trust this device for 30 days", and account lockout after repeated wrong codes. **Passkeys** sign
+  in on their own (they already combine something you have with a biometric or PIN), so they skip
+  the TOTP step.
 
 ### Phase 0: Foundations
 - Monorepo, TypeScript config, Biome, Vitest, Playwright, CI
@@ -651,7 +682,8 @@ Built as planned, with these differences:
 - Household sharing (invites, roles, per-person attribution, private/shared accounts)
 - Split groups with debt simplification and settle-up
 - Zero-based (envelope) budgeting mode
-- Recurring and subscription detection; insights feed; cash-flow forecast
+- Subscription detection; insights feed; cash-flow forecast
+- Web push notifications (moved from Phase 2)
 - AI: receipt scan, natural-language quick add, category fallback, "ask your money", PDF statement import
 - Import presets for YNAB, Actual, Mint and Splitwise; PDF report export; translations
 
