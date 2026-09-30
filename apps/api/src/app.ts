@@ -19,6 +19,7 @@ import { budgetsRouter } from './routes/budgets';
 import { labelsRouter } from './routes/categories';
 import { goalsRouter } from './routes/goals';
 import { importsRouter } from './routes/imports';
+import { insightsRouter } from './routes/insights';
 import { ledgerRouter } from './routes/ledger';
 import { meRouter } from './routes/me';
 import { membersRouter } from './routes/members';
@@ -116,6 +117,7 @@ export function createApp(deps: Deps) {
     notificationsRouter,
     membersRouter,
     splitRouter,
+    insightsRouter,
   ]) {
     api.route('/', router);
   }

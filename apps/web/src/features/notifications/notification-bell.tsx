@@ -5,6 +5,7 @@ import {
   BellOff,
   CalendarClock,
   CheckCheck,
+  Lightbulb,
   type LucideIcon,
   Repeat,
   Settings,
@@ -24,6 +25,7 @@ const KIND: Record<NotificationKind, { icon: LucideIcon; tone: string }> = {
   budget: { icon: Target, tone: 'bg-warning/15 text-warning' },
   recurring: { icon: Repeat, tone: 'bg-muted text-muted-foreground' },
   goal: { icon: Trophy, tone: 'bg-positive/10 text-positive' },
+  insight: { icon: Lightbulb, tone: 'bg-warning/15 text-warning' },
 };
 
 function timeAgo(iso: string, f: Formatters) {

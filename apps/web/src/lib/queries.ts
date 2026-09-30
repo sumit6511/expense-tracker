@@ -21,6 +21,7 @@ import type {
   Dashboard,
   ExchangeRate,
   FinishReconcileInput,
+  Forecast,
   Goal,
   GoalInput,
   ImportBatch,
@@ -28,6 +29,7 @@ import type {
   ImportPreview,
   ImportProfile,
   ImportRow,
+  Insights,
   InvitationCreated,
   ListTransactionsQuery,
   MarkNotificationsRead,
@@ -613,6 +615,49 @@ export function useRecurringSuggestions() {
     queryKey: [...wsKey(wid), 'recurring-suggestions'],
     queryFn: () => api<RecurringSuggestion[]>(`${base}/recurring/suggestions`),
     staleTime: 5 * 60_000,
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Insights & forecast
+// ---------------------------------------------------------------------------------------------
+
+export function useInsights() {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'insights'],
+    queryFn: () => api<Insights>(`${base}/insights`),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** Hides an insight (or a recurring suggestion) for you, straight away. */
+export function useDismissInsight() {
+  const { wid, base } = useWs();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) =>
+      api<void>(`${base}/insights/dismiss`, { method: 'POST', body: { key } }),
+    onMutate: (key) => {
+      qc.setQueryData<Insights>([...wsKey(wid), 'insights'], (old) =>
+        old ? { ...old, items: old.items.filter((i) => i.key !== key) } : old,
+      );
+      qc.setQueryData<RecurringSuggestion[]>([...wsKey(wid), 'recurring-suggestions'], (old) =>
+        old?.filter((s) => s.dismissKey !== key),
+      );
+    },
+  });
+}
+
+export function useForecast(days: number, accountIds?: string) {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'forecast', days, accountIds ?? ''],
+    queryFn: () =>
+      api<Forecast>(`${base}/forecast`, {
+        query: { days, ...(accountIds ? { accountIds } : {}) },
+      }),
+    placeholderData: keepPreviousData,
   });
 }
 

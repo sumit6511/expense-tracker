@@ -4,6 +4,7 @@ import type { Db } from '../db/client';
 import type { Env } from '../env';
 import type { Logger } from '../logger';
 import type { Mailer } from '../mailer';
+import { runHeadsUp } from '../services/insights';
 import { pruneNotifications, runNotifications } from '../services/notifications';
 import { fetchNrbRates, storePublishedRates } from '../services/rates';
 import { postDueRecurring } from '../services/recurring';
@@ -14,6 +15,7 @@ export const QUEUES = {
   purgeTrash: 'purge-trash',
   recurring: 'recurring-post',
   notifications: 'notifications',
+  headsUp: 'heads-up',
 } as const;
 
 /** Fetches the last `days` days of NRB rates and stores them. */
@@ -61,6 +63,13 @@ export async function startJobs(db: Db, env: Env, logger: Logger, mailer: Mailer
   await boss.schedule(QUEUES.notifications, '*/15 * * * *');
   await boss.work(QUEUES.notifications, async () => {
     await runNotifications(db, mailer, env.PUBLIC_URL, logger);
+  });
+
+  // Accounts the bills could empty, prices that changed: once a day, in the morning.
+  await boss.createQueue(QUEUES.headsUp);
+  await boss.schedule(QUEUES.headsUp, '41 7 * * *', null, { tz: 'Asia/Kathmandu' });
+  await boss.work(QUEUES.headsUp, async () => {
+    await runHeadsUp(db, logger);
   });
 
   if (env.FX_NRB_ENABLED) {

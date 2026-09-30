@@ -170,6 +170,7 @@ describe('notifications', () => {
       budgets: true,
       recurring: true,
       goals: true,
+      insights: true,
       emailAvailable: true,
     });
     const patched = await f.client.patch('/api/v1/me/notification-settings', { budgets: false });

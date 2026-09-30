@@ -2,7 +2,7 @@ import { and, eq, type SQL, sql } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import type { WorkspaceCtx } from '../context';
 import type { Executor } from '../db/client';
-import { accounts } from '../db/schema';
+import { accounts, workspaceMembers, workspaces } from '../db/schema';
 
 /**
  * Private accounts: an account can be private to the member who owns it. Everyone else in the
@@ -55,4 +55,31 @@ export async function loadHiddenAccountIds(db: Executor, workspaceId: string, us
       ),
     );
   return rows.map((r) => r.id);
+}
+
+/** What a background job sees when it acts for one member (their view, private accounts and all). */
+export async function memberContexts(db: Executor): Promise<WorkspaceCtx[]> {
+  const rows = await db
+    .select({ w: workspaces, userId: workspaceMembers.userId, role: workspaceMembers.role })
+    .from(workspaces)
+    .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id));
+  const out: WorkspaceCtx[] = [];
+  for (const { w, userId, role } of rows) {
+    out.push({
+      id: w.id,
+      name: w.name,
+      baseCurrency: w.baseCurrency,
+      calendar: w.calendar,
+      monthStartDay: w.monthStartDay,
+      weekStart: w.weekStart,
+      timezone: w.timezone,
+      budgetMode: w.budgetMode,
+      envelopeSince: w.envelopeSince,
+      userId,
+      role,
+      hiddenAccountIds: await loadHiddenAccountIds(db, w.id, userId),
+      createdAt: w.createdAt,
+    });
+  }
+  return out;
 }

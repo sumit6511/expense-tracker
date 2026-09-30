@@ -7,6 +7,8 @@ import { forbidden, notFound, unauthorized } from '../lib/errors';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const WRITE_ROLES: readonly Role[] = ['owner', 'admin', 'editor'];
+/** Writes that only change the person's own view, so viewers may make them. */
+const PERSONAL_WRITES = [/\/insights\/dismiss$/];
 
 /**
  * Resolves /workspaces/:wid/* to a workspace the signed-in user belongs to. Non-members get 404,
@@ -36,7 +38,11 @@ export const loadWorkspace: MiddlewareHandler<AppEnv> = async (c, next) => {
     .limit(1);
   if (!row) throw notFound('Workspace');
 
-  if (!['GET', 'HEAD'].includes(c.req.method) && !WRITE_ROLES.includes(row.role)) {
+  if (
+    !['GET', 'HEAD'].includes(c.req.method) &&
+    !WRITE_ROLES.includes(row.role) &&
+    !PERSONAL_WRITES.some((re) => re.test(c.req.path))
+  ) {
     throw forbidden('You have read-only access to this workspace');
   }
   const ws = row.workspace;

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { adToBs, BS_LAST_YEAR, bsDaysInMonth, bsToAd, isBsSupported } from './bs';
 import { adDaysInMonth, addDays, diffDays, type IsoDate, parseIsoDate, toIsoDate } from './dates';
+import { CADENCES } from './patterns';
 import { Id, IsoDateSchema, TransactionSchema } from './schemas';
 
 /**
@@ -269,9 +270,16 @@ export const RecurringSuggestionSchema = z.object({
   /** Positive; the most recent amount. */
   amountMinor: z.number(),
   currency: z.string(),
-  frequency: z.enum(['weekly', 'monthly']),
+  cadence: z.enum(CADENCES),
+  /** The schedule that matches the cadence (quarterly = every 3 months). */
+  frequency: z.enum(['weekly', 'monthly', 'yearly']),
+  interval: z.number(),
+  /** The same amount each time (a subscription) rather than a bill that varies. */
+  fixed: z.boolean(),
   count: z.number(),
   lastDate: z.string(),
   nextDate: z.string(),
+  /** What to pass to "dismiss" to stop suggesting it. */
+  dismissKey: z.string(),
 });
 export type RecurringSuggestion = z.infer<typeof RecurringSuggestionSchema>;

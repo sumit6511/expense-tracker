@@ -322,6 +322,50 @@ test.describe('everyday use', () => {
     await expect(page.getByRole('link', { name: 'Rs. 43,000 ready to assign' })).toBeVisible();
   });
 
+  test('insights: track a subscription found in history, and see the balance ahead', async ({
+    signedIn: page,
+    user,
+    baseURL,
+  }) => {
+    const base = `/api/v1/workspaces/${user.workspaceId}`;
+    const headers = { origin: baseURL! };
+    const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+    const accounts: Array<{ id: string; name: string }> = await (
+      await page.request.get(`${base}/accounts`)
+    ).json();
+    for (const a of accounts) {
+      await page.request.patch(`${base}/accounts/${a.id}`, {
+        data: { openingDate: daysAgo(200) },
+        headers,
+      });
+    }
+    const cash = accounts.find((a) => a.name === 'Cash')!.id;
+    for (const n of [91, 61, 31, 1]) {
+      const res = await page.request.post(`${base}/transactions`, {
+        data: { accountId: cash, date: daysAgo(n), amountMinor: -149_900, payee: 'Netflix' },
+        headers,
+      });
+      expect(res.ok()).toBeTruthy();
+    }
+
+    await page.goto('/insights');
+    // Rs. 60,000 opening balances less four months of Netflix.
+    await expect(page.getByText('Cash flow ahead')).toBeVisible();
+    await expect(page.getByText('Rs. 54,004').first()).toBeVisible();
+    await expect(page.getByText('Netflix looks monthly')).toBeVisible();
+    await page.getByRole('button', { name: 'Track it' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByLabel('Name')).toHaveValue('Netflix');
+    await dialog.getByRole('button', { name: 'Set up', exact: true }).click();
+    await expect(page.getByText('“Netflix” set up')).toBeVisible();
+    await expect(page.getByText('Netflix looks monthly')).toBeHidden();
+    // Now scheduled, it shows up in the forecast.
+    await page.getByText(/Scheduled in the next 30 days/).click();
+    await expect(
+      page.locator('details').getByRole('listitem').filter({ hasText: 'Netflix' }),
+    ).toContainText('-Rs. 1,499');
+  });
+
   test('import a bank statement CSV, then undo it', async ({ signedIn: page }) => {
     await page.goto('/import');
     await page.getByLabel('Import into account').selectOption({ label: 'Nabil Bank (NPR)' });

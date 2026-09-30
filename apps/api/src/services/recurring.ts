@@ -1,6 +1,5 @@
 import {
   addDays,
-  diffDays,
   type IsoDate,
   indexOnOrAfter,
   occurrenceAt,
@@ -10,12 +9,12 @@ import {
   type Recurring,
   type RecurringBody,
   RecurringBodySchema,
-  type RecurringSuggestion,
   type Schedule,
   type UpcomingItem,
   uuidv7,
 } from '@et/shared';
 import { and, asc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { z } from 'zod';
 import type { WorkspaceCtx } from '../context';
 import type { Db, Executor } from '../db/client';
@@ -29,7 +28,7 @@ import { findOrCreatePayee } from './payees';
 import { loadRateBook } from './rates';
 import { assertTagsExist } from './tags';
 import { getTransaction, insertTransaction, insertTransfer, workspaceToday } from './transactions';
-import { isHidden, type Scope, systemScope, visibleAccount, visibleAccountSql } from './visibility';
+import { isHidden, type Scope, systemScope, visibleAccount } from './visibility';
 
 type Row = typeof recurring.$inferSelect;
 
@@ -168,14 +167,45 @@ export async function getRecurring(db: Executor, ws: WorkspaceCtx, id: string) {
   return dto!;
 }
 
-/** Everything due in the next `days` days (and reminders already overdue), soonest first. */
-export async function upcoming(db: Db, ws: WorkspaceCtx, days: number): Promise<UpcomingItem[]> {
+export interface ScheduledOccurrence {
+  recurringId: string;
+  name: string;
+  kind: Row['kind'];
+  date: IsoDate;
+  index: number;
+  isNext: boolean;
+  accountId: string;
+  currency: string;
+  toAccountId: string | null;
+  toCurrency: string | null;
+  /** Positive; the usual amount for a variable bill. */
+  amountMinor: number;
+  /** Transfers: what arrives (null = the same as `amountMinor`). */
+  toAmountMinor: number | null;
+  categoryId: string | null;
+  variableAmount: boolean;
+  mode: Row['mode'];
+  /** A reminder whose date has passed without being recorded or skipped. */
+  overdue: boolean;
+}
+
+/**
+ * Every occurrence of the active series up to `until` (and reminders already overdue), at most
+ * `perSeries` of each.
+ */
+export async function scheduledOccurrences(
+  db: Executor,
+  ws: WorkspaceCtx,
+  until: IsoDate,
+  perSeries: number,
+): Promise<ScheduledOccurrence[]> {
   const today = workspaceToday(ws);
-  const until = addDays(today, days);
+  const toAccounts = alias(accounts, 'to_accounts');
   const rows = await db
-    .select({ r: recurring, currency: accounts.currency })
+    .select({ r: recurring, currency: accounts.currency, toCurrency: toAccounts.currency })
     .from(recurring)
     .innerJoin(accounts, eq(accounts.id, recurring.accountId))
+    .leftJoin(toAccounts, eq(toAccounts.id, recurring.toAccountId))
     .where(
       and(
         eq(recurring.workspaceId, ws.id),
@@ -185,30 +215,52 @@ export async function upcoming(db: Db, ws: WorkspaceCtx, days: number): Promise<
         visibleSeries(ws),
       ),
     );
-  const items: UpcomingItem[] = [];
-  for (const { r, currency } of rows) {
+  const out: ScheduledOccurrence[] = [];
+  for (const { r, currency, toCurrency } of rows) {
     const schedule = scheduleOf(r);
-    const occurrences = occurrencesUntil(schedule, r.nextIndex, until, 12);
-    for (const { index, date } of occurrences) {
+    for (const { index, date } of occurrencesUntil(schedule, r.nextIndex, until, perSeries)) {
       const remaining = r.remaining === null ? null : r.remaining - (index - r.nextIndex);
       if (dateOrEnd(r, schedule, index, remaining) === null) break;
-      items.push({
+      out.push({
         recurringId: r.id,
         name: r.name,
         kind: r.kind,
         date,
-        amountMinor: signedAmount(r.kind, r.amountMinor),
-        currency,
+        index,
+        isNext: index === r.nextIndex,
         accountId: r.accountId,
+        currency,
+        toAccountId: r.toAccountId,
+        toCurrency,
+        amountMinor: r.amountMinor,
+        toAmountMinor: r.toAmountMinor,
         categoryId: r.categoryId,
         variableAmount: r.variableAmount,
         mode: r.mode,
         overdue: r.mode === 'remind' && date < today,
-        isNext: index === r.nextIndex,
       });
     }
   }
-  return items.sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
+  return out.sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
+}
+
+/** Everything due in the next `days` days (and reminders already overdue), soonest first. */
+export async function upcoming(db: Db, ws: WorkspaceCtx, days: number): Promise<UpcomingItem[]> {
+  const occurrences = await scheduledOccurrences(db, ws, addDays(workspaceToday(ws), days), 12);
+  return occurrences.map((o) => ({
+    recurringId: o.recurringId,
+    name: o.name,
+    kind: o.kind,
+    date: o.date,
+    amountMinor: signedAmount(o.kind, o.amountMinor),
+    currency: o.currency,
+    accountId: o.accountId,
+    categoryId: o.categoryId,
+    variableAmount: o.variableAmount,
+    mode: o.mode,
+    overdue: o.overdue,
+    isNext: o.isNext,
+  }));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -526,91 +578,4 @@ export async function postDueRecurring(db: Db, logger?: Logger, now: Date = new 
   }
   if (posted) logger?.info({ posted }, 'recorded recurring transactions');
   return posted;
-}
-
-// ---------------------------------------------------------------------------------------------
-// Detecting subscriptions and bills in history
-// ---------------------------------------------------------------------------------------------
-
-const median = (xs: number[]) => {
-  const s = [...xs].sort((a, b) => a - b);
-  const m = s.length >> 1;
-  return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
-};
-
-/**
- * Payees paid (or paying) at a steady monthly or weekly rhythm with similar amounts, that aren't
- * already set up as recurring: "Looks like WorldLink is monthly — track it?"
- */
-export async function suggestRecurring(db: Db, ws: WorkspaceCtx): Promise<RecurringSuggestion[]> {
-  const today = workspaceToday(ws);
-  const result = await db.execute<{
-    payee_id: string;
-    payee_name: string;
-    account_id: string;
-    currency: string;
-    date: string;
-    amount_minor: number;
-    category_id: string | null;
-  }>(sql`
-    select t.payee_id, p.name as payee_name, t.account_id, a.currency, t.date, t.amount_minor,
-      (select s.category_id from transaction_splits s where s.transaction_id = t.id
-        order by s.sort_order limit 1) as category_id
-    from transactions t
-    join payees p on p.id = t.payee_id
-    join accounts a on a.id = t.account_id
-    where t.workspace_id = ${ws.id}
-      and t.deleted_at is null
-      and t.transfer_group_id is null
-      and t.date >= ${addDays(today, -400)}
-      ${visibleAccountSql(ws, sql`t.account_id`)}
-      and not exists (
-        select 1 from recurring r
-        where r.workspace_id = t.workspace_id and r.payee_id = t.payee_id and r.next_date is not null
-      )
-    order by t.payee_id, t.account_id, t.date
-  `);
-  const groups = Map.groupBy(
-    result.rows,
-    (r) => `${r.payee_id}|${r.account_id}|${Number(r.amount_minor) < 0 ? 'out' : 'in'}`,
-  );
-  const suggestions: RecurringSuggestion[] = [];
-  for (const rows of groups.values()) {
-    // One per day at most (a split bill paid twice the same day counts once).
-    const byDay = [...new Map(rows.map((r) => [r.date, r])).values()];
-    if (byDay.length < 3) continue;
-    const gaps = byDay.slice(1).map((r, i) => diffDays(byDay[i]!.date, r.date));
-    const recent = gaps.slice(-5);
-    const m = median(recent);
-    const frequency =
-      m >= 26 && m <= 35 && recent.every((g) => g >= 20 && g <= 40)
-        ? 'monthly'
-        : m >= 6 && m <= 8 && recent.every((g) => g >= 5 && g <= 9)
-          ? 'weekly'
-          : null;
-    if (!frequency) continue;
-    const amounts = byDay.slice(-4).map((r) => Math.abs(Number(r.amount_minor)));
-    const typical = median(amounts);
-    if (amounts.some((a) => Math.abs(a - typical) > typical * 0.2)) continue;
-    const last = byDay.at(-1)!;
-    const period = frequency === 'monthly' ? 30 : 7;
-    // Still going: seen within the last one and a half periods.
-    if (diffDays(last.date, today) > period * 1.5) continue;
-    let nextDate = addDays(last.date, Math.round(m));
-    while (nextDate < today) nextDate = addDays(nextDate, Math.round(m));
-    suggestions.push({
-      payeeId: last.payee_id,
-      payeeName: last.payee_name,
-      accountId: last.account_id,
-      categoryId: last.category_id,
-      kind: Number(last.amount_minor) < 0 ? 'expense' : 'income',
-      amountMinor: Math.abs(Number(last.amount_minor)),
-      currency: last.currency,
-      frequency,
-      count: byDay.length,
-      lastDate: last.date,
-      nextDate,
-    });
-  }
-  return suggestions.sort((a, b) => a.nextDate.localeCompare(b.nextDate));
 }

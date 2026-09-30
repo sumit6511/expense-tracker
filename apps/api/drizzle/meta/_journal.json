@@ -99,6 +99,13 @@
       "when": 1790786008591,
       "tag": "0013_budget_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790787171504,
+      "tag": "0014_insights",
+      "breakpoints": true
     }
   ]
 }

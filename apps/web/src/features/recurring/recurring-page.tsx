@@ -1,4 +1,4 @@
-import { addDays, type Recurring, type RecurringSuggestion, type UpcomingItem } from '@et/shared';
+import { addDays, type Recurring, type UpcomingItem } from '@et/shared';
 import { Link } from '@tanstack/react-router';
 import {
   ArrowLeftRight,
@@ -15,7 +15,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
@@ -36,6 +36,7 @@ import {
   useAccountMap,
   useCategoryMap,
   useDeleteRecurring,
+  useDismissInsight,
   useRecordRecurring,
   useRecurring,
   useRecurringSuggestions,
@@ -43,8 +44,8 @@ import {
   useUpcoming,
   useUpdateRecurring,
 } from '@/lib/queries';
-import { useCanWrite, useWorkspace } from '@/lib/session';
-import { cn, storage } from '@/lib/utils';
+import { useCanWrite } from '@/lib/session';
+import { cn } from '@/lib/utils';
 import { describeSchedule, dueLabel, recurringStart, useRecurringDialog } from './recurring-dialog';
 
 export function RecurringPage() {
@@ -416,30 +417,20 @@ function SeriesRow({ r, canWrite }: { r: Recurring; canWrite: boolean }) {
   );
 }
 
-const DISMISSED_KEY = 'et.dismissedRecurringSuggestions';
+const CADENCE_LABEL = {
+  weekly: 'weekly',
+  monthly: 'monthly',
+  quarterly: 'every 3 months',
+  yearly: 'yearly',
+} as const;
 
 function Suggestions() {
   const f = useFormat();
-  const ws = useWorkspace();
   const canWrite = useCanWrite();
   const { data = [] } = useRecurringSuggestions();
+  const dismiss = useDismissInsight();
   const { openRecurring } = useRecurringDialog();
-  const [dismissed, setDismissed] = useState<string[]>(() => {
-    try {
-      return JSON.parse(storage.get(DISMISSED_KEY) ?? '[]') as string[];
-    } catch {
-      return [];
-    }
-  });
-  const key = (s: RecurringSuggestion) => `${ws.id}:${s.payeeId}:${s.accountId}`;
-  const visible = data.filter((s) => !dismissed.includes(key(s)));
-  if (!canWrite || visible.length === 0) return null;
-
-  const dismiss = (s: RecurringSuggestion) => {
-    const next = [...dismissed, key(s)];
-    setDismissed(next);
-    storage.set(DISMISSED_KEY, JSON.stringify(next.slice(-200)));
-  };
+  if (!canWrite || data.length === 0) return null;
 
   return (
     <Card>
@@ -450,8 +441,8 @@ function Suggestions() {
         <span className="text-xs text-muted-foreground">Found in your history</span>
       </CardHeader>
       <div className="divide-y border-t">
-        {visible.slice(0, 5).map((s) => (
-          <div key={key(s)} className="flex items-center gap-3 px-4 py-3">
+        {data.slice(0, 5).map((s) => (
+          <div key={s.dismissKey} className="flex items-center gap-3 px-4 py-3">
             <SeriesIcon kind={s.kind} categoryId={s.categoryId} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{s.payeeName}</p>
@@ -462,7 +453,8 @@ function Suggestions() {
                   className="font-medium text-foreground sm:hidden"
                 />
                 <span className="sm:hidden"> · </span>
-                {s.frequency === 'monthly' ? 'monthly' : 'weekly'} · seen {s.count} times
+                {CADENCE_LABEL[s.cadence]}
+                {s.fixed ? '' : ', amount varies'} · seen {s.count} times
                 <span className="hidden sm:inline"> · last {f.date(s.lastDate, 'short')}</span>
               </p>
             </div>
@@ -480,10 +472,12 @@ function Suggestions() {
                   kind: s.kind,
                   accountId: s.accountId,
                   amountMinor: s.amountMinor,
+                  variableAmount: !s.fixed,
                   payee: s.payeeName,
                   categoryId: s.categoryId,
                   frequency: s.frequency,
-                  calendar: s.frequency === 'monthly' ? f.calendar : 'ad',
+                  interval: s.interval,
+                  calendar: s.frequency === 'weekly' ? 'ad' : f.calendar,
                   nextDate: s.nextDate,
                 })
               }
@@ -494,7 +488,9 @@ function Suggestions() {
               size="icon-sm"
               variant="ghost"
               aria-label={`Not recurring: ${s.payeeName}`}
-              onClick={() => dismiss(s)}
+              onClick={() =>
+                dismiss.mutate(s.dismissKey, { onError: (err) => toast.error(errorMessage(err)) })
+              }
             >
               <X />
             </Button>

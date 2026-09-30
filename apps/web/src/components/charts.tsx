@@ -6,6 +6,7 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -533,6 +534,118 @@ export function NetWorthChart({ data, height = 280 }: { data: NetWorthPoint[]; h
             stroke="var(--foreground)"
             strokeWidth={2}
             dot={{ r: 2.5, fill: 'var(--foreground)' }}
+            isAnimationActive={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Forecast: the expected balance, with a band for how far it could drift
+// ---------------------------------------------------------------------------------------------
+
+export interface ForecastChartPoint {
+  date: string;
+  label: string;
+  expected: number;
+  low: number;
+  high: number;
+  /** Scheduled items that day, e.g. "Rent −Rs. 25,000". */
+  items: string[];
+}
+
+export function ForecastChart({
+  data,
+  height = 240,
+}: {
+  data: ForecastChartPoint[];
+  height?: number;
+}) {
+  const { f, major, tick } = useMajorUnits();
+  const values = data.flatMap((d) => [major(d.low) ?? 0, major(d.high) ?? 0]);
+  const scale = niceRange(Math.min(...values), Math.max(...values));
+  const dips = values.some((v) => v < 0);
+  return (
+    <div role="img" aria-label="Expected balance for the coming days, with a likely range">
+      <ResponsiveContainer width="100%" height={height}>
+        <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+          <XAxis
+            dataKey="label"
+            tick={axisTick}
+            tickLine={false}
+            axisLine={{ stroke: 'var(--chart-axis)' }}
+            interval="preserveStartEnd"
+            minTickGap={28}
+          />
+          <YAxis
+            tick={axisTick}
+            tickLine={false}
+            axisLine={false}
+            width={56}
+            tickFormatter={tick}
+            ticks={scale.ticks}
+            domain={scale.domain}
+          />
+          {dips && (
+            <ReferenceLine
+              y={0}
+              stroke="var(--destructive)"
+              strokeDasharray="4 4"
+              strokeWidth={1}
+            />
+          )}
+          <Tooltip
+            cursor={{ stroke: 'var(--chart-axis)', strokeWidth: 1 }}
+            content={(props) => {
+              const p = props.payload?.[0]?.payload as ForecastChartPoint | undefined;
+              if (!props.active || !p) return null;
+              return (
+                <div className="min-w-48 rounded-lg border bg-popover px-3 py-2 text-xs shadow-lg">
+                  <div className="mb-1 font-medium text-foreground">{f.date(p.date, 'medium')}</div>
+                  <div className="flex items-center gap-2 py-0.5">
+                    <span className="size-2 rounded-full bg-[var(--series-1)]" />
+                    <span className="text-muted-foreground">Expected</span>
+                    <span className="ml-auto pl-3 font-medium text-foreground tabular">
+                      {f.money(p.expected, undefined, { trimZeroFraction: true })}
+                    </span>
+                  </div>
+                  {p.high !== p.low && (
+                    <div className="flex items-center gap-2 py-0.5">
+                      <span className="size-2 rounded-full bg-[var(--series-1)] opacity-30" />
+                      <span className="text-muted-foreground">Likely</span>
+                      <span className="ml-auto pl-3 font-medium text-foreground tabular">
+                        {`${f.compact(p.low)} – ${f.compact(p.high)}`}
+                      </span>
+                    </div>
+                  )}
+                  {p.items.map((item) => (
+                    <div key={item} className="mt-1 border-t pt-1 text-muted-foreground">
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              );
+            }}
+          />
+          <Area
+            type="linear"
+            dataKey={(d: ForecastChartPoint) => [major(d.low), major(d.high)]}
+            stroke="none"
+            fill="var(--series-1)"
+            fillOpacity={0.18}
+            activeDot={false}
+            isAnimationActive={false}
+          />
+          <Line
+            type="linear"
+            dataKey={(d: ForecastChartPoint) => major(d.expected)}
+            stroke="var(--series-1)"
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4, stroke: 'var(--card)', strokeWidth: 2 }}
             isAnimationActive={false}
           />
         </ComposedChart>

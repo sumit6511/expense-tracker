@@ -8,6 +8,7 @@ import {
   House,
   Inbox,
   Landmark,
+  Lightbulb,
   Loader2,
   LogOut,
   type LucideIcon,
@@ -73,6 +74,7 @@ const NAV: NavItem[] = [
   { to: '/recurring', label: 'Recurring', icon: Repeat },
   { to: '/split', label: 'Split', icon: Handshake },
   { to: '/reports', label: 'Reports', icon: ChartPie },
+  { to: '/insights', label: 'Insights', icon: Lightbulb },
   { to: '/accounts', label: 'Accounts', icon: Landmark },
   { to: '/import', label: 'Import', icon: Upload },
 ];

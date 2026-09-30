@@ -686,6 +686,7 @@ export const notificationKindEnum = pgEnum('notification_kind', [
   'budget',
   'recurring',
   'goal',
+  'insight',
 ]);
 
 /** One notification for one person in one workspace. */
@@ -726,11 +727,28 @@ export const notificationPrefs = pgTable('notification_prefs', {
   budgets: boolean().notNull().default(true),
   recurring: boolean().notNull().default(true),
   goals: boolean().notNull().default(true),
+  insights: boolean().notNull().default(true),
   updatedAt: timestamp({ withTimezone: true })
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
+
+/** Insights (and recurring suggestions) someone has waved away. */
+export const insightDismissals = pgTable(
+  'insight_dismissals',
+  {
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    key: text().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.userId, t.key] })],
+);
 
 // ---------------------------------------------------------------------------------------------
 // Split groups (shared costs with friends, flatmates, trips)

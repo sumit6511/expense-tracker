@@ -26,6 +26,7 @@ import { Money } from '@/components/money';
 import { EmptyState, ErrorState } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, Progress, Skeleton } from '@/components/ui/card';
+import { InsightList } from '@/features/insights/insight-list';
 import { dueLabel } from '@/features/recurring/recurring-dialog';
 import { useTransactionDialog } from '@/features/transactions/transaction-dialog';
 import { TransactionRow } from '@/features/transactions/transaction-row';
@@ -35,6 +36,7 @@ import {
   useCategoryMap,
   useDashboard,
   useGoals,
+  useInsights,
   useTransactions,
   useUpcoming,
 } from '@/lib/queries';
@@ -306,6 +308,7 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
           </CardContent>
         </Card>
         <AttentionCard data={data} />
+        {isCurrent && <InsightsCard />}
       </div>
 
       {/* Top categories */}
@@ -494,6 +497,23 @@ function GoalsCard() {
 }
 
 /** Bills and income due in the next three weeks, overdue reminders first. */
+function InsightsCard() {
+  const { data } = useInsights();
+  const items = data?.items ?? [];
+  if (items.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Worth knowing</CardTitle>
+        <Link to="/insights" className="text-xs font-medium text-primary hover:underline">
+          {items.length > 2 ? `See all ${items.length}` : 'Insights'}
+        </Link>
+      </CardHeader>
+      <InsightList items={items.slice(0, 2)} className="-mt-1 border-t" />
+    </Card>
+  );
+}
+
 function UpcomingCard() {
   const f = useFormat();
   const { data: items = [] } = useUpcoming(21);

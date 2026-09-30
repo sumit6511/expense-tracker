@@ -2,11 +2,11 @@ import { z } from 'zod';
 import { Id } from './schemas';
 
 /**
- * Notifications: bills coming due, budgets running out, recurring items recorded automatically
- * and goals reached. Each person chooses which kinds they want, and whether to get them by
+ * Notifications: bills coming due, budgets running out, recurring items recorded automatically,
+ * goals reached, and insights worth acting on (an account that may run dry, a price rise). Each person chooses which kinds they want, and whether to get them by
  * email too (when the server can send email).
  */
-export const NOTIFICATION_KINDS = ['bill', 'budget', 'recurring', 'goal'] as const;
+export const NOTIFICATION_KINDS = ['bill', 'budget', 'recurring', 'goal', 'insight'] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 export const NotificationSchema = z.object({
@@ -46,6 +46,7 @@ export const NotificationPrefsSchema = z.object({
   budgets: z.boolean(),
   recurring: z.boolean(),
   goals: z.boolean(),
+  insights: z.boolean(),
 });
 export type NotificationPrefs = z.infer<typeof NotificationPrefsSchema>;
 
@@ -64,4 +65,5 @@ export const PREF_FOR_KIND: Record<NotificationKind, keyof Omit<NotificationPref
   budget: 'budgets',
   recurring: 'recurring',
   goal: 'goals',
+  insight: 'insights',
 };

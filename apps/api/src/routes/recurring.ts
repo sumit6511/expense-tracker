@@ -19,13 +19,13 @@ import {
   WidIdParams,
   WidParams,
 } from '../lib/openapi';
+import { suggestRecurring } from '../services/insights';
 import {
   createRecurring,
   deleteRecurring,
   listRecurring,
   recordOccurrence,
   skipOccurrence,
-  suggestRecurring,
   upcoming,
   updateRecurring,
 } from '../services/recurring';

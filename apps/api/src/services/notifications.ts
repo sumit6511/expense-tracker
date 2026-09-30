@@ -33,7 +33,7 @@ import { budgetOverview } from './budgets';
 import { listGoals } from './goals';
 import { periodSettings } from './reports';
 import { workspaceToday } from './transactions';
-import { loadHiddenAccountIds, visibleAccount } from './visibility';
+import { memberContexts, visibleAccount } from './visibility';
 
 /** Something worth telling the workspace's members about. */
 export interface Candidate {
@@ -53,6 +53,7 @@ const DEFAULT_PREFS: NotificationPrefs = {
   budgets: true,
   recurring: true,
   goals: true,
+  insights: true,
 };
 
 /** Warn when this much of a budget is spent. */
@@ -401,6 +402,7 @@ export async function getNotificationSettings(
     budgets: prefs.budgets,
     recurring: prefs.recurring,
     goals: prefs.goals,
+    insights: prefs.insights,
     emailAvailable: mailer !== null,
   };
 }
@@ -536,31 +538,12 @@ export async function runNotifications(
   publicUrl: string,
   logger?: Logger,
 ) {
-  const rows = await db
-    .select({ w: workspaces, userId: workspaceMembers.userId, role: workspaceMembers.role })
-    .from(workspaces)
-    .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id));
   let created = 0;
-  for (const { w, userId, role } of rows) {
-    const ws: WorkspaceCtx = {
-      id: w.id,
-      name: w.name,
-      baseCurrency: w.baseCurrency,
-      calendar: w.calendar,
-      monthStartDay: w.monthStartDay,
-      weekStart: w.weekStart,
-      timezone: w.timezone,
-      budgetMode: w.budgetMode,
-      envelopeSince: w.envelopeSince,
-      userId,
-      role,
-      hiddenAccountIds: await loadHiddenAccountIds(db, w.id, userId),
-      createdAt: w.createdAt,
-    };
+  for (const ws of await memberContexts(db)) {
     try {
       created += await refreshNotifications(db, ws);
     } catch (err) {
-      logger?.warn({ err, workspaceId: w.id }, 'could not check workspace for notifications');
+      logger?.warn({ err, workspaceId: ws.id }, 'could not check workspace for notifications');
     }
   }
   const emailed = mailer ? await sendNotificationEmails(db, mailer, publicUrl, logger) : 0;

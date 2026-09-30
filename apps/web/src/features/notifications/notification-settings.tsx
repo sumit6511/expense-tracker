@@ -1,5 +1,5 @@
 import type { NotificationSettings as Settings } from '@et/shared';
-import { CalendarClock, Mail, Repeat, Target, Trophy } from 'lucide-react';
+import { CalendarClock, Lightbulb, Mail, Repeat, Target, Trophy } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/components/ui/card';
@@ -34,6 +34,12 @@ const KINDS: Array<{ key: Key; icon: ReactNode; label: string; hint: string }> =
     icon: <Trophy />,
     label: 'Goals reached',
     hint: 'When a savings goal hits its target.',
+  },
+  {
+    key: 'insights',
+    icon: <Lightbulb />,
+    label: 'Heads-ups',
+    hint: 'When upcoming bills could take an account below zero, or a subscription’s price changes.',
   },
 ];
 

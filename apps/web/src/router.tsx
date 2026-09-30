@@ -137,6 +137,16 @@ const reportsRoute = createRoute({
   component: lazyRouteComponent(() => import('./features/reports/reports-page'), 'ReportsPage'),
 });
 
+const insightsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/insights',
+  validateSearch: z.object({
+    days: z.union([z.literal(30), z.literal(60), z.literal(90)]).optional(),
+    accountIds: z.string().optional(),
+  }),
+  component: lazyRouteComponent(() => import('./features/insights/insights-page'), 'InsightsPage'),
+});
+
 const accountsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/accounts',
@@ -215,6 +225,7 @@ const routeTree = rootRoute.addChildren([
     transactionsRoute,
     budgetsRoute,
     reportsRoute,
+    insightsRoute,
     accountsRoute,
     accountRoute,
     importRoute,

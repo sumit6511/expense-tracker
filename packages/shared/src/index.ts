@@ -11,6 +11,7 @@ export * from './ledger';
 export * from './members';
 export * from './money';
 export * from './notifications';
+export * from './patterns';
 export * from './periods';
 export * from './presets';
 export * from './recurrence';
