@@ -1,7 +1,18 @@
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { Database, Hash, Landmark, Settings2, Tags, UserRound, Users, Wand2 } from 'lucide-react';
+import {
+  Bell,
+  Database,
+  Hash,
+  Landmark,
+  Settings2,
+  Tags,
+  UserRound,
+  Users,
+  Wand2,
+} from 'lucide-react';
 import { PageHeader } from '@/components/page';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/menu';
+import { NotificationSettings } from '@/features/notifications/notification-settings';
 import { RulesSettings } from '@/features/rules/rules-settings';
 import { CategoriesSettings } from './categories-settings';
 import { DataSettings } from './data-settings';
@@ -10,7 +21,16 @@ import { PayeesSettings, TagsSettings } from './labels-settings';
 import { ProfileSettings } from './profile-settings';
 import { RatesSettings } from './rates-settings';
 
-type Tab = 'general' | 'categories' | 'payees' | 'tags' | 'rules' | 'rates' | 'data' | 'profile';
+type Tab =
+  | 'general'
+  | 'categories'
+  | 'payees'
+  | 'tags'
+  | 'rules'
+  | 'rates'
+  | 'notifications'
+  | 'data'
+  | 'profile';
 
 export function SettingsPage() {
   const search = useSearch({ from: '/app/settings' });
@@ -42,6 +62,9 @@ export function SettingsPage() {
           <TabsTrigger value="rates">
             <Landmark /> Exchange rates
           </TabsTrigger>
+          <TabsTrigger value="notifications">
+            <Bell /> Notifications
+          </TabsTrigger>
           <TabsTrigger value="data">
             <Database /> Data
           </TabsTrigger>
@@ -66,6 +89,9 @@ export function SettingsPage() {
         </TabsContent>
         <TabsContent value="rates">
           <RatesSettings />
+        </TabsContent>
+        <TabsContent value="notifications">
+          <NotificationSettings />
         </TabsContent>
         <TabsContent value="data">
           <DataSettings />

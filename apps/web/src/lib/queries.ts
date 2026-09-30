@@ -27,8 +27,11 @@ import type {
   ImportProfile,
   ImportRow,
   ListTransactionsQuery,
+  MarkNotificationsRead,
   Me,
   NetWorthSeries,
+  NotificationList,
+  NotificationSettings,
   Payee,
   ReconcileState,
   Reconciliation,
@@ -51,6 +54,7 @@ import type {
   UpdateAccountInput,
   UpdateCategoryInput,
   UpdateMeInput,
+  UpdateNotificationPrefs,
   UpdateTransactionInput,
   UpdateWorkspaceInput,
   Workspace,
@@ -709,3 +713,66 @@ export const useFinishReconcile = () =>
       body: input,
     }),
   );
+
+// ---------------------------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------------------------
+
+/** Your notifications in this workspace; the server checks for new ones on each fetch. */
+export function useNotifications() {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'notifications'],
+    queryFn: () => api<NotificationList>(`${base}/notifications`),
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+  });
+}
+
+export function useMarkNotificationsRead() {
+  const { wid } = useWs();
+  const qc = useQueryClient();
+  const key = [...wsKey(wid), 'notifications'];
+  return useMutation({
+    mutationFn: (input: MarkNotificationsRead) =>
+      api<{ updated: number }>('/me/notifications/read', { method: 'POST', body: input }),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<NotificationList>(key);
+      if (previous) {
+        const items = previous.items.map((n) =>
+          !input.ids || input.ids.includes(n.id) ? { ...n, read: true } : n,
+        );
+        const newlyRead = previous.items.filter(
+          (n) => !n.read && (!input.ids || input.ids.includes(n.id)),
+        ).length;
+        qc.setQueryData<NotificationList>(key, {
+          items,
+          unreadCount: input.ids ? Math.max(0, previous.unreadCount - newlyRead) : 0,
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previous) qc.setQueryData(key, context.previous);
+    },
+  });
+}
+
+const notificationSettingsKey = ['notification-settings'] as const;
+
+export function useNotificationSettings() {
+  return useQuery({
+    queryKey: notificationSettingsKey,
+    queryFn: () => api<NotificationSettings>('/me/notification-settings'),
+  });
+}
+
+export function useUpdateNotificationSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateNotificationPrefs) =>
+      api<NotificationSettings>('/me/notification-settings', { method: 'PATCH', body: input }),
+    onSuccess: (settings) => qc.setQueryData(notificationSettingsKey, settings),
+  });
+}

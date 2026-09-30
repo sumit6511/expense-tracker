@@ -238,6 +238,34 @@ test.describe('everyday use', () => {
     await expect(page.getByText('25% there')).toBeVisible();
   });
 
+  test('a budget running low shows up under the bell', async ({ signedIn: page }) => {
+    await page.keyboard.press('n');
+    await page.getByRole('dialog').getByLabel('Amount').fill('9500');
+    await page.getByRole('dialog').getByRole('button', { name: 'Food & Groceries' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Expense added')).toBeVisible();
+    await page.goto('/budgets');
+    const budget = page.getByLabel('Budget for Food & Groceries');
+    await budget.fill('10000');
+    await budget.press('Enter');
+    await expect(page.getByText('Rs. 500 left')).toBeVisible();
+
+    const bell = page.getByRole('button', { name: 'Notifications, 1 unread' });
+    await expect(bell).toBeVisible();
+    await bell.click();
+    await page.getByRole('button', { name: /Food & Groceries budget is almost used/ }).click();
+    await expect(page).toHaveURL(/\/budgets$/);
+    await expect(page.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible();
+
+    await page.goto('/settings?tab=notifications');
+    const toggle = page.getByRole('switch', { name: /Budgets running low/ });
+    await expect(toggle).toBeChecked();
+    await toggle.click();
+    await expect(toggle).not.toBeChecked();
+    await page.reload();
+    await expect(page.getByRole('switch', { name: /Budgets running low/ })).not.toBeChecked();
+  });
+
   test('attach a receipt, mark pending, then reconcile the account', async ({ signedIn: page }) => {
     await page.keyboard.press('n');
     const dialog = page.getByRole('dialog');

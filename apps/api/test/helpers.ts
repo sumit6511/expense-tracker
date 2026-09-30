@@ -5,6 +5,7 @@ import { createAuth } from '../src/auth';
 import { createDb } from '../src/db/client';
 import { loadEnv } from '../src/env';
 import { createLogger } from '../src/logger';
+import type { Mail, Mailer } from '../src/mailer';
 
 export const ORIGIN = 'http://localhost:5173';
 
@@ -23,8 +24,15 @@ function build() {
   const logger = createLogger(env.LOG_LEVEL, false);
   const { db, pool } = createDb(env.DATABASE_URL, 5);
   const auth = createAuth(db, env);
-  const app = createApp({ db, env, auth, logger });
-  return { app, db, pool, env };
+  // Keeps sent email in memory so tests can read it.
+  const outbox: Mail[] = [];
+  const mailer: Mailer = {
+    async send(mail) {
+      outbox.push(mail);
+    },
+  };
+  const app = createApp({ db, env, auth, logger, mailer });
+  return { app, db, pool, env, mailer, outbox };
 }
 
 /** One app + pool per test file. */
@@ -113,7 +121,7 @@ export async function signUp(
 }
 
 export interface Fixture {
-  client: Client & { userId: string };
+  client: Client & { userId: string; email: string };
   ws: Workspace;
   base: string;
   accounts: Record<string, string>;

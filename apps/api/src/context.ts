@@ -3,12 +3,15 @@ import type { Auth } from './auth';
 import type { Db } from './db/client';
 import type { Env } from './env';
 import type { Logger } from './logger';
+import type { Mailer } from './mailer';
 
 export interface Deps {
   db: Db;
   env: Env;
   auth: Auth;
   logger: Logger;
+  /** Null when SMTP isn't configured. */
+  mailer: Mailer | null;
 }
 
 export interface SessionUser {

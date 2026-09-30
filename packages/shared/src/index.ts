@@ -9,6 +9,7 @@ export * from './import';
 export * from './insights';
 export * from './ledger';
 export * from './money';
+export * from './notifications';
 export * from './periods';
 export * from './presets';
 export * from './recurrence';

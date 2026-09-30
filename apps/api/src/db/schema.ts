@@ -602,6 +602,61 @@ export const goals = pgTable(
 );
 
 // ---------------------------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------------------------
+
+export const notificationKindEnum = pgEnum('notification_kind', [
+  'bill',
+  'budget',
+  'recurring',
+  'goal',
+]);
+
+/** One notification for one person in one workspace. */
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    kind: notificationKindEnum().notNull(),
+    title: text().notNull(),
+    body: text().notNull().default(''),
+    /** In-app path to open, e.g. /recurring. */
+    link: text(),
+    /** The same event is never announced twice (e.g. "bill:<series>:<date>"). */
+    dedupeKey: text().notNull(),
+    readAt: timestamp({ withTimezone: true }),
+    emailedAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex().on(t.userId, t.workspaceId, t.dedupeKey),
+    index().on(t.userId, t.workspaceId, t.createdAt),
+  ],
+);
+
+/** What each person wants to hear about, and whether by email too. */
+export const notificationPrefs = pgTable('notification_prefs', {
+  userId: text()
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  email: boolean().notNull().default(false),
+  bills: boolean().notNull().default(true),
+  budgets: boolean().notNull().default(true),
+  recurring: boolean().notNull().default(true),
+  goals: boolean().notNull().default(true),
+  updatedAt: timestamp({ withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+// ---------------------------------------------------------------------------------------------
 // Exchange rates
 // ---------------------------------------------------------------------------------------------
 

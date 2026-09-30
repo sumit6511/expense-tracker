@@ -24,6 +24,7 @@ import { badRequest, conflict, notFound } from '../lib/errors';
 import type { Logger } from '../logger';
 import { requireAccount } from './accounts';
 import { assertCategoriesExist } from './categories';
+import { deliver, recordedCandidate } from './notifications';
 import { findOrCreatePayee } from './payees';
 import { loadRateBook } from './rates';
 import { assertTagsExist } from './tags';
@@ -431,7 +432,12 @@ export async function skipOccurrence(db: Db, ws: WorkspaceCtx, id: string) {
  */
 export async function postDueRecurring(db: Db, logger?: Logger, now: Date = new Date()) {
   const due = await db
-    .select({ id: recurring.id, workspaceId: recurring.workspaceId, timezone: workspaces.timezone })
+    .select({
+      id: recurring.id,
+      workspaceId: recurring.workspaceId,
+      timezone: workspaces.timezone,
+      calendar: workspaces.calendar,
+    })
     .from(recurring)
     .innerJoin(workspaces, eq(workspaces.id, recurring.workspaceId))
     .where(
@@ -445,7 +451,7 @@ export async function postDueRecurring(db: Db, logger?: Logger, now: Date = new 
   let posted = 0;
   for (const item of due) {
     try {
-      posted += await db.transaction(async (tx) => {
+      const done = await db.transaction(async (tx) => {
         let r = await requireRow(tx, item.workspaceId, item.id, true);
         const today = await tx
           .execute<{ d: string }>(
@@ -463,8 +469,27 @@ export async function postDueRecurring(db: Db, logger?: Logger, now: Date = new 
           r = { ...r, ...next, lastPostedDate: r.nextDate };
           n++;
         }
-        return n;
+        return { n, r };
       });
+      posted += done.n;
+      if (done.n > 0) {
+        const [account] = await db
+          .select({ currency: accounts.currency })
+          .from(accounts)
+          .where(eq(accounts.id, done.r.accountId));
+        await deliver(db, item.workspaceId, [
+          recordedCandidate({
+            recurringId: done.r.id,
+            name: done.r.name,
+            kind: done.r.kind,
+            count: done.n,
+            lastDate: done.r.lastPostedDate!,
+            amountMinor: done.r.amountMinor,
+            currency: account?.currency ?? 'NPR',
+            calendar: item.calendar,
+          }),
+        ]);
+      }
     } catch (err) {
       // e.g. the account was archived: leave it due so the person sees it.
       logger?.warn({ err, recurringId: item.id }, 'could not record recurring transaction');

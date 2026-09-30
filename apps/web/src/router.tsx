@@ -168,7 +168,17 @@ const settingsRoute = createRoute({
   path: '/settings',
   validateSearch: z.object({
     tab: z
-      .enum(['general', 'categories', 'payees', 'tags', 'rules', 'rates', 'data', 'profile'])
+      .enum([
+        'general',
+        'categories',
+        'payees',
+        'tags',
+        'rules',
+        'rates',
+        'notifications',
+        'data',
+        'profile',
+      ])
       .optional(),
   }),
   component: lazyRouteComponent(() => import('./features/settings/settings-page'), 'SettingsPage'),

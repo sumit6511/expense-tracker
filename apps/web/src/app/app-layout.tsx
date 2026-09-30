@@ -36,6 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/menu';
+import { NotificationBell } from '@/features/notifications/notification-bell';
 import { RecurringDialogProvider } from '@/features/recurring/recurring-dialog';
 import { RuleDialogProvider } from '@/features/rules/rule-dialog';
 import {
@@ -189,7 +190,12 @@ function Shell() {
     <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_1fr]">
       {/* Sidebar (desktop) */}
       <aside className="sticky top-0 hidden h-dvh flex-col border-r bg-card/50 px-3 py-4 lg:flex">
-        <WorkspaceMenu />
+        <div className="flex items-center gap-1">
+          <div className="min-w-0 flex-1">
+            <WorkspaceMenu />
+          </div>
+          <NotificationBell />
+        </div>
         {canWrite && (
           <Button className="mt-4 w-full justify-start" onClick={() => openNew()}>
             <Plus /> New transaction
@@ -237,10 +243,10 @@ function Shell() {
       <div className="min-w-0 pb-24 lg:pb-8">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/85 px-4 backdrop-blur lg:hidden">
           <WorkspaceMenu compact />
+          <NotificationBell align="end" className="ml-auto" />
           <Button
             variant="ghost"
             size="icon"
-            className="ml-auto"
             aria-label="Search"
             onClick={() => setPaletteOpen(true)}
           >
