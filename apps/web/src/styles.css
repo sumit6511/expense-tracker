@@ -1,0 +1,156 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Design tokens. Calm neutrals with a deep teal accent. Spending is shown in the normal text
+ * colour; green marks money coming in; amber and red are reserved for budgets that need attention,
+ * so the app informs rather than scolds.
+ */
+:root {
+  --background: oklch(0.985 0.003 247);
+  --foreground: oklch(0.2 0.02 262);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--foreground);
+  --muted: oklch(0.965 0.004 255);
+  --muted-foreground: oklch(0.5 0.02 258);
+  --border: oklch(0.92 0.006 255);
+  --input: oklch(0.88 0.008 255);
+  --primary: oklch(0.51 0.086 186);
+  --primary-foreground: oklch(0.985 0.01 180);
+  --accent: oklch(0.96 0.02 180);
+  --accent-foreground: oklch(0.36 0.07 186);
+  --secondary: oklch(0.955 0.006 255);
+  --secondary-foreground: oklch(0.25 0.02 262);
+  --positive: oklch(0.55 0.14 152);
+  --warning: oklch(0.7 0.15 65);
+  --destructive: oklch(0.577 0.2 27);
+  --destructive-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.51 0.086 186 / 0.45);
+  /* Chart series: validated categorical slots (blue, orange), CVD-safe on the card surface. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --chart-grid: #eceef1;
+  --chart-axis: #c9ced6;
+  --chart-reference: #6b7280;
+  --radius: 0.75rem;
+}
+
+.dark {
+  --background: oklch(0.155 0.012 262);
+  --foreground: oklch(0.95 0.005 255);
+  --card: oklch(0.195 0.014 262);
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.215 0.015 262);
+  --popover-foreground: var(--foreground);
+  --muted: oklch(0.245 0.015 262);
+  --muted-foreground: oklch(0.7 0.015 258);
+  --border: oklch(0.29 0.016 262);
+  --input: oklch(0.34 0.016 262);
+  --primary: oklch(0.72 0.12 182);
+  --primary-foreground: oklch(0.18 0.03 190);
+  --accent: oklch(0.27 0.04 186);
+  --accent-foreground: oklch(0.9 0.06 180);
+  --secondary: oklch(0.26 0.015 262);
+  --secondary-foreground: oklch(0.93 0.005 255);
+  --positive: oklch(0.74 0.15 152);
+  --warning: oklch(0.8 0.14 75);
+  --destructive: oklch(0.66 0.2 25);
+  --destructive-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.72 0.12 182 / 0.5);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --chart-grid: #222731;
+  --chart-axis: #3a404c;
+  --chart-reference: #9aa1ad;
+}
+
+@theme inline {
+  --font-sans:
+    "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans Devanagari",
+    sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-positive: var(--positive);
+  --color-warning: var(--warning);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-ring: var(--ring);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --animate-in: fade-in 150ms ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      /* biome-ignore lint/complexity/noImportantStyles: reduced motion must beat every component style */
+      animation-duration: 0.01ms !important;
+      /* biome-ignore lint/complexity/noImportantStyles: as above */
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}

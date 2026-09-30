@@ -26,7 +26,13 @@
         "noExplicitAny": "error"
       },
       "a11y": {
-        "noSvgWithoutTitle": "off"
+        "noSvgWithoutTitle": "off",
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": {
+            "inputComponents": ["Checkbox", "Switch", "Input", "NativeSelect", "Textarea"]
+          }
+        }
       }
     }
   },

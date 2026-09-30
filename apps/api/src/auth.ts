@@ -2,8 +2,9 @@ import { uuidv7 } from '@et/shared';
 import { hash, verify } from '@node-rs/argon2';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { sql } from 'drizzle-orm';
 import type { Db } from './db/client';
-import { account, session, user, verification } from './db/schema';
+import { account, session, user, verification, workspaceMembers, workspaces } from './db/schema';
 import type { Env } from './env';
 
 // OWASP-recommended Argon2id parameters (19 MiB memory, 2 iterations).
@@ -35,7 +36,19 @@ export function createAuth(db: Db, env: Env) {
       expiresIn: 60 * 60 * 24 * 30, // 30 days
       updateAge: 60 * 60 * 24, // refresh expiry at most once a day
     },
-    user: { deleteUser: { enabled: true } },
+    user: {
+      deleteUser: {
+        enabled: true,
+        // Workspaces nobody else belongs to would be orphaned: delete them with the user.
+        beforeDelete: async (deleted) => {
+          await db.execute(sql`
+            delete from ${workspaces} w
+            where w.id in (select workspace_id from ${workspaceMembers} where user_id = ${deleted.id})
+              and (select count(*) from ${workspaceMembers} m where m.workspace_id = w.id) = 1
+          `);
+        },
+      },
+    },
     rateLimit: {
       enabled: env.NODE_ENV !== 'test',
       window: 60,
