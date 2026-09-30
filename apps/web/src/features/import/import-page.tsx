@@ -8,6 +8,9 @@ import {
   type ImportPreview,
   type NormalizedRow,
   normalizeRows,
+  type ParsedStatement,
+  parseBankSms,
+  parseStatementFile,
   toIsoDate,
 } from '@et/shared';
 import { Link } from '@tanstack/react-router';
@@ -17,6 +20,7 @@ import {
   CircleCheck,
   FileSpreadsheet,
   Loader2,
+  MessageSquareText,
   Save,
   Undo2,
   Upload,
@@ -30,7 +34,7 @@ import { CategoryPicker } from '@/components/pickers';
 import { Button } from '@/components/ui/button';
 import { Badge, Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/dialog';
-import { Field, Input, NativeSelect } from '@/components/ui/input';
+import { Field, Input, NativeSelect, Textarea } from '@/components/ui/input';
 import { Checkbox, Segmented } from '@/components/ui/menu';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
@@ -49,13 +53,27 @@ import { cn } from '@/lib/utils';
 
 type Step = 'upload' | 'map' | 'review' | 'done';
 
+type Source = 'csv' | 'xlsx' | 'ofx' | 'qif' | 'camt' | 'sms';
+
 interface ParsedFile {
   name: string;
-  source: 'csv' | 'xlsx';
+  source: Source;
+  /** Table cells, for CSV and Excel (mapped to fields in the next step). */
   rows: string[][];
+  /** Rows already read from a structured format (OFX, QIF, CAMT, SMS): no mapping needed. */
+  structured?: Pick<ParsedStatement, 'rows' | 'errors' | 'currency' | 'balance'>;
 }
 
-async function parseFile(file: File): Promise<ParsedFile> {
+const FORMAT_NAMES: Record<Source, string> = {
+  csv: 'CSV',
+  xlsx: 'Excel',
+  ofx: 'OFX',
+  qif: 'QIF',
+  camt: 'CAMT.053',
+  sms: 'SMS',
+};
+
+async function parseFile(file: File, digits: number): Promise<ParsedFile> {
   const lower = file.name.toLowerCase();
   if (lower.endsWith('.xlsx')) {
     const { readSheet } = await import('read-excel-file/browser');
@@ -80,8 +98,14 @@ async function parseFile(file: File): Promise<ParsedFile> {
       'Old .xls files aren’t supported. Open the file in Excel or Google Sheets and save it as .xlsx or .csv.',
     );
   }
-  const Papa = (await import('papaparse')).default;
   const text = await file.text();
+  const statement = parseStatementFile(text, digits, file.name);
+  if (statement) {
+    if (statement.rows.length === 0)
+      throw new Error(`No transactions found in this ${FORMAT_NAMES[statement.format]} file.`);
+    return { name: file.name, source: statement.format, rows: [], structured: statement };
+  }
+  const Papa = (await import('papaparse')).default;
   const result = Papa.parse<string[]>(text.replace(/^﻿/, ''), { skipEmptyLines: 'greedy' });
   if (result.data.length === 0) throw new Error('The file looks empty.');
   return {
@@ -150,6 +174,8 @@ export function ImportPage() {
   const [result, setResult] = useState<ImportBatch | null>(null);
   const [dragging, setDragging] = useState(false);
   const [profileName, setProfileName] = useState('');
+  const [mode, setMode] = useState<'file' | 'sms'>('file');
+  const [smsText, setSmsText] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   const account = accountMap.get(accountId);
@@ -175,14 +201,38 @@ export function ImportPage() {
   async function onFile(selected: File | undefined) {
     if (!selected) return;
     try {
-      const parsed = await parseFile(selected);
+      const parsed = await parseFile(selected, digits);
       setFile(parsed);
+      if (parsed.structured) {
+        await startReview(parsed.structured.rows);
+        return;
+      }
       const guess = guessMapping(parsed.rows);
       setMapping({ hasHeader: true, ...guess });
       setStep('map');
     } catch (err) {
       toast.error(errorMessage(err));
     }
+  }
+
+  async function onSms() {
+    const { rows, unreadable } = parseBankSms(smsText, { today: f.today, digits });
+    if (rows.length === 0) {
+      toast.error('No transactions found. Paste the alert messages exactly as you received them.');
+      return;
+    }
+    if (unreadable.length)
+      toast.warning(
+        `${unreadable.length} message${unreadable.length === 1 ? '' : 's'} didn’t look like a transaction and ${unreadable.length === 1 ? 'was' : 'were'} skipped.`,
+      );
+    const parsed: ParsedFile = {
+      name: 'SMS alerts',
+      source: 'sms',
+      rows: [],
+      structured: { rows, errors: [], currency: null, balance: null },
+    };
+    setFile(parsed);
+    await startReview(rows);
   }
 
   function onDrop(e: DragEvent) {
@@ -192,9 +242,14 @@ export function ImportPage() {
   }
 
   async function goReview() {
-    if (!normalized || normalized.rows.length === 0 || !accountId) return;
+    if (!normalized || normalized.rows.length === 0) return;
+    await startReview(normalized.rows);
+  }
+
+  async function startReview(source: NormalizedRow[]) {
+    if (!accountId) return;
     try {
-      const rows = normalized.rows.map((r) => ({
+      const rows = source.map((r) => ({
         date: r.date,
         amountMinor: r.amountMinor,
         payee: r.payee,
@@ -203,7 +258,7 @@ export function ImportPage() {
         externalId: r.externalId,
       }));
       const res = await preview.mutateAsync({ accountId, rows });
-      setReview({ rows: normalized.rows, preview: res });
+      setReview({ rows: source, preview: res });
       setInclude(res.rows.map((r) => r.duplicateOfId === null));
       setCategories(res.rows.map((r) => r.suggestedCategoryId));
       setStep('review');
@@ -219,7 +274,7 @@ export function ImportPage() {
         accountId,
         fileName: file.name,
         source: file.source,
-        mapping: mapping as ImportMapping,
+        ...(file.structured ? {} : { mapping: mapping as ImportMapping }),
         rows: review.rows.map((r, i) => ({
           date: r.date,
           amountMinor: r.amountMinor,
@@ -258,7 +313,7 @@ export function ImportPage() {
     <div className="pb-10">
       <PageHeader
         title="Import a statement"
-        description="Bring in transactions from your bank, card or wallet (eSewa, Khalti…) as CSV or Excel."
+        description="Bring in transactions from your bank, card or wallet (eSewa, Khalti…): a statement file, or the alert SMS messages you received."
       />
       <ol className="mb-5 flex gap-2" aria-label="Import steps">
         {steps.map(([s, label], i) => (
@@ -299,33 +354,71 @@ export function ImportPage() {
                 ))}
               </NativeSelect>
             </Field>
-            <button
-              type="button"
-              disabled={!accountId}
-              onClick={() => inputRef.current?.click()}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragging(true);
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={onDrop}
-              className={cn(
-                'flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-                dragging ? 'border-primary bg-accent' : 'hover:bg-muted/50',
-              )}
-            >
-              <FileSpreadsheet className="size-8 text-primary" />
-              <span className="font-medium">
-                {accountId ? 'Drop a file here, or click to choose' : 'Choose an account first'}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                .xlsx or .csv · the file is read on your device
-              </span>
-            </button>
+            <Segmented
+              label="Import from"
+              className="w-full sm:w-auto sm:justify-self-start"
+              value={mode}
+              onChange={setMode}
+              options={[
+                { value: 'file', label: 'Statement file' },
+                { value: 'sms', label: 'Paste SMS alerts' },
+              ]}
+            />
+            {mode === 'sms' ? (
+              <div className="grid grid-cols-1 gap-3">
+                <Field
+                  label="Alert messages"
+                  htmlFor="imp-sms"
+                  hint="Copy the debit/credit alerts from your bank or wallet and paste them here, separated by blank lines. They’re read on your device."
+                >
+                  <Textarea
+                    id="imp-sms"
+                    value={smsText}
+                    onChange={(e) => setSmsText(e.target.value)}
+                    rows={8}
+                    placeholder={
+                      'Dear Customer, your A/C 01XXXX456 has been debited by NPR 2,500.00 on 15/09/2026. Remarks: POS/BHAT BHATENI…\n\nYou have paid Rs. 250 to Momo Hut via Khalti. Txn ID: …'
+                    }
+                  />
+                </Field>
+                <Button
+                  className="justify-self-start"
+                  onClick={onSms}
+                  disabled={!accountId || !smsText.trim() || preview.isPending}
+                >
+                  {preview.isPending ? <Loader2 className="animate-spin" /> : <MessageSquareText />}{' '}
+                  {accountId ? 'Read messages' : 'Choose an account first'}
+                </Button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={!accountId}
+                onClick={() => inputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={onDrop}
+                className={cn(
+                  'flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                  dragging ? 'border-primary bg-accent' : 'hover:bg-muted/50',
+                )}
+              >
+                <FileSpreadsheet className="size-8 text-primary" />
+                <span className="font-medium">
+                  {accountId ? 'Drop a file here, or click to choose' : 'Choose an account first'}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  Excel, CSV, OFX/QFX, QIF or CAMT.053 · the file is read on your device
+                </span>
+              </button>
+            )}
             <input
               ref={inputRef}
               type="file"
-              accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              accept=".csv,.xlsx,.ofx,.qfx,.qif,.xml,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/x-ofx,application/xml,text/xml"
               className="hidden"
               onChange={(e) => {
                 onFile(e.target.files?.[0]);
@@ -622,6 +715,12 @@ export function ImportPage() {
 
       {canWrite && step === 'review' && review && (
         <div className="grid grid-cols-1 gap-4">
+          {file?.structured?.currency && file.structured.currency !== currency && (
+            <p className="rounded-lg bg-warning/10 px-3 py-2 text-sm" role="alert">
+              This statement is in {file.structured.currency}, but {account?.name} is in {currency}.
+              Check you picked the right account.
+            </p>
+          )}
           <Card className="overflow-hidden">
             <CardHeader>
               <CardTitle>
@@ -631,6 +730,8 @@ export function ImportPage() {
               <span className="text-xs text-muted-foreground">
                 {review.preview.rows.filter((r) => r.duplicateOfId).length} look like transactions
                 you already have
+                {file?.structured?.balance &&
+                  ` · statement closing balance ${f.money(file.structured.balance.amountMinor, currency)}`}
               </span>
             </CardHeader>
             <div className="overflow-x-auto">

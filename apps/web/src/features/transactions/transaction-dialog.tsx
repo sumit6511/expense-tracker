@@ -48,6 +48,7 @@ import {
 import { canMakeRule, ruleFromTransaction, useRuleDialog } from '@/features/rules/rule-dialog';
 import { ApiError, errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
+import { isOffline, outbox } from '@/lib/outbox';
 import {
   useAccountMap,
   useAccounts,
@@ -62,7 +63,7 @@ import {
   useUpdateTransfer,
   useUploadAttachment,
 } from '@/lib/queries';
-import { useCanWrite } from '@/lib/session';
+import { useCanWrite, useWorkspace } from '@/lib/session';
 import { cn, storage } from '@/lib/utils';
 import { TransactionHistory } from './history';
 import { ReceiptsField, uploadAll } from './receipts';
@@ -197,6 +198,7 @@ function EditorForm({
   const categoryMap = useCategoryMap();
   const { data: groups = [] } = useCategories();
   const { openRecurring } = useRecurringDialog();
+  const ws = useWorkspace();
 
   const isEdit = existing !== null;
   const isTransfer = existing?.transfer != null;
@@ -418,15 +420,30 @@ function EditorForm({
               }),
           });
         } else {
-          const created = await createTx.mutateAsync({ id: uuidv7(), ...common });
-          if (queuedFiles.length) await uploadAll(upload, created.id, queuedFiles);
-          toast.success(mode === 'expense' ? 'Expense added' : 'Income added', {
-            description: `${f.money(sign * parsed, currency)}${payee.trim() ? ` · ${payee.trim()}` : ''}`,
-            action: {
-              label: 'Undo',
-              onClick: () => deleteTx.mutate(created.id),
-            },
-          });
+          const body = { id: uuidv7(), ...common };
+          const summary = `${f.money(sign * parsed, currency)}${payee.trim() ? ` · ${payee.trim()}` : ''}`;
+          let created: Transaction | null = null;
+          try {
+            created = navigator.onLine ? await createTx.mutateAsync(body) : null;
+          } catch (err) {
+            if (!isOffline(err)) throw err;
+          }
+          if (created) {
+            const id = created.id;
+            if (queuedFiles.length) await uploadAll(upload, id, queuedFiles);
+            toast.success(mode === 'expense' ? 'Expense added' : 'Income added', {
+              description: summary,
+              action: { label: 'Undo', onClick: () => deleteTx.mutate(id) },
+            });
+          } else {
+            // Offline: keep it on this device and send it when the connection is back.
+            outbox.add({ id: body.id, workspaceId: ws.id, body });
+            toast.success('Saved on this device', {
+              description: `${summary} · it syncs when you’re back online`,
+            });
+            if (queuedFiles.length)
+              toast.warning('Receipts need a connection. Add them once it has synced.');
+          }
         }
       }
       storage.set(LAST_ACCOUNT_KEY, accountId);

@@ -259,7 +259,15 @@ export const transactionStatusEnum = pgEnum('transaction_status', [
   'reconciled',
 ]);
 
-export const importSourceEnum = pgEnum('import_source', ['csv', 'xlsx', 'backup']);
+export const importSourceEnum = pgEnum('import_source', [
+  'csv',
+  'xlsx',
+  'backup',
+  'ofx',
+  'qif',
+  'camt',
+  'sms',
+]);
 
 export const importBatches = pgTable(
   'import_batches',

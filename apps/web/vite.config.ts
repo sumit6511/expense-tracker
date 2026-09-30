@@ -33,10 +33,28 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Cache the app shell; API data is never cached by the service worker.
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
+        // So the app opens and quick add works offline, keep the last copy of the reference data
+        // it needs (who you are, accounts, categories, payees, tags). Transactions, reports and
+        // receipts are never cached. Signing out deletes this cache (see lib/offline.ts).
+        runtimeCaching: [
+          {
+            urlPattern: ({ url, request }) =>
+              request.method === 'GET' &&
+              /^\/api\/v1\/(me|workspaces\/[^/]+\/(accounts|categories|payees|tags))$/.test(
+                url.pathname,
+              ),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'et-reference-data',
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 50, maxAgeSeconds: 30 * 24 * 3600 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+        ],
       },
     }),
   ],

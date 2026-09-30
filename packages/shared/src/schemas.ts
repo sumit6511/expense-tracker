@@ -684,7 +684,7 @@ export { MappingSchema as ImportMappingSchema };
 export const CommitImportSchema = z.object({
   accountId: Id,
   fileName: OptionalText(200).default('import'),
-  source: z.enum(['csv', 'xlsx']),
+  source: z.enum(['csv', 'xlsx', 'ofx', 'qif', 'camt', 'sms']),
   mapping: MappingSchema.optional(),
   rows: z
     .array(

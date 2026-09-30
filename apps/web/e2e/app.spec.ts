@@ -275,6 +275,57 @@ test.describe('everyday use', () => {
     await expect(page.getByText(/Reconciled through/).first()).toBeVisible();
   });
 
+  test('import an OFX statement and pasted SMS alerts', async ({ signedIn: page }) => {
+    await page.goto('/import');
+    await page.getByLabel('Import into account').selectOption({ label: 'Nabil Bank (NPR)' });
+    const ofx = [
+      'OFXHEADER:100',
+      '<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><CURDEF>NPR',
+      '<BANKTRANLIST>',
+      '<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20260915<TRNAMT>-2450.00<FITID>F1<NAME>BHAT BHATENI</STMTTRN>',
+      '<STMTTRN><TRNTYPE>CREDIT<DTPOSTED>20260916<TRNAMT>85000<FITID>F2<NAME>SALARY</STMTTRN>',
+      '</BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>',
+    ].join('\n');
+    await page.locator('input[type=file]').setInputFiles({
+      name: 'nabil.ofx',
+      mimeType: 'application/x-ofx',
+      buffer: Buffer.from(ofx),
+    });
+    // No column matching for OFX: straight to review.
+    await expect(page.getByText('2 of 2 will be imported into Nabil Bank')).toBeVisible();
+    await page.getByRole('button', { name: 'Import 2 transactions' }).click();
+    await expect(page.getByRole('heading', { name: 'Imported 2 transactions' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Import another file' }).click();
+    await page.getByRole('button', { name: 'Paste SMS alerts' }).click();
+    await page
+      .getByLabel('Alert messages')
+      .fill(
+        'Dear Customer, your A/C 01XXXX456 has been debited by NPR 1,200.00 on 20/09/2026. Remarks: FONEPAY/QR/HIMALAYAN JAVA. Bal: NPR 10,000.00\n\nHello, not an alert',
+      );
+    await page.getByRole('button', { name: 'Read messages' }).click();
+    await expect(page.getByText('1 of 1 will be imported into Nabil Bank')).toBeVisible();
+    await expect(page.getByText(/didn’t look like a transaction/)).toBeVisible();
+    await page.getByRole('button', { name: 'Import 1 transactions' }).click();
+    await expect(page.getByRole('heading', { name: 'Imported 1 transactions' })).toBeVisible();
+  });
+
+  test('add an expense offline; it syncs when back online', async ({ signedIn: page }) => {
+    await page.context().setOffline(true);
+    await page.keyboard.press('n');
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Amount').fill('340');
+    await dialog.getByLabel('Payee').fill('Tea stall');
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Saved on this device')).toBeVisible();
+    await expect(page.getByText(/1 transaction saved on this device/)).toBeVisible();
+
+    await page.context().setOffline(false);
+    await expect(page.getByText('Synced 1 transaction recorded offline')).toBeVisible();
+    await page.goto('/transactions');
+    await expect(page.getByRole('button', { name: /Tea stall/ })).toContainText('-Rs. 340.00');
+  });
+
   test('reports and settings pages load', async ({ signedIn: page }) => {
     await page.goto('/reports?tab=cashflow');
     await expect(page.getByText('Income and spending per month')).toBeVisible();

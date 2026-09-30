@@ -9,6 +9,7 @@ import { useConfirm } from '@/components/ui/dialog';
 import { Field, Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/menu';
 import { authApi, errorMessage } from '@/lib/api';
+import { clearOfflineData } from '@/lib/offline';
 import { useUpdateMe } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 
@@ -60,6 +61,7 @@ export function ProfileSettings() {
   }
 
   async function signOut() {
+    await clearOfflineData();
     await authApi.signOut().catch(() => undefined);
     queryClient.clear();
     navigate({ to: '/login', search: {} });

@@ -26,6 +26,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  useConfirm,
 } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -42,6 +43,8 @@ import {
   useTransactionDialog,
 } from '@/features/transactions/transaction-dialog';
 import { ApiError, authApi } from '@/lib/api';
+import { clearOfflineData } from '@/lib/offline';
+import { outbox } from '@/lib/outbox';
 import { useMeQuery, useReviewCounts } from '@/lib/queries';
 import {
   pickWorkspace,
@@ -52,6 +55,7 @@ import {
 } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { CommandPalette } from './command-palette';
+import { OutboxBanner } from './outbox-banner';
 
 interface NavItem {
   to: string;
@@ -244,6 +248,7 @@ function Shell() {
           </Button>
         </header>
         <main className="mx-auto w-full max-w-6xl px-4 pt-5 sm:px-6 lg:pt-8">
+          <OutboxBanner />
           <Outlet />
         </main>
       </div>
@@ -379,7 +384,19 @@ function UserMenu() {
   const { me } = useSession();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   async function signOut() {
+    const waiting = outbox.list().length;
+    if (waiting > 0) {
+      const ok = await confirm({
+        title: 'Sign out and discard unsynced transactions?',
+        description: `${waiting} transaction${waiting === 1 ? '' : 's'} recorded offline haven’t reached the server yet and will be lost.`,
+        confirmLabel: 'Sign out',
+        destructive: true,
+      });
+      if (!ok) return;
+    }
+    await clearOfflineData();
     await authApi.signOut().catch(() => undefined);
     queryClient.clear();
     navigate({ to: '/login', search: {} });
