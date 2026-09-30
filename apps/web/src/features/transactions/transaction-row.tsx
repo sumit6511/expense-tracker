@@ -1,7 +1,8 @@
 import type { Transaction } from '@et/shared';
-import { ArrowLeftRight, Inbox, Repeat, Split } from 'lucide-react';
+import { ArrowLeftRight, Inbox, Lock, Paperclip, Repeat, Split } from 'lucide-react';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
+import { Badge } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/menu';
 import { useFormat } from '@/lib/format';
 import { useAccountMap, useCategoryMap, useTags } from '@/lib/queries';
@@ -95,6 +96,16 @@ export function TransactionRow({
             )}
             {tx.recurringId && (
               <Repeat className="size-3.5 shrink-0 text-muted-foreground" aria-label="Recurring" />
+            )}
+            {tx.attachmentCount > 0 && (
+              <Paperclip
+                className="size-3.5 shrink-0 text-muted-foreground"
+                aria-label={`${tx.attachmentCount} attachment${tx.attachmentCount === 1 ? '' : 's'}`}
+              />
+            )}
+            {tx.status === 'pending' && <Badge tone="warning">Pending</Badge>}
+            {tx.status === 'reconciled' && (
+              <Lock className="size-3 shrink-0 text-muted-foreground/70" aria-label="Reconciled" />
             )}
           </span>
           <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">

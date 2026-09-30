@@ -238,6 +238,43 @@ test.describe('everyday use', () => {
     await expect(page.getByText('25% there')).toBeVisible();
   });
 
+  test('attach a receipt, mark pending, then reconcile the account', async ({ signedIn: page }) => {
+    await page.keyboard.press('n');
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Amount').fill('1,000');
+    await dialog.getByLabel('Account').selectOption({ label: 'Nabil Bank' });
+    await dialog.getByLabel('Payee').fill('Daraz');
+    // A 1×1 PNG, queued until the expense is saved.
+    await page.locator('input[type=file]').setInputFiles({
+      name: 'receipt.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    });
+    await dialog.getByText('Pending').click();
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Expense added')).toBeVisible();
+
+    await page.goto('/transactions');
+    const row = page.getByRole('button', { name: /Daraz/ });
+    await expect(row).toContainText('Pending');
+    await expect(row.getByLabel('1 attachment')).toBeVisible();
+
+    await page.goto('/accounts');
+    await page.getByRole('link', { name: /Nabil Bank/ }).click();
+    await expect(page.getByText('1 pending')).toBeVisible();
+    await page.getByRole('button', { name: 'Reconcile' }).click();
+    // The statement shows the opening balance; the pending purchase isn't on it yet.
+    await page.getByLabel('Closing balance on the statement').fill('50,000');
+    await page.getByRole('button', { name: 'Next' }).click();
+    await expect(page.getByText('0 of 1 ticked')).toBeVisible();
+    await page.getByRole('button', { name: 'Finish' }).click();
+    await expect(page.getByText(/Nabil Bank reconciled through/)).toBeVisible();
+    await expect(page.getByText(/Reconciled through/).first()).toBeVisible();
+  });
+
   test('reports and settings pages load', async ({ signedIn: page }) => {
     await page.goto('/reports?tab=cashflow');
     await expect(page.getByText('Income and spending per month')).toBeVisible();

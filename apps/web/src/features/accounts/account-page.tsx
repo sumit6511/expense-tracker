@@ -5,6 +5,7 @@ import {
   ArchiveRestore,
   ArrowLeft,
   ArrowLeftRight,
+  CheckCheck,
   Ellipsis,
   Loader2,
   Pencil,
@@ -34,6 +35,7 @@ import { useFormat } from '@/lib/format';
 import { useAccounts, useDeleteAccount, useTransactions, useUpdateAccount } from '@/lib/queries';
 import { useCanWrite } from '@/lib/session';
 import { AccountFormDialog } from './account-form';
+import { ReconcileDialog } from './reconcile-dialog';
 
 export function AccountPage() {
   const { accountId } = useParams({ from: '/app/accounts/$accountId' });
@@ -46,6 +48,7 @@ export function AccountPage() {
   const update = useUpdateAccount();
   const remove = useDeleteAccount();
   const [editing, setEditing] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
   const account = accounts?.find((a) => a.id === accountId);
   const filters = useMemo(() => ({ accountIds: accountId }), [accountId]);
   const list = useTransactions(filters);
@@ -140,6 +143,17 @@ export function AccountPage() {
           {account.currency !== f.base && account.balanceBaseMinor !== null && (
             <p className="text-xs text-muted-foreground">≈ {f.money(account.balanceBaseMinor)}</p>
           )}
+          {account.pendingCount > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Cleared {f.money(account.clearedBalanceMinor, account.currency)} ·{' '}
+              {account.pendingCount} pending
+            </p>
+          )}
+          {account.reconciledThrough && (
+            <p className="text-xs text-muted-foreground">
+              Reconciled through {f.date(account.reconciledThrough, 'short')}
+            </p>
+          )}
         </div>
       </div>
 
@@ -164,6 +178,9 @@ export function AccountPage() {
               </Button>
             </>
           )}
+          <Button size="sm" variant="outline" onClick={() => setReconciling(true)}>
+            <CheckCheck /> Reconcile
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" variant="ghost" aria-label="More actions">
@@ -220,6 +237,9 @@ export function AccountPage() {
 
       <Dialog open={editing} onOpenChange={setEditing}>
         {editing && <AccountFormDialog account={account} onDone={() => setEditing(false)} />}
+      </Dialog>
+      <Dialog open={reconciling} onOpenChange={setReconciling}>
+        {reconciling && <ReconcileDialog account={account} onDone={() => setReconciling(false)} />}
       </Dialog>
     </div>
   );

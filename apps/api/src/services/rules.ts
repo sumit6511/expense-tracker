@@ -14,6 +14,7 @@ import type { WorkspaceCtx } from '../context';
 import type { Db, Executor } from '../db/client';
 import { accounts, categories, rules, tags } from '../db/schema';
 import { badRequest, notFound } from '../lib/errors';
+import { withAudit } from './audit';
 import { assertCategoriesExist } from './categories';
 import { findOrCreatePayee } from './payees';
 import { assertTagsExist } from './tags';
@@ -313,30 +314,37 @@ export async function applyRule(
       enabled: true,
     };
     const candidates = await loadCandidates(tx, ws.id);
-    const payeeIds = new Map<string, string | null>();
-    let updated = 0;
-    for (const c of candidates) {
-      if (onlyUncategorized && !isUncategorized(c)) continue;
+    const todo = candidates.flatMap((c) => {
+      if (onlyUncategorized && !isUncategorized(c)) return [];
       const result = evaluateRules([{ ...rule, enabled: true }], subjectOf(c));
-      if (result.matchedRuleIds.length === 0) continue;
-      const changes = diff(c, result);
-      if (!changes) continue;
-      const { payee, ...effects } = changes;
-      let payeeId: string | null | undefined;
-      if (payee !== undefined) {
-        payeeId = payeeIds.get(payee);
-        if (payeeId === undefined) {
-          payeeId = await findOrCreatePayee(tx, ws.id, payee);
-          payeeIds.set(payee, payeeId);
+      const changes = result.matchedRuleIds.length ? diff(c, result) : null;
+      return changes ? [{ c, changes }] : [];
+    });
+    const payeeIds = new Map<string, string | null>();
+    await withAudit(
+      tx,
+      ws.id,
+      userId,
+      todo.map(({ c }) => c.id),
+      async () => {
+        for (const { c, changes } of todo) {
+          const { payee, ...effects } = changes;
+          let payeeId: string | null | undefined;
+          if (payee !== undefined) {
+            payeeId = payeeIds.get(payee);
+            if (payeeId === undefined) {
+              payeeId = await findOrCreatePayee(tx, ws.id, payee);
+              payeeIds.set(payee, payeeId);
+            }
+          }
+          await applyEffects(tx, ws.id, userId, c, {
+            ...effects,
+            ...(payeeId !== undefined && { payeeId }),
+          });
         }
-      }
-      await applyEffects(tx, ws.id, userId, c, {
-        ...effects,
-        ...(payeeId !== undefined && { payeeId }),
-      });
-      updated++;
-    }
-    await recordHits(tx, new Map([[id, updated]]));
-    return { updated };
+      },
+    );
+    await recordHits(tx, new Map([[id, todo.length]]));
+    return { updated: todo.length };
   });
 }

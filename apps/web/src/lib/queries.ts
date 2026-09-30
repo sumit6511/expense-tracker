@@ -1,5 +1,6 @@
 import type {
   Account,
+  Attachment,
   BudgetMonth,
   BudgetVsActual,
   BulkTransactionAction,
@@ -15,6 +16,7 @@ import type {
   CreateWorkspaceInput,
   Dashboard,
   ExchangeRate,
+  FinishReconcileInput,
   Goal,
   GoalInput,
   ImportBatch,
@@ -25,6 +27,8 @@ import type {
   ListTransactionsQuery,
   Me,
   Payee,
+  ReconcileState,
+  Reconciliation,
   RecordRecurringInput,
   Recurring,
   RecurringInput,
@@ -37,6 +41,7 @@ import type {
   SpendingByCategory,
   Tag,
   Transaction,
+  TransactionChange,
   TransactionPage,
   UpcomingItem,
   UpdateAccountInput,
@@ -54,7 +59,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { api } from './api';
+import { api, apiUpload } from './api';
 import { useWorkspace } from './session';
 
 // ---------------------------------------------------------------------------------------------
@@ -619,4 +624,66 @@ export const useDeleteGoal = () =>
 export const useContributeGoal = () =>
   useWsMutation((base, { id, amountMinor }: { id: string; amountMinor: number }) =>
     api<Goal>(`${base}/goals/${id}/contribute`, { method: 'POST', body: { amountMinor } }),
+  );
+
+// ---------------------------------------------------------------------------------------------
+// History, attachments, reconciliation
+// ---------------------------------------------------------------------------------------------
+
+export function useTransactionHistory(id: string | null) {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'history', id],
+    queryFn: () => api<TransactionChange[]>(`${base}/transactions/${id}/history`),
+    enabled: id !== null,
+  });
+}
+
+export function useAttachments(transactionId: string | null) {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'attachments', transactionId],
+    queryFn: () => api<Attachment[]>(`${base}/transactions/${transactionId}/attachments`),
+    enabled: transactionId !== null,
+  });
+}
+
+export const attachmentUrl = (wid: string, id: string) =>
+  `/api/v1/workspaces/${wid}/attachments/${id}`;
+
+export const useUploadAttachment = () =>
+  useWsMutation(
+    (base, { transactionId, file, name }: { transactionId: string; file: Blob; name: string }) =>
+      apiUpload<Attachment>(`${base}/transactions/${transactionId}/attachments`, file, name),
+  );
+export const useDeleteAttachment = () =>
+  useWsMutation((base, id: string) => api<void>(`${base}/attachments/${id}`, { method: 'DELETE' }));
+
+export function useReconcileState(accountId: string, statementDate: string, enabled = true) {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'reconcile', accountId, statementDate],
+    queryFn: () =>
+      api<ReconcileState>(`${base}/accounts/${accountId}/reconcile`, {
+        query: { statementDate },
+      }),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useReconciliations(accountId: string) {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'reconciliations', accountId],
+    queryFn: () => api<Reconciliation[]>(`${base}/accounts/${accountId}/reconciliations`),
+  });
+}
+
+export const useFinishReconcile = () =>
+  useWsMutation((base, { accountId, ...input }: FinishReconcileInput & { accountId: string }) =>
+    api<Reconciliation>(`${base}/accounts/${accountId}/reconcile`, {
+      method: 'POST',
+      body: input,
+    }),
   );

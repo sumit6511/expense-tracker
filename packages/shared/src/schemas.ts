@@ -176,6 +176,11 @@ export const AccountSchema = z.object({
   balanceMinor: MinorAmount,
   /** Balance converted to the workspace base currency (null when no rate is known). */
   balanceBaseMinor: MinorAmount.nullable(),
+  /** Balance counting only cleared and reconciled transactions (what the bank shows). */
+  clearedBalanceMinor: MinorAmount,
+  pendingCount: z.number(),
+  /** The statement date of the last reconciliation. */
+  reconciledThrough: z.string().nullable(),
   transactionCount: z.number(),
   lastTransactionDate: z.string().nullable(),
 });
@@ -320,6 +325,8 @@ export const UpdateTransactionSchema = z
     needsReview: z.boolean().optional(),
     /** Version the client last saw; the update is rejected with 409 if it changed since. */
     version: z.number().int().optional(),
+    /** Changing the amount, date or account of a reconciled transaction needs this. */
+    confirmReconciled: z.boolean().optional(),
   })
   .partial()
   .refine(splitsMatchTotal, { error: 'Split amounts must add up to the total', path: ['splits'] });
@@ -357,6 +364,8 @@ export const TransactionSchema = z.object({
   original: z.object({ amountMinor: MinorAmount, currency: z.string() }).nullable(),
   importBatchId: Id.nullable(),
   /** The recurring series this was recorded from. */
+  /** Receipts and other files attached. */
+  attachmentCount: z.number(),
   recurringId: Id.nullable(),
   deleted: z.boolean(),
   version: z.number(),

@@ -6,7 +6,7 @@ import {
   toDecimalString,
   uuidv7,
 } from '@et/shared';
-import { Loader2, Plus, Repeat, Split, Trash2, X } from 'lucide-react';
+import { Loader2, Lock, Plus, Repeat, Split, Trash2, X } from 'lucide-react';
 import {
   createContext,
   type FormEvent,
@@ -40,7 +40,7 @@ import {
   useConfirm,
 } from '@/components/ui/dialog';
 import { Field, Input, Textarea } from '@/components/ui/input';
-import { Segmented } from '@/components/ui/menu';
+import { Checkbox, Segmented } from '@/components/ui/menu';
 import {
   recurringFromTransaction,
   useRecurringDialog,
@@ -60,9 +60,12 @@ import {
   useTransaction,
   useUpdateTransaction,
   useUpdateTransfer,
+  useUploadAttachment,
 } from '@/lib/queries';
 import { useCanWrite } from '@/lib/session';
 import { cn, storage } from '@/lib/utils';
+import { TransactionHistory } from './history';
+import { ReceiptsField, uploadAll } from './receipts';
 
 type Mode = 'expense' | 'income' | 'transfer';
 
@@ -261,6 +264,9 @@ function EditorForm({
   const categoryTouched = useRef(existing !== null || defaults.categoryId !== undefined);
   const [notes, setNotes] = useState(existing?.notes ?? '');
   const [tagIds, setTagIds] = useState<string[]>(existing?.tagIds ?? []);
+  const [pending, setPending] = useState(existing?.status === 'pending');
+  const [queuedFiles, setQueuedFiles] = useState<File[]>([]);
+  const upload = useUploadAttachment();
   const [splitMode, setSplitMode] = useState(existing ? existing.splits.length > 1 : false);
   const [lines, setLines] = useState<SplitLine[]>(() =>
     existing && existing.splits.length > 1
@@ -315,7 +321,7 @@ function EditorForm({
     }
   }, [splitMode, lines.length, categoryId, amount]);
 
-  async function submit(event: FormEvent, another = false) {
+  async function submit(event: FormEvent, another = false, confirmReconciled = false) {
     event.preventDefault();
     setError(null);
     if (!canWrite) return;
@@ -383,6 +389,10 @@ function EditorForm({
           notes: notes.trim() || null,
           tagIds,
           ...(splits ? { splits } : { categoryId }),
+          // A reconciled transaction keeps its status; otherwise pending or cleared.
+          ...(existing?.status === 'reconciled'
+            ? {}
+            : { status: pending ? ('pending' as const) : ('cleared' as const) }),
         };
         if (existing) {
           // Saving an edit also confirms a transaction waiting in the review inbox.
@@ -391,6 +401,7 @@ function EditorForm({
             version: existing.version,
             ...common,
             ...(existing.needsReview && { needsReview: false }),
+            ...(confirmReconciled && { confirmReconciled: true }),
           });
           const recategorized =
             !splits &&
@@ -408,6 +419,7 @@ function EditorForm({
           });
         } else {
           const created = await createTx.mutateAsync({ id: uuidv7(), ...common });
+          if (queuedFiles.length) await uploadAll(upload, created.id, queuedFiles);
           toast.success(mode === 'expense' ? 'Expense added' : 'Income added', {
             description: `${f.money(sign * parsed, currency)}${payee.trim() ? ` · ${payee.trim()}` : ''}`,
             action: {
@@ -421,7 +433,14 @@ function EditorForm({
       if (another && !isEdit) onAnother({ mode, accountId, date });
       else onDone();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
+      if (err instanceof ApiError && err.code === 'reconciled' && !confirmReconciled) {
+        const ok = await confirm({
+          title: 'Change a reconciled transaction?',
+          description: err.message,
+          confirmLabel: 'Change it',
+        });
+        if (ok) return submit(event, another, true);
+      } else if (err instanceof ApiError && err.status === 409) {
         setError(
           'This transaction was changed somewhere else. Close and reopen it to see the latest version.',
         );
@@ -734,6 +753,36 @@ function EditorForm({
               disabled={!canWrite}
             />
           </Field>
+
+          {mode !== 'transfer' &&
+            (existing?.status === 'reconciled' ? (
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Lock className="size-3.5" /> Reconciled with a bank statement
+              </p>
+            ) : (
+              <label className="flex items-center gap-2.5 text-sm">
+                <Checkbox
+                  checked={pending}
+                  onCheckedChange={(v) => setPending(v === true)}
+                  disabled={!canWrite}
+                />
+                <span>
+                  Pending
+                  <span className="text-muted-foreground"> · not on the bank statement yet</span>
+                </span>
+              </label>
+            ))}
+
+          {mode !== 'transfer' && (
+            <ReceiptsField
+              transactionId={existing?.id ?? null}
+              queued={queuedFiles}
+              onQueue={setQueuedFiles}
+              disabled={!canWrite}
+            />
+          )}
+
+          {existing && <TransactionHistory tx={existing} />}
 
           {error && (
             <p

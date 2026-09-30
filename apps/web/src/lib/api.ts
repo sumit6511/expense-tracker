@@ -80,6 +80,13 @@ export function api<T>(
   });
 }
 
+/** Sends a file as multipart/form-data (the browser sets the boundary). */
+export function apiUpload<T>(path: string, file: Blob, fileName: string): Promise<T> {
+  const form = new FormData();
+  form.append('file', file, fileName);
+  return request<T>(`/api/v1${path}`, { method: 'POST', body: form });
+}
+
 /** Better Auth endpoints (cookie sessions). */
 export const authApi = {
   signUp: (input: { name: string; email: string; password: string }) =>

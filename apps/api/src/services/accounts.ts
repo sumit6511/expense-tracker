@@ -22,6 +22,12 @@ const balanceColumns = {
   lastDate: sql<
     string | null
   >`max(${transactions.date}) filter (where ${transactions.deletedAt} is null)::text`,
+  clearedSum: sql<number>`coalesce(sum(${transactions.amountMinor}) filter (where ${transactions.deletedAt} is null and ${transactions.status} <> 'pending'), 0)::bigint`,
+  pendingCount: sql<number>`count(${transactions.id}) filter (where ${transactions.deletedAt} is null and ${transactions.status} = 'pending')::int`,
+  // Qualified by hand: correlated subqueries don't get table prefixes from Drizzle.
+  reconciledThrough: sql<
+    string | null
+  >`(select max(r.statement_date)::text from reconciliations r where r.account_id = "accounts"."id")`,
 };
 
 async function withBalances(
@@ -46,20 +52,33 @@ async function withBalances(
     today,
     today,
   );
-  return rows.map(({ account, txSum, txCount, lastDate }) => {
-    const balance = account.openingBalanceMinor + Number(txSum);
-    return toAccountDto(account, {
-      balance,
-      balanceBase: rates.convert(balance, account.currency, ws.baseCurrency, today),
-      count: Number(txCount),
-      lastDate,
-    });
-  });
+  return rows.map(
+    ({ account, txSum, txCount, lastDate, clearedSum, pendingCount, reconciledThrough }) => {
+      const balance = account.openingBalanceMinor + Number(txSum);
+      return toAccountDto(account, {
+        balance,
+        balanceBase: rates.convert(balance, account.currency, ws.baseCurrency, today),
+        cleared: account.openingBalanceMinor + Number(clearedSum),
+        pendingCount: Number(pendingCount),
+        reconciledThrough,
+        count: Number(txCount),
+        lastDate,
+      });
+    },
+  );
 }
 
 function toAccountDto(
   a: AccountRow,
-  stats: { balance: number; balanceBase: number | null; count: number; lastDate: string | null },
+  stats: {
+    balance: number;
+    balanceBase: number | null;
+    cleared: number;
+    pendingCount: number;
+    reconciledThrough: string | null;
+    count: number;
+    lastDate: string | null;
+  },
 ): Account {
   return {
     id: a.id,
@@ -78,6 +97,9 @@ function toAccountDto(
     sortOrder: a.sortOrder,
     balanceMinor: stats.balance,
     balanceBaseMinor: stats.balanceBase,
+    clearedBalanceMinor: stats.cleared,
+    pendingCount: stats.pendingCount,
+    reconciledThrough: stats.reconciledThrough,
     transactionCount: stats.count,
     lastTransactionDate: stats.lastDate,
   };

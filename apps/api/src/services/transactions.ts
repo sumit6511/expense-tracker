@@ -11,13 +11,21 @@ import {
   type UpdateTransactionSchema,
   uuidv7,
 } from '@et/shared';
-import { and, asc, eq, inArray, isNotNull, isNull, type SQL, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, ne, type SQL, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { WorkspaceCtx } from '../context';
 import type { Db, Executor } from '../db/client';
-import { accounts, payees, transactionSplits, transactions, transactionTags } from '../db/schema';
-import { badRequest, conflict, notFound } from '../lib/errors';
+import {
+  accounts,
+  attachments,
+  payees,
+  transactionSplits,
+  transactions,
+  transactionTags,
+} from '../db/schema';
+import { ApiError, badRequest, conflict, notFound } from '../lib/errors';
 import { requireAccount } from './accounts';
+import { logAction, withAudit } from './audit';
 import { assertCategoriesExist } from './categories';
 import { findOrCreatePayee } from './payees';
 import { loadRateBook } from './rates';
@@ -44,7 +52,7 @@ async function hydrate(
     ...new Set(rows.map((r) => r.transferGroupId).filter((g): g is string => g !== null)),
   ];
 
-  const [splits, tagRows, payeeRows, accountRows, peerRows] = await Promise.all([
+  const [splits, tagRows, payeeRows, accountRows, peerRows, attachmentRows] = await Promise.all([
     db
       .select()
       .from(transactionSplits)
@@ -72,12 +80,18 @@ async function hydrate(
           .from(transactions)
           .where(inArray(transactions.transferGroupId, groups))
       : Promise.resolve([]),
+    db
+      .select({ id: attachments.transactionId, n: sql<number>`count(*)::int` })
+      .from(attachments)
+      .where(inArray(attachments.transactionId, ids))
+      .groupBy(attachments.transactionId),
   ]);
 
   const splitsByTx = Map.groupBy(splits, (s) => s.transactionId);
   const tagsByTx = Map.groupBy(tagRows, (t) => t.transactionId);
   const payeeName = new Map(payeeRows.map((p) => [p.id, p.name]));
   const currency = new Map(accountRows.map((a) => [a.id, a.currency]));
+  const attachmentCount = new Map(attachmentRows.map((a) => [a.id, Number(a.n)]));
 
   return rows.map((r) => {
     const peer = r.transferGroupId
@@ -116,6 +130,7 @@ async function hydrate(
           ? { amountMinor: r.originalAmountMinor, currency: r.originalCurrency }
           : null,
       importBatchId: r.importBatchId,
+      attachmentCount: attachmentCount.get(r.id) ?? 0,
       recurringId: r.recurringId,
       deleted: r.deletedAt !== null,
       version: r.version,
@@ -529,68 +544,91 @@ export async function updateTransaction(
         currentVersion: row.version,
       });
     }
-    if (input.tagIds) await assertTagsExist(tx, ws.id, input.tagIds);
-
-    if (row.transferGroupId) {
-      await updateTransferLegFields(tx, ws.id, userId, row, input);
-      return;
-    }
-
-    const patch: Partial<typeof transactions.$inferInsert> = {
-      updatedBy: userId,
-      version: row.version + 1,
-    };
-    let accountCurrency: string | null = null;
-    if (input.accountId !== undefined && input.accountId !== row.accountId) {
-      const account = await requireAccount(tx, ws.id, input.accountId);
-      patch.accountId = account.id;
-      accountCurrency = account.currency;
-    }
-    if (input.date !== undefined) patch.date = input.date;
-    if (input.amountMinor !== undefined) patch.amountMinor = input.amountMinor;
-    if (input.notes !== undefined) patch.notes = input.notes ?? '';
-    if (input.status !== undefined) patch.status = input.status;
-    if (input.needsReview !== undefined) patch.needsReview = input.needsReview;
-    if (input.payee !== undefined) patch.payeeId = await findOrCreatePayee(tx, ws.id, input.payee);
-    if (input.original !== undefined) {
-      const currency =
-        accountCurrency ??
-        (await requireAccount(tx, ws.id, patch.accountId ?? row.accountId, { allowArchived: true }))
-          .currency;
-      Object.assign(patch, normalizedOriginal(input.original, currency));
-    }
-
-    const amount = input.amountMinor ?? row.amountMinor;
-    if (input.splits) {
-      await assertCategoriesExist(
-        tx,
-        ws.id,
-        input.splits.map((s) => s.categoryId),
+    const touchesBalance =
+      (input.amountMinor !== undefined && input.amountMinor !== row.amountMinor) ||
+      (input.date !== undefined && input.date !== row.date) ||
+      (input.accountId !== undefined && input.accountId !== row.accountId);
+    if (row.status === 'reconciled' && touchesBalance && !input.confirmReconciled) {
+      throw new ApiError(
+        409,
+        'reconciled',
+        'This transaction is reconciled. Changing its amount, date or account changes a balance you already matched to a statement.',
       );
-      if (input.splits.reduce((sum, s) => sum + s.amountMinor, 0) !== amount) {
-        throw badRequest('Split amounts must add up to the total');
-      }
-      await replaceSplits(tx, ws.id, id, input.splits);
-    } else if (input.categoryId !== undefined) {
-      await assertCategoriesExist(tx, ws.id, [input.categoryId]);
-      await replaceSplits(tx, ws.id, id, [{ categoryId: input.categoryId, amountMinor: amount }]);
-    } else if (amount !== row.amountMinor) {
-      const existing = await tx
-        .select()
-        .from(transactionSplits)
-        .where(eq(transactionSplits.transactionId, id));
-      if (existing.length > 1)
-        throw badRequest('This transaction is split. Update the split amounts too.');
-      await tx
-        .update(transactionSplits)
-        .set({ amountMinor: amount })
-        .where(eq(transactionSplits.transactionId, id));
     }
-
-    await tx.update(transactions).set(patch).where(eq(transactions.id, id));
-    if (input.tagIds) await replaceTags(tx, id, input.tagIds);
+    const ids = await withTransferPeers(tx, ws.id, [id]);
+    await withAudit(tx, ws.id, userId, ids, () => applyUpdate(tx, ws, userId, row, input));
   });
   return getTransaction(db, ws.id, id);
+}
+
+async function applyUpdate(
+  tx: Executor,
+  ws: WorkspaceCtx,
+  userId: string,
+  row: TxRow,
+  input: z.output<typeof UpdateTransactionSchema>,
+) {
+  const id = row.id;
+  if (input.tagIds) await assertTagsExist(tx, ws.id, input.tagIds);
+
+  if (row.transferGroupId) {
+    await updateTransferLegFields(tx, ws.id, userId, row, input);
+    return;
+  }
+
+  const patch: Partial<typeof transactions.$inferInsert> = {
+    updatedBy: userId,
+    version: row.version + 1,
+  };
+  let accountCurrency: string | null = null;
+  if (input.accountId !== undefined && input.accountId !== row.accountId) {
+    const account = await requireAccount(tx, ws.id, input.accountId);
+    patch.accountId = account.id;
+    accountCurrency = account.currency;
+  }
+  if (input.date !== undefined) patch.date = input.date;
+  if (input.amountMinor !== undefined) patch.amountMinor = input.amountMinor;
+  if (input.notes !== undefined) patch.notes = input.notes ?? '';
+  if (input.status !== undefined) patch.status = input.status;
+  if (input.needsReview !== undefined) patch.needsReview = input.needsReview;
+  if (input.payee !== undefined) patch.payeeId = await findOrCreatePayee(tx, ws.id, input.payee);
+  if (input.original !== undefined) {
+    const currency =
+      accountCurrency ??
+      (await requireAccount(tx, ws.id, patch.accountId ?? row.accountId, { allowArchived: true }))
+        .currency;
+    Object.assign(patch, normalizedOriginal(input.original, currency));
+  }
+
+  const amount = input.amountMinor ?? row.amountMinor;
+  if (input.splits) {
+    await assertCategoriesExist(
+      tx,
+      ws.id,
+      input.splits.map((s) => s.categoryId),
+    );
+    if (input.splits.reduce((sum, s) => sum + s.amountMinor, 0) !== amount) {
+      throw badRequest('Split amounts must add up to the total');
+    }
+    await replaceSplits(tx, ws.id, id, input.splits);
+  } else if (input.categoryId !== undefined) {
+    await assertCategoriesExist(tx, ws.id, [input.categoryId]);
+    await replaceSplits(tx, ws.id, id, [{ categoryId: input.categoryId, amountMinor: amount }]);
+  } else if (amount !== row.amountMinor) {
+    const existing = await tx
+      .select()
+      .from(transactionSplits)
+      .where(eq(transactionSplits.transactionId, id));
+    if (existing.length > 1)
+      throw badRequest('This transaction is split. Update the split amounts too.');
+    await tx
+      .update(transactionSplits)
+      .set({ amountMinor: amount })
+      .where(eq(transactionSplits.transactionId, id));
+  }
+
+  await tx.update(transactions).set(patch).where(eq(transactions.id, id));
+  if (input.tagIds) await replaceTags(tx, id, input.tagIds);
 }
 
 /** Fields that can be edited on one leg of a transfer; date and notes apply to both legs. */
@@ -675,6 +713,13 @@ export async function softDeleteTransactions(
       ),
     )
     .returning({ id: transactions.id });
+  await logAction(
+    db,
+    workspaceId,
+    userId,
+    updated.map((u) => u.id),
+    'delete',
+  );
   return updated.length;
 }
 
@@ -697,6 +742,13 @@ export async function restoreTransactions(
       ),
     )
     .returning({ id: transactions.id });
+  await logAction(
+    db,
+    workspaceId,
+    userId,
+    updated.map((u) => u.id),
+    'restore',
+  );
   return updated.length;
 }
 
@@ -721,104 +773,120 @@ export async function bulkUpdate(
   userId: string,
   action: BulkTransactionAction,
 ): Promise<{ updated: number; skipped: number }> {
-  return db.transaction(async (tx) => {
-    const rows = await tx
-      .select({
-        id: transactions.id,
-        group: transactions.transferGroupId,
-        amount: transactions.amountMinor,
-      })
-      .from(transactions)
-      .where(and(eq(transactions.workspaceId, ws.id), inArray(transactions.id, action.ids)));
-    const ids = rows.map((r) => r.id);
-    const missing = action.ids.length - ids.length;
-    const bump = { updatedBy: userId, version: sql`${transactions.version} + 1` };
+  return db.transaction((tx) =>
+    // Deleting and restoring log themselves; everything else is recorded as field changes.
+    action.action === 'delete' || action.action === 'restore'
+      ? bulkEdit(tx, ws, userId, action)
+      : withAudit(tx, ws.id, userId, action.ids, () => bulkEdit(tx, ws, userId, action)),
+  );
+}
 
-    switch (action.action) {
-      case 'setCategory': {
-        await assertCategoriesExist(tx, ws.id, [action.categoryId]);
-        const regular = rows.filter((r) => r.group === null);
-        const splitCounts = regular.length
-          ? await tx
-              .select({ id: transactionSplits.transactionId, n: sql<number>`count(*)::int` })
-              .from(transactionSplits)
-              .where(
-                inArray(
-                  transactionSplits.transactionId,
-                  regular.map((r) => r.id),
-                ),
-              )
-              .groupBy(transactionSplits.transactionId)
-          : [];
-        // Split transactions keep their lines rather than being collapsed into one category.
-        const single = new Set(splitCounts.filter((s) => Number(s.n) === 1).map((s) => s.id));
-        const target = regular.filter((r) => single.has(r.id)).map((r) => r.id);
-        if (target.length) {
-          await tx
-            .update(transactionSplits)
-            .set({ categoryId: action.categoryId })
-            .where(inArray(transactionSplits.transactionId, target));
-          await tx.update(transactions).set(bump).where(inArray(transactions.id, target));
-        }
-        return { updated: target.length, skipped: action.ids.length - target.length };
-      }
-      case 'addTags': {
-        await assertTagsExist(tx, ws.id, action.tagIds);
-        if (ids.length) {
-          await tx
-            .insert(transactionTags)
-            .values(
-              ids.flatMap((transactionId) =>
-                action.tagIds.map((tagId) => ({ transactionId, tagId })),
+async function bulkEdit(
+  tx: Executor,
+  ws: WorkspaceCtx,
+  userId: string,
+  action: BulkTransactionAction,
+): Promise<{ updated: number; skipped: number }> {
+  const rows = await tx
+    .select({
+      id: transactions.id,
+      group: transactions.transferGroupId,
+      amount: transactions.amountMinor,
+    })
+    .from(transactions)
+    .where(and(eq(transactions.workspaceId, ws.id), inArray(transactions.id, action.ids)));
+  const ids = rows.map((r) => r.id);
+  const missing = action.ids.length - ids.length;
+  const bump = { updatedBy: userId, version: sql`${transactions.version} + 1` };
+
+  switch (action.action) {
+    case 'setCategory': {
+      await assertCategoriesExist(tx, ws.id, [action.categoryId]);
+      const regular = rows.filter((r) => r.group === null);
+      const splitCounts = regular.length
+        ? await tx
+            .select({ id: transactionSplits.transactionId, n: sql<number>`count(*)::int` })
+            .from(transactionSplits)
+            .where(
+              inArray(
+                transactionSplits.transactionId,
+                regular.map((r) => r.id),
               ),
             )
-            .onConflictDoNothing();
-          await tx.update(transactions).set(bump).where(inArray(transactions.id, ids));
-        }
-        return { updated: ids.length, skipped: missing };
+            .groupBy(transactionSplits.transactionId)
+        : [];
+      // Split transactions keep their lines rather than being collapsed into one category.
+      const single = new Set(splitCounts.filter((s) => Number(s.n) === 1).map((s) => s.id));
+      const target = regular.filter((r) => single.has(r.id)).map((r) => r.id);
+      if (target.length) {
+        await tx
+          .update(transactionSplits)
+          .set({ categoryId: action.categoryId })
+          .where(inArray(transactionSplits.transactionId, target));
+        await tx.update(transactions).set(bump).where(inArray(transactions.id, target));
       }
-      case 'removeTags': {
-        if (ids.length) {
-          await tx
-            .delete(transactionTags)
-            .where(
-              and(
-                inArray(transactionTags.transactionId, ids),
-                inArray(transactionTags.tagId, action.tagIds),
-              ),
-            );
-          await tx.update(transactions).set(bump).where(inArray(transactions.id, ids));
-        }
-        return { updated: ids.length, skipped: missing };
+      return { updated: target.length, skipped: action.ids.length - target.length };
+    }
+    case 'addTags': {
+      await assertTagsExist(tx, ws.id, action.tagIds);
+      if (ids.length) {
+        await tx
+          .insert(transactionTags)
+          .values(
+            ids.flatMap((transactionId) =>
+              action.tagIds.map((tagId) => ({ transactionId, tagId })),
+            ),
+          )
+          .onConflictDoNothing();
+        await tx.update(transactions).set(bump).where(inArray(transactions.id, ids));
       }
-      case 'delete': {
-        const n = await softDeleteTransactions(tx, ws.id, userId, ids);
-        return { updated: n, skipped: missing };
+      return { updated: ids.length, skipped: missing };
+    }
+    case 'removeTags': {
+      if (ids.length) {
+        await tx
+          .delete(transactionTags)
+          .where(
+            and(
+              inArray(transactionTags.transactionId, ids),
+              inArray(transactionTags.tagId, action.tagIds),
+            ),
+          );
+        await tx.update(transactions).set(bump).where(inArray(transactions.id, ids));
       }
-      case 'restore': {
-        const n = await restoreTransactions(tx, ws.id, userId, ids);
-        return { updated: n, skipped: missing };
+      return { updated: ids.length, skipped: missing };
+    }
+    case 'delete': {
+      const n = await softDeleteTransactions(tx, ws.id, userId, ids);
+      return { updated: n, skipped: missing };
+    }
+    case 'restore': {
+      const n = await restoreTransactions(tx, ws.id, userId, ids);
+      return { updated: n, skipped: missing };
+    }
+    case 'markReviewed': {
+      if (ids.length) {
+        await tx
+          .update(transactions)
+          .set({ ...bump, needsReview: false })
+          .where(inArray(transactions.id, ids));
       }
-      case 'markReviewed': {
-        if (ids.length) {
-          await tx
-            .update(transactions)
-            .set({ ...bump, needsReview: false })
-            .where(inArray(transactions.id, ids));
-        }
-        return { updated: ids.length, skipped: missing };
-      }
-      case 'setStatus': {
-        if (ids.length) {
-          await tx
+      return { updated: ids.length, skipped: missing };
+    }
+    case 'setStatus': {
+      // Reconciled transactions change only through reconciliation.
+      if (action.status === 'reconciled')
+        throw badRequest('Reconcile the account to mark transactions reconciled');
+      const changed = ids.length
+        ? await tx
             .update(transactions)
             .set({ ...bump, status: action.status })
-            .where(inArray(transactions.id, ids));
-        }
-        return { updated: ids.length, skipped: missing };
-      }
+            .where(and(inArray(transactions.id, ids), ne(transactions.status, 'reconciled')))
+            .returning({ id: transactions.id })
+        : [];
+      return { updated: changed.length, skipped: action.ids.length - changed.length };
     }
-  });
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -928,23 +996,25 @@ export async function updateTransfer(
       input.toAmountMinor ?? (input.amountMinor === undefined ? current.to.amountMinor : undefined),
     notes: input.notes === undefined ? current.from.notes : (input.notes ?? ''),
   };
-  await db.transaction(async (tx) => {
-    const { from, to, toAmount } = await resolveTransferAmounts(tx, ws.id, merged);
-    const common = {
-      date: merged.date,
-      notes: merged.notes,
-      updatedBy: userId,
-      version: sql`${transactions.version} + 1`,
-    };
-    await tx
-      .update(transactions)
-      .set({ ...common, accountId: from.id, amountMinor: -merged.amountMinor })
-      .where(eq(transactions.id, current.from.id));
-    await tx
-      .update(transactions)
-      .set({ ...common, accountId: to.id, amountMinor: toAmount })
-      .where(eq(transactions.id, current.to.id));
-  });
+  await db.transaction((tx) =>
+    withAudit(tx, ws.id, userId, [current.from.id, current.to.id], async () => {
+      const { from, to, toAmount } = await resolveTransferAmounts(tx, ws.id, merged);
+      const common = {
+        date: merged.date,
+        notes: merged.notes,
+        updatedBy: userId,
+        version: sql`${transactions.version} + 1`,
+      };
+      await tx
+        .update(transactions)
+        .set({ ...common, accountId: from.id, amountMinor: -merged.amountMinor })
+        .where(eq(transactions.id, current.from.id));
+      await tx
+        .update(transactions)
+        .set({ ...common, accountId: to.id, amountMinor: toAmount })
+        .where(eq(transactions.id, current.to.id));
+    }),
+  );
   return transferLegs(db, ws.id, groupId);
 }
 

@@ -3,6 +3,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import {
   ArrowLeftRight,
   CheckCheck,
+  CircleDashed,
   Download,
   Inbox,
   Loader2,
@@ -453,6 +454,35 @@ export function TransactionsPage() {
                 >
                   <CheckCheck /> Reviewed
                 </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <CircleDashed /> Status
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        runBulk(
+                          { action: 'setStatus', ids: selectedIds, status: 'cleared' },
+                          (n) => `Marked ${n} as cleared`,
+                        )
+                      }
+                    >
+                      Cleared (on the statement)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        runBulk(
+                          { action: 'setStatus', ids: selectedIds, status: 'pending' },
+                          (n) => `Marked ${n} as pending`,
+                        )
+                      }
+                    >
+                      Pending
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Button
                   variant="outline"
                   size="sm"

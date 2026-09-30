@@ -3,6 +3,7 @@ import {
   bigint,
   boolean,
   char,
+  customType,
   date,
   index,
   integer,
@@ -27,6 +28,9 @@ const timestamps = {
     .defaultNow()
     .$onUpdate(() => new Date()),
 };
+
+/** Binary data (Buffer in, Buffer out). */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' });
 
 const money = (name?: string) =>
   name ? bigint(name, { mode: 'number' }) : bigint({ mode: 'number' });
@@ -371,6 +375,71 @@ export const transactionTags = pgTable(
       .references(() => tags.id, { onDelete: 'cascade' }),
   },
   (t) => [primaryKey({ columns: [t.transactionId, t.tagId] }), index().on(t.tagId)],
+);
+
+/** A statement reconciled against an account: everything up to it is locked in. */
+export const reconciliations = pgTable(
+  'reconciliations',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    accountId: uuid()
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    statementDate: date({ mode: 'string' }).notNull(),
+    statementBalanceMinor: money().notNull(),
+    /** A balancing transaction added to make the books match, if any. */
+    adjustmentMinor: money().notNull().default(0),
+    transactionCount: integer().notNull(),
+    createdBy: text().references(() => user.id, { onDelete: 'set null' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.accountId, t.statementDate)],
+);
+
+export const auditActionEnum = pgEnum('audit_action', ['update', 'delete', 'restore', 'reconcile']);
+
+/** Who changed what on a transaction (creation is implied by the row itself). */
+export const auditLog = pgTable(
+  'audit_log',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    transactionId: uuid()
+      .notNull()
+      .references(() => transactions.id, { onDelete: 'cascade' }),
+    action: auditActionEnum().notNull(),
+    userId: text().references(() => user.id, { onDelete: 'set null' }),
+    /** field → [before, after] */
+    changes: jsonb().notNull().default({}),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.transactionId, t.createdAt)],
+);
+
+/** Receipts and bills attached to transactions, stored in the database. */
+export const attachments = pgTable(
+  'attachments',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    transactionId: uuid()
+      .notNull()
+      .references(() => transactions.id, { onDelete: 'cascade' }),
+    fileName: text().notNull(),
+    contentType: text().notNull(),
+    sizeBytes: integer().notNull(),
+    data: bytea().notNull(),
+    createdBy: text().references(() => user.id, { onDelete: 'set null' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.transactionId), index().on(t.workspaceId)],
 );
 
 // ---------------------------------------------------------------------------------------------

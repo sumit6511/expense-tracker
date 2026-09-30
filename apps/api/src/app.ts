@@ -1,9 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { MAX_ATTACHMENT_BYTES } from '@et/shared';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { Scalar } from '@scalar/hono-api-reference';
 import { sql } from 'drizzle-orm';
+import { bodyLimit } from 'hono/body-limit';
 import { HTTPException } from 'hono/http-exception';
 import { secureHeaders } from 'hono/secure-headers';
 import type { AppEnv, Deps } from './context';
@@ -17,6 +19,7 @@ import { budgetsRouter } from './routes/budgets';
 import { labelsRouter } from './routes/categories';
 import { goalsRouter } from './routes/goals';
 import { importsRouter } from './routes/imports';
+import { ledgerRouter } from './routes/ledger';
 import { meRouter } from './routes/me';
 import { recurringRouter } from './routes/recurring';
 import { rulesRouter } from './routes/rules';
@@ -84,6 +87,15 @@ export function createApp(deps: Deps) {
   api.use('*', originCheck([env.PUBLIC_URL, ...env.TRUSTED_ORIGINS]));
   api.use('*', loadSession);
   api.use('*', writeRateLimit(env.NODE_ENV === 'test' ? 0 : 600));
+  // Receipts are the only large uploads; everything else is small JSON.
+  api.use(
+    '/workspaces/:wid/transactions/:id/attachments',
+    bodyLimit({
+      maxSize: MAX_ATTACHMENT_BYTES + 64 * 1024,
+      onError: (c) =>
+        c.json({ error: { code: 'too_large', message: 'Files can be at most 5 MB' } }, 413),
+    }),
+  );
   api.use('/workspaces/:wid', loadWorkspace);
   api.use('/workspaces/:wid/*', loadWorkspace);
   for (const router of [
@@ -97,6 +109,7 @@ export function createApp(deps: Deps) {
     rulesRouter,
     recurringRouter,
     goalsRouter,
+    ledgerRouter,
   ]) {
     api.route('/', router);
   }
