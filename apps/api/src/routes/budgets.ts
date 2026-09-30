@@ -8,7 +8,9 @@ import {
   FillAverageBudgetsSchema,
   IsoDateSchema,
   ReportQuerySchema,
+  SetBudgetCapSchema,
   SetBudgetsSchema,
+  SetRolloverSchema,
   SpendingByCategorySchema,
   todayIn,
 } from '@et/shared';
@@ -22,7 +24,14 @@ import {
   NoContent,
   WidParams,
 } from '../lib/openapi';
-import { copyBudgets, fillAverageBudgets, getBudgetMonth, setBudgets } from '../services/budgets';
+import {
+  copyBudgets,
+  fillAverageBudgets,
+  getBudgetMonth,
+  setBudgetCap,
+  setBudgets,
+  setRollover,
+} from '../services/budgets';
 import {
   budgetVsActual,
   cashFlow,
@@ -190,5 +199,36 @@ budgetsRouter.openapi(
       await budgetVsActual(c.get('deps').db, ws, date ?? todayIn(ws.timezone), periods),
       200,
     );
+  },
+);
+
+budgetsRouter.openapi(
+  createRoute({
+    method: 'put',
+    path: '/workspaces/{wid}/budgets/rollover',
+    tags: ['Budgets'],
+    summary: 'Choose whether a category’s leftover budget carries into the next month',
+    request: { params: WidParams, ...jsonBody(SetRolloverSchema) },
+    responses: { 204: NoContent, ...errorResponses },
+  }),
+  async (c) => {
+    await setRollover(c.get('deps').db, c.get('workspace'), c.req.valid('json'));
+    return c.body(null, 204);
+  },
+);
+
+budgetsRouter.openapi(
+  createRoute({
+    method: 'put',
+    path: '/workspaces/{wid}/budgets/cap',
+    tags: ['Budgets'],
+    summary: 'Set an overall monthly spending limit from a month on (0 removes it)',
+    request: { params: WidParams, ...jsonBody(SetBudgetCapSchema) },
+    responses: { 204: NoContent, ...errorResponses },
+  }),
+  async (c) => {
+    const { periodStart, amountMinor } = c.req.valid('json');
+    await setBudgetCap(c.get('deps').db, c.get('workspace'), periodStart, amountMinor);
+    return c.body(null, 204);
   },
 );

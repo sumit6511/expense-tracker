@@ -16,9 +16,11 @@ import type { WorkspaceCtx } from '../context';
 import type { Db } from '../db/client';
 import {
   accounts,
+  budgetCaps,
   budgets,
   categories,
   categoryGroups,
+  goals,
   importProfiles,
   manualRates,
   payees,
@@ -224,6 +226,8 @@ export const BackupSchema = z.object({
       color: z.string(),
       sortOrder: z.number().int(),
       archived: z.boolean(),
+      budgetRollover: z.enum(['none', 'surplus', 'all']).default('none'),
+      rolloverSince: date.nullable().default(null),
     }),
   ),
   payees: z.array(z.object({ id, name: z.string(), defaultCategoryId: id.nullable() })),
@@ -288,6 +292,25 @@ export const BackupSchema = z.object({
       }),
     )
     .default([]),
+  budgetCaps: z
+    .array(z.object({ periodStart: date, amountMinor: z.number().int().min(0) }))
+    .default([]),
+  goals: z
+    .array(
+      z.object({
+        name: z.string(),
+        kind: z.enum(['account', 'category', 'manual']),
+        targetMinor: z.number().int().positive(),
+        targetDate: date.nullable(),
+        accountId: id.nullable(),
+        categoryId: id.nullable(),
+        savedMinor: z.number().int().min(0),
+        icon: z.string(),
+        color: z.string(),
+        archived: z.boolean(),
+      }),
+    )
+    .default([]),
 });
 export type Backup = z.infer<typeof BackupSchema>;
 
@@ -307,6 +330,8 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
     profileRows,
     ruleRows,
     recurringRows,
+    capRows,
+    goalRows,
   ] = await Promise.all([
     db.select().from(accounts).where(eq(accounts.workspaceId, w)).orderBy(asc(accounts.sortOrder)),
     db
@@ -341,6 +366,8 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
     db.select().from(importProfiles).where(eq(importProfiles.workspaceId, w)),
     listRules(db, w),
     db.select().from(recurring).where(eq(recurring.workspaceId, w)),
+    db.select().from(budgetCaps).where(eq(budgetCaps.workspaceId, w)),
+    db.select().from(goals).where(eq(goals.workspaceId, w)),
   ]);
   const splitsByTx = Map.groupBy(splitRows, (s) => s.transactionId);
   const tagsByTx = Map.groupBy(txTagRows, (t) => t.transactionId);
@@ -387,6 +414,8 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
       color: c.color,
       sortOrder: c.sortOrder,
       archived: c.archivedAt !== null,
+      budgetRollover: c.budgetRollover,
+      rolloverSince: c.rolloverSince,
     })),
     payees: payeeRows.map((p) => ({
       id: p.id,
@@ -438,6 +467,19 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
       conditions: r.conditions,
       actions: r.actions,
       stopProcessing: r.stopProcessing,
+    })),
+    budgetCaps: capRows.map((c) => ({ periodStart: c.periodStart, amountMinor: c.amountMinor })),
+    goals: goalRows.map((g) => ({
+      name: g.name,
+      kind: g.kind,
+      targetMinor: g.targetMinor,
+      targetDate: g.targetDate,
+      accountId: g.accountId,
+      categoryId: g.categoryId,
+      savedMinor: g.savedMinor,
+      icon: g.icon,
+      color: g.color,
+      archived: g.archivedAt !== null,
     })),
     recurring: recurringRows.map(({ workspaceId: _, createdAt, updatedAt, ...r }) => r),
   };
@@ -635,6 +677,21 @@ export async function restoreBackup(
         .values(
           part.map((p) => ({ id: uuidv7(), workspaceId, name: p.name, mapping: p.mapping ?? {} })),
         ),
+    );
+    await chunk(b.budgetCaps, (part) =>
+      tx.insert(budgetCaps).values(part.map((c) => ({ id: uuidv7(), workspaceId, ...c }))),
+    );
+    await chunk(b.goals, (part) =>
+      tx.insert(goals).values(
+        part.map(({ archived, ...g }) => ({
+          ...g,
+          id: uuidv7(),
+          workspaceId,
+          accountId: g.accountId ? (remap.get(g.accountId) ?? null) : null,
+          categoryId: g.categoryId ? (remap.get(g.categoryId) ?? null) : null,
+          archivedAt: archivedAt(archived),
+        })),
+      ),
     );
     const restoredRules = b.rules.flatMap((r) => remapRule(r, (old) => remap.get(old)) ?? []);
     await chunk(restoredRules, (part) =>

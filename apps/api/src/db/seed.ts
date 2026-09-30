@@ -1,5 +1,6 @@
 import {
   addDays,
+  GoalBodySchema,
   getMonthPeriod,
   listMonthPeriods,
   RecurringBodySchema,
@@ -11,7 +12,8 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Auth } from '../auth';
 import type { WorkspaceCtx } from '../context';
-import { setBudgets } from '../services/budgets';
+import { setBudgets, setRollover } from '../services/budgets';
+import { createGoal } from '../services/goals';
 import { findOrCreatePayee } from '../services/payees';
 import { setManualRate } from '../services/rates';
 import { createRecurring } from '../services/recurring';
@@ -253,6 +255,7 @@ export async function seedDemo(db: Db, auth: Auth, options: { months?: number } 
     ['Entertainment', 300_000],
     ['Family Support', 1_000_000],
     ['Loan / EMI', 1_150_000],
+    ['Festivals & Gifts', 500_000],
   ] as const;
   for (const period of [shiftMonthPeriod(current, -1, settings), current]) {
     await setBudgets(
@@ -353,6 +356,39 @@ export async function seedDemo(db: Db, auth: Auth, options: { months?: number } 
     },
   ];
   for (const item of series) await createRecurring(db, ws, RecurringBodySchema.parse(item));
+
+  // Unspent dining money carries over; a Dashain fund and a scooter goal.
+  await setRollover(db, ws, {
+    categoryId: cat['Dining Out']!,
+    mode: 'surplus',
+    fromPeriodStart: shiftMonthPeriod(current, -1, settings).start,
+  });
+  await createGoal(
+    db,
+    ws,
+    GoalBodySchema.parse({
+      name: 'Dashain 2084',
+      kind: 'category',
+      categoryId: cat['Festivals & Gifts']!,
+      targetMinor: 4_000_000,
+      targetDate: addDays(current.start, 330),
+      icon: 'gift',
+      color: '#e11d48',
+    }),
+  );
+  await createGoal(
+    db,
+    ws,
+    GoalBodySchema.parse({
+      name: 'New scooter',
+      kind: 'manual',
+      targetMinor: 25_000_000,
+      savedMinor: 6_000_000,
+      targetDate: addDays(current.start, 240),
+      icon: 'bike',
+      color: '#2563eb',
+    }),
+  );
 
   return { created: true as const, email: DEMO_EMAIL, workspaceId: ws.id };
 }

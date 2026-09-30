@@ -70,11 +70,12 @@ export function Progress({
 }: {
   value: number;
   className?: string;
-  tone?: 'primary' | 'warning' | 'destructive' | 'muted';
+  tone?: 'primary' | 'positive' | 'warning' | 'destructive' | 'muted';
   label?: string;
 }) {
   const colors = {
     primary: 'bg-primary',
+    positive: 'bg-positive',
     warning: 'bg-warning',
     destructive: 'bg-destructive',
     muted: 'bg-muted-foreground/40',

@@ -29,6 +29,13 @@
       "when": 1790763395913,
       "tag": "0003_recurring",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790764835351,
+      "tag": "0004_budgeting",
+      "breakpoints": true
     }
   ]
 }

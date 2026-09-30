@@ -29,6 +29,7 @@ import {
   transactions,
 } from '../db/schema';
 import { badRequest } from '../lib/errors';
+import { budgetOverview } from './budgets';
 import { loadRateBook } from './rates';
 
 export function periodSettings(ws: WorkspaceCtx): PeriodSettings {
@@ -348,7 +349,12 @@ export async function dashboard(
     dailyExpense.push({ date: d, amountMinor: daily.get(d) ?? 0 });
   }
 
-  const budgeted = (await budgetTotalsByPeriod(db, ws.id, [period.start])).get(period.start) ?? 0;
+  // "Left to spend" follows the monthly limit when there is one, else the category budgets
+  // (including what rolled over from earlier months).
+  const overview = await budgetOverview(db, ws, period);
+  const categoryBudget = overview.totals.budgetedMinor + overview.totals.carryInMinor;
+  const source = overview.cap ? 'cap' : categoryBudget > 0 ? 'categories' : 'none';
+  const budgeted = overview.cap ? overview.cap.amountMinor : Math.max(0, categoryBudget);
   const budgetSpent = sum(budgetFlows, (f) => f.expense);
   const remaining = budgeted - budgetSpent;
   const daysLeft = daysLeftInPeriod(period, today);
@@ -374,6 +380,7 @@ export async function dashboard(
       budgetedMinor: budgeted,
       spentMinor: budgetSpent,
       remainingMinor: remaining,
+      source,
       safePerDayMinor:
         budgeted > 0 && daysLeft > 0 ? Math.max(0, Math.floor(remaining / daysLeft)) : null,
     },

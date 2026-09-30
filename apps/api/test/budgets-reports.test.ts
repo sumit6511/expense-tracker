@@ -114,14 +114,19 @@ describe('budgets', () => {
       categoryId: f.categories['Food & Groceries'],
       budgetedMinor: 1_000_000,
       spentMinor: 200_000,
+      carryInMinor: 0,
+      availableMinor: 1_000_000,
       remainingMinor: 800_000,
+      rollover: 'none',
       averageMinor: 100_000,
       lastPeriodSpentMinor: 300_000,
     });
     expect(line('Dining Out')).toMatchObject({ spentMinor: 133_500, remainingMinor: 66_500 });
     expect(line('Transport')).toMatchObject({ budgetedMinor: 0, spentMinor: 16_000 });
+    expect(month.cap).toBeNull();
     expect(month.totals).toEqual({
       budgetedMinor: 1_200_000,
+      carryInMinor: 0,
       spentMinor: 200_000 + 133_500 + 16_000 + 3000,
       remainingMinor: 1_200_000 - 352_500,
       unbudgetedSpentMinor: 19_000,

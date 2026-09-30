@@ -15,6 +15,7 @@ import { loadWorkspace } from './middleware/workspace';
 import { accountsRouter } from './routes/accounts';
 import { budgetsRouter } from './routes/budgets';
 import { labelsRouter } from './routes/categories';
+import { goalsRouter } from './routes/goals';
 import { importsRouter } from './routes/imports';
 import { meRouter } from './routes/me';
 import { recurringRouter } from './routes/recurring';
@@ -95,6 +96,7 @@ export function createApp(deps: Deps) {
     importsRouter,
     rulesRouter,
     recurringRouter,
+    goalsRouter,
   ]) {
     api.route('/', router);
   }

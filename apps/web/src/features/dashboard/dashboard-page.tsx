@@ -34,6 +34,7 @@ import {
   useAccounts,
   useCategoryMap,
   useDashboard,
+  useGoals,
   useTransactions,
   useUpcoming,
 } from '@/lib/queries';
@@ -227,7 +228,7 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
                     ? `Over budget by ${f.money(-data.budget.remainingMinor, undefined, { trimZeroFraction: true })}`
                     : isCurrent && data.budget.safePerDayMinor !== null
                       ? `About ${f.money(wholeUnits(data.budget.safePerDayMinor, f.digits()), undefined, { trimZeroFraction: true })} a day for the next ${data.daysLeft} days`
-                      : `of ${f.money(data.budget.budgetedMinor, undefined, { trimZeroFraction: true })} budgeted`}
+                      : `of ${f.money(data.budget.budgetedMinor, undefined, { trimZeroFraction: true })} ${data.budget.source === 'cap' ? 'monthly limit' : 'budgeted'}`}
                 </p>
               )}
             </div>
@@ -245,7 +246,8 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
                   Spent {f.money(data.budget.spentMinor, undefined, { trimZeroFraction: true })}
                 </span>
                 <span>
-                  Budget {f.money(data.budget.budgetedMinor, undefined, { trimZeroFraction: true })}
+                  {data.budget.source === 'cap' ? 'Limit' : 'Budget'}{' '}
+                  {f.money(data.budget.budgetedMinor, undefined, { trimZeroFraction: true })}
                 </span>
               </div>
             </div>
@@ -289,11 +291,10 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
           </CardContent>
         </Card>
         <AttentionCard data={data} />
-        {isCurrent && <UpcomingCard />}
       </div>
 
       {/* Top categories */}
-      <Card>
+      <Card className="self-start">
         <CardHeader>
           <CardTitle>Where it went</CardTitle>
           <Link to="/reports" className="text-xs font-medium text-primary hover:underline">
@@ -345,64 +346,70 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
         </CardContent>
       </Card>
 
-      {/* Accounts */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Accounts</CardTitle>
-          <Link to="/accounts" className="text-xs font-medium text-primary hover:underline">
-            Manage
-          </Link>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-1">
-          {accounts
-            .filter((a) => !a.archived)
-            .slice(0, 6)
-            .map((a) => (
-              <Link
-                key={a.id}
-                to="/accounts/$accountId"
-                params={{ accountId: a.id }}
-                className="-mx-2 flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-muted/60"
-              >
-                <CategoryIcon icon={a.icon} color={a.color} size="sm" />
-                <span className="min-w-0 flex-1 truncate text-sm">{a.name}</span>
-                <Money
-                  minor={a.balanceMinor}
-                  currency={a.currency}
-                  className={cn(
-                    'text-sm',
-                    LIABILITY_ACCOUNT_TYPES.includes(a.type) &&
-                      a.balanceMinor < 0 &&
-                      'text-muted-foreground',
-                  )}
-                  trimZero
-                />
-              </Link>
-            ))}
-          <div className="mt-2 flex items-center justify-between border-t pt-3 text-sm">
-            <span className="text-muted-foreground">Net worth</span>
-            <Money minor={data.netWorthMinor} className="font-semibold" trimZero />
-          </div>
-        </CardContent>
-      </Card>
+      {/* Accounts and goals */}
+      <div className="grid grid-cols-1 content-start gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Accounts</CardTitle>
+            <Link to="/accounts" className="text-xs font-medium text-primary hover:underline">
+              Manage
+            </Link>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-1">
+            {accounts
+              .filter((a) => !a.archived)
+              .slice(0, 6)
+              .map((a) => (
+                <Link
+                  key={a.id}
+                  to="/accounts/$accountId"
+                  params={{ accountId: a.id }}
+                  className="-mx-2 flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-muted/60"
+                >
+                  <CategoryIcon icon={a.icon} color={a.color} size="sm" />
+                  <span className="min-w-0 flex-1 truncate text-sm">{a.name}</span>
+                  <Money
+                    minor={a.balanceMinor}
+                    currency={a.currency}
+                    className={cn(
+                      'text-sm',
+                      LIABILITY_ACCOUNT_TYPES.includes(a.type) &&
+                        a.balanceMinor < 0 &&
+                        'text-muted-foreground',
+                    )}
+                    trimZero
+                  />
+                </Link>
+              ))}
+            <div className="mt-2 flex items-center justify-between border-t pt-3 text-sm">
+              <span className="text-muted-foreground">Net worth</span>
+              <Money minor={data.netWorthMinor} className="font-semibold" trimZero />
+            </div>
+          </CardContent>
+        </Card>
+        <GoalsCard />
+      </div>
 
-      {/* Recent */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent</CardTitle>
-          <Link to="/transactions" className="text-xs font-medium text-primary hover:underline">
-            See all
-          </Link>
-        </CardHeader>
-        <div className="-mt-1 divide-y pb-2">
-          {recentItems.length === 0 && (
-            <p className="px-5 py-6 text-sm text-muted-foreground">Nothing yet.</p>
-          )}
-          {recentItems.map((tx) => (
-            <RecentRow key={tx.id} tx={tx} />
-          ))}
-        </div>
-      </Card>
+      {/* Coming up and recent */}
+      <div className="grid grid-cols-1 content-start gap-4">
+        {isCurrent && <UpcomingCard />}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent</CardTitle>
+            <Link to="/transactions" className="text-xs font-medium text-primary hover:underline">
+              See all
+            </Link>
+          </CardHeader>
+          <div className="-mt-1 divide-y pb-2">
+            {recentItems.length === 0 && (
+              <p className="px-5 py-6 text-sm text-muted-foreground">Nothing yet.</p>
+            )}
+            {recentItems.map((tx) => (
+              <RecentRow key={tx.id} tx={tx} />
+            ))}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -429,6 +436,45 @@ function Stat({
       </div>
       <p className="text-lg font-semibold">{value}</p>
     </div>
+  );
+}
+
+/** Progress on the nearest goals. */
+function GoalsCard() {
+  const { data: goals = [] } = useGoals();
+  const active = goals.filter((g) => !g.archived).slice(0, 3);
+  if (active.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Goals</CardTitle>
+        <Link
+          to="/budgets"
+          search={{ view: 'goals' }}
+          className="text-xs font-medium text-primary hover:underline"
+        >
+          All goals
+        </Link>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 gap-3">
+        {active.map((g) => (
+          <div key={g.id} className="grid grid-cols-1 gap-1.5">
+            <div className="flex items-baseline justify-between gap-2 text-sm">
+              <span className="truncate">{g.name}</span>
+              <span className="shrink-0 text-xs text-muted-foreground tabular">
+                {Math.round(g.progress * 100)}%
+              </span>
+            </div>
+            <Progress
+              value={g.progress * 100}
+              tone={g.reached ? 'positive' : 'primary'}
+              className="h-1.5"
+              label={`${g.name} progress`}
+            />
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 

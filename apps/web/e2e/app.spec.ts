@@ -207,6 +207,37 @@ test.describe('everyday use', () => {
     await expect(page.getByRole('button', { name: /WorldLink/ })).toContainText('-Rs. 1,500.00');
   });
 
+  test('a monthly limit and a savings goal', async ({ signedIn: page }) => {
+    await page.keyboard.press('n');
+    await page.getByRole('dialog').getByLabel('Amount').fill('2000');
+    await page.getByRole('dialog').getByRole('button', { name: 'Shopping' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Expense added')).toBeVisible();
+
+    await page.goto('/budgets');
+    await page.getByRole('button', { name: 'Set an overall monthly spending limit' }).click();
+    await page.getByLabel('Spend at most this much a month').fill('50000');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Monthly limit set')).toBeVisible();
+    await expect(page.getByText('Rs. 48,000 left')).toBeVisible();
+    await page.goto('/');
+    await expect(page.getByText('Limit Rs. 50,000')).toBeVisible();
+    await expect(page.getByText('Rs. 48,000', { exact: true })).toBeVisible();
+
+    await page.goto('/budgets?view=goals');
+    await page.getByRole('button', { name: 'New goal' }).click();
+    const dialog = page.getByRole('dialog', { name: 'New goal' });
+    await dialog.getByLabel('Name').fill('New phone');
+    await dialog.getByLabel('Target amount').fill('60,000');
+    await dialog.getByLabel('Reach it by a date').click(); // no date
+    await dialog.getByRole('button', { name: 'Create goal' }).click();
+    await expect(page.getByText('Goal created')).toBeVisible();
+    await page.getByRole('button', { name: 'Add money' }).click();
+    await page.getByRole('dialog').getByLabel('Amount').fill('15000');
+    await page.getByRole('dialog').getByRole('button', { name: 'Add' }).click();
+    await expect(page.getByText('25% there')).toBeVisible();
+  });
+
   test('reports and settings pages load', async ({ signedIn: page }) => {
     await page.goto('/reports?tab=cashflow');
     await expect(page.getByText('Income and spending per month')).toBeVisible();

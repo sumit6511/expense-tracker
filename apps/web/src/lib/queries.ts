@@ -15,6 +15,8 @@ import type {
   CreateWorkspaceInput,
   Dashboard,
   ExchangeRate,
+  Goal,
+  GoalInput,
   ImportBatch,
   ImportMapping,
   ImportPreview,
@@ -30,6 +32,8 @@ import type {
   Rule,
   RuleInput,
   RulePreview,
+  SetBudgetCapInput,
+  SetRolloverInput,
   SpendingByCategory,
   Tag,
   Transaction,
@@ -580,4 +584,39 @@ export const useRecordRecurring = () =>
 export const useSkipRecurring = () =>
   useWsMutation((base, id: string) =>
     api<Recurring>(`${base}/recurring/${id}/skip`, { method: 'POST' }),
+  );
+
+// ---------------------------------------------------------------------------------------------
+// Rollover, monthly limit, goals
+// ---------------------------------------------------------------------------------------------
+
+export const useSetRollover = () =>
+  useWsMutation((base, input: SetRolloverInput) =>
+    api<void>(`${base}/budgets/rollover`, { method: 'PUT', body: input }),
+  );
+export const useSetBudgetCap = () =>
+  useWsMutation((base, input: SetBudgetCapInput) =>
+    api<void>(`${base}/budgets/cap`, { method: 'PUT', body: input }),
+  );
+
+export function useGoals() {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'goals'],
+    queryFn: () => api<Goal[]>(`${base}/goals`),
+  });
+}
+export const useCreateGoal = () =>
+  useWsMutation((base, input: GoalInput) =>
+    api<Goal>(`${base}/goals`, { method: 'POST', body: input }),
+  );
+export const useUpdateGoal = () =>
+  useWsMutation((base, { id, ...input }: Partial<GoalInput> & { id: string }) =>
+    api<Goal>(`${base}/goals/${id}`, { method: 'PATCH', body: input }),
+  );
+export const useDeleteGoal = () =>
+  useWsMutation((base, id: string) => api<void>(`${base}/goals/${id}`, { method: 'DELETE' }));
+export const useContributeGoal = () =>
+  useWsMutation((base, { id, amountMinor }: { id: string; amountMinor: number }) =>
+    api<Goal>(`${base}/goals/${id}/contribute`, { method: 'POST', body: { amountMinor } }),
   );

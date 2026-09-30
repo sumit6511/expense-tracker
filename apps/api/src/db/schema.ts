@@ -188,6 +188,8 @@ export const categoryGroups = pgTable(
   (t) => [index().on(t.workspaceId)],
 );
 
+export const rolloverEnum = pgEnum('budget_rollover', ['none', 'surplus', 'all']);
+
 export const categories = pgTable(
   'categories',
   {
@@ -203,6 +205,10 @@ export const categories = pgTable(
     color: text().notNull().default('#64748b'),
     sortOrder: integer().notNull().default(0),
     archivedAt: timestamp({ withTimezone: true }),
+    /** What happens to this category's leftover budget at the end of a month. */
+    budgetRollover: rolloverEnum().notNull().default('none'),
+    /** First budget month whose leftover carries over. */
+    rolloverSince: date({ mode: 'string' }),
     ...timestamps,
   },
   (t) => [index().on(t.workspaceId), index().on(t.groupId)],
@@ -472,6 +478,48 @@ export const budgets = pgTable(
     ...timestamps,
   },
   (t) => [uniqueIndex().on(t.workspaceId, t.categoryId, t.periodStart)],
+);
+
+/** An overall monthly spending limit; it applies from `periodStart` until a later row. */
+export const budgetCaps = pgTable(
+  'budget_caps',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    periodStart: date({ mode: 'string' }).notNull(),
+    /** 0 = no limit from this month on. */
+    amountMinor: money().notNull(),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex().on(t.workspaceId, t.periodStart)],
+);
+
+export const goalKindEnum = pgEnum('goal_kind', ['account', 'category', 'manual']);
+
+export const goals = pgTable(
+  'goals',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    kind: goalKindEnum().notNull(),
+    /** In the workspace currency. */
+    targetMinor: money().notNull(),
+    targetDate: date({ mode: 'string' }),
+    accountId: uuid().references(() => accounts.id, { onDelete: 'set null' }),
+    categoryId: uuid().references(() => categories.id, { onDelete: 'set null' }),
+    /** Manual goals: what has been put aside so far. */
+    savedMinor: money().notNull().default(0),
+    icon: text().notNull().default('piggy-bank'),
+    color: text().notNull().default('#0f766e'),
+    archivedAt: timestamp({ withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index().on(t.workspaceId)],
 );
 
 // ---------------------------------------------------------------------------------------------

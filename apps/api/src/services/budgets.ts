@@ -1,16 +1,22 @@
 import {
   type BudgetMonth,
+  carryForward,
   getCurrency,
   getMonthPeriod,
   type IsoDate,
+  listMonthPeriods,
   type MonthPeriod,
+  maxDate,
+  type SetRolloverSchema,
   shiftMonthPeriod,
+  todayIn,
   uuidv7,
 } from '@et/shared';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
+import type { z } from 'zod';
 import type { WorkspaceCtx } from '../context';
 import type { Db, Executor } from '../db/client';
-import { budgets, categories, categoryGroups } from '../db/schema';
+import { budgetCaps, budgets, categories, categoryGroups } from '../db/schema';
 import { badRequest } from '../lib/errors';
 import { loadFlows, periodSettings, toPeriodDto } from './reports';
 
@@ -49,60 +55,192 @@ async function spendingByPeriod(db: Executor, ws: WorkspaceCtx, periods: MonthPe
   });
 }
 
+// Rollover looks back at most this many months.
+const MAX_ROLLOVER_MONTHS = 36;
+
+/** The monthly limit in force in `period` (the latest one set at or before it). */
+async function capFor(db: Executor, workspaceId: string, period: MonthPeriod) {
+  const [row] = await db
+    .select({ amount: budgetCaps.amountMinor, start: budgetCaps.periodStart })
+    .from(budgetCaps)
+    .where(and(eq(budgetCaps.workspaceId, workspaceId), lte(budgetCaps.periodStart, period.start)))
+    .orderBy(desc(budgetCaps.periodStart))
+    .limit(1);
+  return row && row.amount > 0 ? row : null;
+}
+
+/**
+ * One budget month: what each category has (assigned + carried over), what was spent, and the
+ * overall limit. Shared by the budget page and the dashboard.
+ */
+export async function budgetOverview(db: Executor, ws: WorkspaceCtx, period: MonthPeriod) {
+  const settings = periodSettings(ws);
+  const cats = await db
+    .select({
+      id: categories.id,
+      rollover: categories.budgetRollover,
+      since: categories.rolloverSince,
+    })
+    .from(categories)
+    .innerJoin(categoryGroups, eq(categoryGroups.id, categories.groupId))
+    .where(and(eq(categories.workspaceId, ws.id), eq(categoryGroups.kind, 'expense')));
+
+  // Look back far enough for the 3-month average and every rollover category's history.
+  const oldestAllowed = shiftMonthPeriod(period, -MAX_ROLLOVER_MONTHS, settings).start;
+  let from = shiftMonthPeriod(period, -3, settings).start;
+  for (const c of cats) {
+    if (c.rollover !== 'none' && c.since && c.since < from) from = maxDate(c.since, oldestAllowed);
+  }
+  const periods = listMonthPeriods(from, period.start, settings);
+  const spending = await spendingByPeriod(db, ws, periods);
+  const index = periods.length - 1; // `period` itself
+  const current = spending[index]!;
+
+  const budgetRows = await db
+    .select({
+      categoryId: budgets.categoryId,
+      start: budgets.periodStart,
+      amount: budgets.amountMinor,
+    })
+    .from(budgets)
+    .where(
+      and(
+        eq(budgets.workspaceId, ws.id),
+        gte(budgets.periodStart, periods[0]!.start),
+        lte(budgets.periodStart, period.start),
+      ),
+    );
+  const budgetOf = new Map(budgetRows.map((b) => [`${b.categoryId}|${b.start}`, b.amount]));
+
+  const lines = cats.map((c) => {
+    const budgeted = budgetOf.get(`${c.id}|${period.start}`) ?? 0;
+    const spent = current.get(c.id) ?? 0;
+    let carryIn = 0;
+    if (c.rollover !== 'none' && c.since && c.since < period.start) {
+      const history = periods
+        .slice(0, index)
+        .map((p, i) => ({ p, i }))
+        .filter(({ p }) => p.end >= c.since!)
+        .map(({ p, i }) => ({
+          budgetedMinor: budgetOf.get(`${c.id}|${p.start}`) ?? 0,
+          spentMinor: spending[i]!.get(c.id) ?? 0,
+        }));
+      carryIn = carryForward(c.rollover, history);
+    }
+    const previous = [1, 2, 3].map((n) => spending[index - n]?.get(c.id) ?? 0);
+    return {
+      categoryId: c.id,
+      budgetedMinor: budgeted,
+      spentMinor: spent,
+      carryInMinor: carryIn,
+      availableMinor: budgeted + carryIn,
+      remainingMinor: budgeted + carryIn - spent,
+      rollover: c.rollover,
+      averageMinor: Math.round(previous.reduce((a, b) => a + b, 0) / 3),
+      lastPeriodSpentMinor: previous[0]!,
+    };
+  });
+
+  const totalSpent = [...current.values()].reduce((s, v) => s + v, 0);
+  const coveredSpent = lines
+    .filter((l) => l.availableMinor !== 0)
+    .reduce((s, l) => s + l.spentMinor, 0);
+  const totalBudgeted = lines.reduce((s, l) => s + l.budgetedMinor, 0);
+  const totalCarry = lines.reduce((s, l) => s + l.carryInMinor, 0);
+  const cap = await capFor(db, ws.id, period);
+  return {
+    lines,
+    totals: {
+      budgetedMinor: totalBudgeted,
+      carryInMinor: totalCarry,
+      spentMinor: totalSpent,
+      remainingMinor: totalBudgeted + totalCarry - totalSpent,
+      unbudgetedSpentMinor: totalSpent - coveredSpent,
+    },
+    cap: cap
+      ? {
+          amountMinor: cap.amount,
+          sincePeriodStart: cap.start,
+          spentMinor: totalSpent,
+          remainingMinor: cap.amount - totalSpent,
+        }
+      : null,
+  };
+}
+
 export async function getBudgetMonth(
   db: Db,
   ws: WorkspaceCtx,
   date: IsoDate,
 ): Promise<BudgetMonth> {
-  const settings = periodSettings(ws);
-  const period = getMonthPeriod(date, settings);
-  const history = [1, 2, 3].map((n) => shiftMonthPeriod(period, -n, settings));
-  const [current, ...previous] = await spendingByPeriod(db, ws, [period, ...history]);
-
-  const rows = await db
-    .select({ categoryId: budgets.categoryId, amount: budgets.amountMinor })
-    .from(budgets)
-    .where(and(eq(budgets.workspaceId, ws.id), eq(budgets.periodStart, period.start)));
-  const budgeted = new Map(rows.map((r) => [r.categoryId, r.amount]));
-  const ids = await expenseCategoryIds(db, ws.id);
-
-  const lines = ids.map((categoryId) => {
-    const spent = current!.get(categoryId) ?? 0;
-    const amount = budgeted.get(categoryId) ?? 0;
-    const history3 = previous.reduce((s, m) => s + (m.get(categoryId) ?? 0), 0);
-    return {
-      categoryId,
-      budgetedMinor: amount,
-      spentMinor: spent,
-      remainingMinor: amount - spent,
-      averageMinor: Math.round(history3 / 3),
-      lastPeriodSpentMinor: previous[0]!.get(categoryId) ?? 0,
-    };
-  });
-
-  const totalSpent = [...current!.values()].reduce((s, v) => s + v, 0);
-  const budgetedSpent = lines
-    .filter((l) => l.budgetedMinor > 0)
-    .reduce((s, l) => s + l.spentMinor, 0);
-  const totalBudgeted = lines.reduce((s, l) => s + l.budgetedMinor, 0);
+  const period = getMonthPeriod(date, periodSettings(ws));
+  const overview = await budgetOverview(db, ws, period);
   const { flows } = await loadFlows(db, ws, {
     from: period.start,
     to: period.end,
     onBudgetOnly: true,
   });
-
   return {
     period: toPeriodDto(period),
     currency: ws.baseCurrency,
-    totals: {
-      budgetedMinor: totalBudgeted,
-      spentMinor: totalSpent,
-      remainingMinor: totalBudgeted - totalSpent,
-      unbudgetedSpentMinor: totalSpent - budgetedSpent,
-      incomeMinor: flows.reduce((s, f) => s + f.income, 0),
-    },
-    lines,
+    totals: { ...overview.totals, incomeMinor: flows.reduce((s, f) => s + f.income, 0) },
+    cap: overview.cap,
+    lines: overview.lines,
   };
+}
+
+/** Turns rollover on or off for a category. */
+export async function setRollover(
+  db: Db,
+  ws: WorkspaceCtx,
+  input: z.output<typeof SetRolloverSchema>,
+) {
+  const [row] = await db
+    .select({
+      id: categories.id,
+      rollover: categories.budgetRollover,
+      since: categories.rolloverSince,
+    })
+    .from(categories)
+    .innerJoin(categoryGroups, eq(categoryGroups.id, categories.groupId))
+    .where(
+      and(
+        eq(categories.workspaceId, ws.id),
+        eq(categories.id, input.categoryId),
+        eq(categoryGroups.kind, 'expense'),
+      ),
+    );
+  if (!row) throw badRequest('Rollover can only be set for expense categories');
+  const settings = periodSettings(ws);
+  const since =
+    input.mode === 'none'
+      ? null
+      : input.fromPeriodStart
+        ? requirePeriodStart(ws, input.fromPeriodStart).start
+        : row.rollover !== 'none' && row.since
+          ? row.since
+          : getMonthPeriod(todayIn(ws.timezone), settings).start;
+  await db
+    .update(categories)
+    .set({ budgetRollover: input.mode, rolloverSince: since })
+    .where(eq(categories.id, row.id));
+}
+
+/** Sets the overall monthly limit from `periodStart` on (0 removes it from then on). */
+export async function setBudgetCap(
+  db: Db,
+  ws: WorkspaceCtx,
+  periodStart: IsoDate,
+  amountMinor: number,
+) {
+  requirePeriodStart(ws, periodStart);
+  await db
+    .insert(budgetCaps)
+    .values({ id: uuidv7(), workspaceId: ws.id, periodStart, amountMinor })
+    .onConflictDoUpdate({
+      target: [budgetCaps.workspaceId, budgetCaps.periodStart],
+      set: { amountMinor, updatedAt: new Date() },
+    });
 }
 
 async function upsertBudgets(

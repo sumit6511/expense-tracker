@@ -95,7 +95,10 @@ const transactionsRoute = createRoute({
 const budgetsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/budgets',
-  validateSearch: z.object({ date: z.string().optional() }),
+  validateSearch: z.object({
+    date: z.string().optional(),
+    view: z.enum(['budget', 'goals']).optional(),
+  }),
   component: lazyRouteComponent(() => import('./features/budgets/budgets-page'), 'BudgetsPage'),
 });
 

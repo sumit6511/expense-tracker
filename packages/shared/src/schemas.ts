@@ -462,9 +462,16 @@ export type PeriodDto = z.infer<typeof PeriodSchema>;
 
 export const BudgetCategoryLineSchema = z.object({
   categoryId: Id,
+  /** Assigned this month. */
   budgetedMinor: MinorAmount,
   spentMinor: MinorAmount,
+  /** Carried in from earlier months (negative after overspending with "all" rollover). */
+  carryInMinor: MinorAmount,
+  /** budgeted + carried in: what this month can spend. */
+  availableMinor: MinorAmount,
+  /** available − spent. */
   remainingMinor: MinorAmount,
+  rollover: z.enum(['none', 'surplus', 'all']),
   /** Average monthly spending over the previous three periods. */
   averageMinor: MinorAmount,
   lastPeriodSpentMinor: MinorAmount,
@@ -475,12 +482,25 @@ export const BudgetMonthSchema = z.object({
   currency: z.string(),
   totals: z.object({
     budgetedMinor: MinorAmount,
+    carryInMinor: MinorAmount,
+    /** Everything spent from budgeted accounts this month, in any category. */
     spentMinor: MinorAmount,
+    /** budgeted + carried in − spent. */
     remainingMinor: MinorAmount,
     /** Spending in categories without a budget (and uncategorized spending). */
     unbudgetedSpentMinor: MinorAmount,
     incomeMinor: MinorAmount,
   }),
+  /** The overall monthly limit in force this month, if any. */
+  cap: z
+    .object({
+      amountMinor: MinorAmount,
+      /** The month it was set in (it applies until changed). */
+      sincePeriodStart: z.string(),
+      spentMinor: MinorAmount,
+      remainingMinor: MinorAmount,
+    })
+    .nullable(),
   lines: z.array(BudgetCategoryLineSchema),
 });
 export type BudgetMonth = z.infer<typeof BudgetMonthSchema>;
@@ -564,9 +584,11 @@ export const DashboardSchema = z.object({
   period: PeriodSchema,
   daysLeft: z.number(),
   budget: z.object({
+    /** The monthly limit when one is set, otherwise category budgets plus carried-in amounts. */
     budgetedMinor: MinorAmount,
     spentMinor: MinorAmount,
     remainingMinor: MinorAmount,
+    source: z.enum(['cap', 'categories', 'none']),
     /** Remaining budget divided by the days left, or null with no budget. */
     safePerDayMinor: MinorAmount.nullable(),
   }),
