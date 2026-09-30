@@ -3,6 +3,7 @@ import {
   type IsoDate,
   parseAmountInput,
   type Transaction,
+  type TransactionDraft,
   toDecimalString,
   uuidv7,
 } from '@et/shared';
@@ -66,6 +67,7 @@ import {
 import { useCanWrite, useWorkspace } from '@/lib/session';
 import { cn, storage } from '@/lib/utils';
 import { TransactionHistory } from './history';
+import { QuickDescribe } from './quick-describe';
 import { ReceiptsField, uploadAll } from './receipts';
 
 type Mode = 'expense' | 'income' | 'transfer';
@@ -301,6 +303,36 @@ function EditorForm({
 
   const digits = f.digits(currency);
   const parsed = amount.trim() ? parseAmountInput(amount, digits) : null;
+
+  /** Fills the form from a sentence or a scanned receipt; the person still checks and saves. */
+  function applyDraft(draft: TransactionDraft) {
+    if (mode !== draft.direction) setMode(draft.direction);
+    // A receipt in another currency: use an account in that currency if there is one.
+    let cur = currency;
+    if (draft.accountId && accountMap.has(draft.accountId)) {
+      setAccountId(draft.accountId);
+      cur = accountMap.get(draft.accountId)!.currency;
+    } else if (draft.currency && draft.currency !== currency) {
+      const match = accounts.find((a) => !a.archived && a.currency === draft.currency);
+      if (match) {
+        setAccountId(match.id);
+        cur = match.currency;
+      } else {
+        toast.warning(`This is in ${draft.currency}; pick the account it was paid from.`);
+      }
+    }
+    if (draft.amountMinor !== null)
+      setAmount(toDecimalString(draft.amountMinor, f.digits(draft.currency ?? cur)));
+    if (draft.date) setDate(draft.date);
+    if (draft.payee) setPayee(draft.payee);
+    if (draft.categoryId) {
+      setCategoryId(draft.categoryId);
+      categoryTouched.current = true;
+    } else if (!categoryTouched.current && draft.direction !== mode) {
+      setCategoryId(null);
+    }
+    if (draft.notes) setNotes((n) => (n ? `${n} · ${draft.notes}` : draft.notes!));
+  }
   const kind: CategoryKind = mode === 'income' ? 'income' : 'expense';
   const sign = mode === 'expense' ? -1 : 1;
 
@@ -523,6 +555,13 @@ function EditorForm({
               The other side of this transfer is someone’s private account, so only they can change
               or delete it.
             </p>
+          )}
+          {!isEdit && editable && (
+            <QuickDescribe
+              accountId={accountId}
+              onDraft={applyDraft}
+              onReceipt={(file) => setQueuedFiles((q) => [...q, file])}
+            />
           )}
           {!isEdit && (
             <Segmented

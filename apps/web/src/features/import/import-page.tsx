@@ -3,6 +3,7 @@ import {
   DATE_FORMATS,
   type DateFormat,
   guessMapping,
+  guessPayeeFromDescription,
   type ImportBatch,
   type ImportMapping,
   type ImportPreview,
@@ -41,11 +42,13 @@ import { useFormat } from '@/lib/format';
 import {
   useAccountMap,
   useAccounts,
+  useAiStatus,
   useCommitImport,
   useCreateImportProfile,
   useImportBatches,
   useImportProfiles,
   usePreviewImport,
+  useReadStatement,
   useRevertImport,
 } from '@/lib/queries';
 import { useCanWrite } from '@/lib/session';
@@ -53,7 +56,7 @@ import { cn } from '@/lib/utils';
 
 type Step = 'upload' | 'map' | 'review' | 'done';
 
-type Source = 'csv' | 'xlsx' | 'ofx' | 'qif' | 'camt' | 'sms';
+type Source = 'csv' | 'xlsx' | 'ofx' | 'qif' | 'camt' | 'sms' | 'pdf';
 
 interface ParsedFile {
   name: string;
@@ -71,6 +74,7 @@ const FORMAT_NAMES: Record<Source, string> = {
   qif: 'QIF',
   camt: 'CAMT.053',
   sms: 'SMS',
+  pdf: 'PDF',
 };
 
 async function parseFile(file: File, digits: number): Promise<ParsedFile> {
@@ -177,6 +181,8 @@ export function ImportPage() {
   const [mode, setMode] = useState<'file' | 'sms'>('file');
   const [smsText, setSmsText] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const readStatement = useReadStatement();
+  const aiOn = useAiStatus().data?.enabled ?? false;
 
   const account = accountMap.get(accountId);
   const currency = account?.currency ?? f.base;
@@ -198,8 +204,52 @@ export function ImportPage() {
     [file, mapping, complete, digits],
   );
 
+  /** PDF statements are read by AI (when the workspace has it on), then go to the preview. */
+  async function onPdf(selected: File) {
+    if (!aiOn) {
+      toast.error(
+        'Reading PDF statements needs the AI helpers (Settings → General). Or download the statement as Excel or CSV.',
+      );
+      return;
+    }
+    try {
+      const extract = await readStatement.mutateAsync(selected);
+      if (extract.currency && extract.currency !== currency)
+        toast.warning(
+          `This statement is in ${extract.currency} but the account is in ${currency}. Check you picked the right account.`,
+        );
+      const rows: NormalizedRow[] = extract.rows.map((r, line) => ({
+        line,
+        date: r.date,
+        amountMinor: r.amountMinor,
+        payee: guessPayeeFromDescription(r.description),
+        description: r.description,
+        notes: '',
+        externalId: null,
+      }));
+      const last = extract.rows.at(-1);
+      setFile({
+        name: selected.name,
+        source: 'pdf',
+        rows: [],
+        structured: {
+          rows,
+          errors: [],
+          currency: extract.currency,
+          balance:
+            last?.balanceMinor != null ? { amountMinor: last.balanceMinor, date: last.date } : null,
+        },
+      });
+      await startReview(rows);
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  }
+
   async function onFile(selected: File | undefined) {
     if (!selected) return;
+    if (selected.type === 'application/pdf' || selected.name.toLowerCase().endsWith('.pdf'))
+      return onPdf(selected);
     try {
       const parsed = await parseFile(selected, digits);
       setFile(parsed);
@@ -411,14 +461,18 @@ export function ImportPage() {
                   {accountId ? 'Drop a file here, or click to choose' : 'Choose an account first'}
                 </span>
                 <span className="text-sm text-muted-foreground">
-                  Excel, CSV, OFX/QFX, QIF or CAMT.053 · the file is read on your device
+                  {readStatement.isPending
+                    ? 'Reading the PDF…'
+                    : aiOn
+                      ? 'Excel, CSV, OFX/QFX, QIF, CAMT.053 · or a PDF, read by AI'
+                      : 'Excel, CSV, OFX/QFX, QIF or CAMT.053 · the file is read on your device'}
                 </span>
               </button>
             )}
             <input
               ref={inputRef}
               type="file"
-              accept=".csv,.xlsx,.ofx,.qfx,.qif,.xml,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/x-ofx,application/xml,text/xml"
+              accept=".csv,.xlsx,.ofx,.qfx,.qif,.xml,.pdf,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/x-ofx,application/xml,text/xml"
               className="hidden"
               onChange={(e) => {
                 onFile(e.target.files?.[0]);

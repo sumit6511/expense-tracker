@@ -7,6 +7,7 @@ import { loadEnv } from '../src/env';
 import { createLogger } from '../src/logger';
 import type { Mail, Mailer } from '../src/mailer';
 import type { Pusher, PushMessage, PushTarget } from '../src/push';
+import { FakeAi } from './fake-ai';
 
 export const ORIGIN = 'http://localhost:5173';
 
@@ -42,8 +43,9 @@ function build() {
       return 'sent';
     },
   };
-  const app = createApp({ db, env, auth, logger, mailer, pusher });
-  return { app, db, pool, env, mailer, outbox, pusher, pushed };
+  const ai = new FakeAi();
+  const app = createApp({ db, env, auth, logger, mailer, pusher, ai });
+  return { app, db, pool, env, mailer, outbox, pusher, pushed, ai };
 }
 
 /** One app + pool per test file. */

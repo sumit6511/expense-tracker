@@ -11,6 +11,7 @@ import { Segmented } from '@/components/ui/menu';
 import { useFormat } from '@/lib/format';
 import { useForecast, useInsights } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { AskCard } from './ask-card';
 import { InsightList } from './insight-list';
 
 const HORIZONS = [30, 60, 90] as const;
@@ -28,6 +29,7 @@ export function InsightsPage() {
         title="Insights"
         description="Where your balance is heading, and what stands out in your own numbers."
       />
+      <AskCard />
       <ForecastCard
         days={days}
         accountIds={search.accountIds}

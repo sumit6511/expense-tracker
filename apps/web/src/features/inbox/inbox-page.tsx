@@ -1,6 +1,6 @@
 import type { Transaction } from '@et/shared';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { Check, CheckCheck, CircleCheck, Loader2, Wand2 } from 'lucide-react';
+import { Check, CheckCheck, CircleCheck, Loader2, Sparkles, Wand2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { EmptyState, ErrorState, PageHeader } from '@/components/page';
@@ -14,9 +14,11 @@ import { useTransactionDialog } from '@/features/transactions/transaction-dialog
 import { TransactionRow } from '@/features/transactions/transaction-row';
 import { errorMessage } from '@/lib/api';
 import {
+  useAiStatus,
   useBulkTransactions,
   useCategoryMap,
   useReviewCounts,
+  useSuggestCategories,
   useTransactions,
   useUpdateTransaction,
 } from '@/lib/queries';
@@ -32,6 +34,8 @@ export function InboxPage() {
   const canWrite = useCanWrite();
   const confirm = useConfirm();
   const bulk = useBulkTransactions();
+  const suggestion = useSuggestCategories();
+  const aiOn = useAiStatus().data?.enabled ?? false;
   const filters = useMemo(
     () => (tab === 'review' ? { needsReview: 'true' as const } : { categoryIds: 'none' }),
     [tab],
@@ -64,6 +68,31 @@ export function InboxPage() {
     );
   }
 
+  /** History first, then AI, for up to 50; the suggestions land in "To review". */
+  function suggest() {
+    suggestion.mutate(
+      items.slice(0, 50).map((t) => t.id),
+      {
+        onSuccess: ({ suggested, skipped }) => {
+          if (suggested === 0) {
+            toast('No confident suggestions this time. These need a person.');
+            return;
+          }
+          toast.success(
+            `Suggested categories for ${suggested}${skipped ? ` (${skipped} left for you)` : ''}. Check them under To review.`,
+            {
+              action: {
+                label: 'Review',
+                onClick: () => navigate({ search: { tab: 'review' }, replace: true }),
+              },
+            },
+          );
+        },
+        onError: (e) => toast.error(errorMessage(e)),
+      },
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 gap-4 pb-10">
       <PageHeader
@@ -77,6 +106,12 @@ export function InboxPage() {
                 <Wand2 /> Rules
               </Link>
             </Button>
+            {canWrite && tab === 'uncategorized' && aiOn && items.length > 0 && (
+              <Button onClick={suggest} disabled={suggestion.isPending}>
+                {suggestion.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />} Suggest
+                categories
+              </Button>
+            )}
             {canWrite && tab === 'review' && items.length > 0 && (
               <Button onClick={confirmAll} disabled={bulk.isPending}>
                 <CheckCheck /> Confirm {items.length < total ? `these ${items.length}` : 'all'}

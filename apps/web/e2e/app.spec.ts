@@ -318,6 +318,32 @@ test.describe('everyday use', () => {
     await expect(page.getByRole('button', { name: /Bhat-Bhateni/ })).toBeVisible();
   });
 
+  test('describe a transaction in words (no AI needed)', async ({ signedIn: page }) => {
+    await page.keyboard.press('n');
+    const dialog = page.getByRole('dialog');
+    const describe = dialog.getByLabel('Describe the transaction');
+    await describe.fill('lunch 450 at Bhojan Griha yesterday via eSewa');
+    await describe.press('Enter');
+    // Enter fills the form; it doesn't save it.
+    await expect(dialog.getByRole('heading', { name: 'New expense' })).toBeVisible();
+    await expect(dialog.getByLabel('Amount')).toHaveValue(/^450/);
+    await expect(dialog.getByLabel('Payee')).toHaveValue('Bhojan Griha');
+    await expect(dialog.getByLabel('Account').locator('option:checked')).toHaveText(/eSewa/);
+    await expect(describe).toHaveValue('');
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Expense added')).toBeVisible();
+
+    await page.goto('/transactions');
+    const row = page.getByRole('button', { name: /Bhojan Griha/ });
+    await expect(row).toContainText('Dining Out');
+    await expect(row).toContainText('-Rs. 450.00');
+    await expect(page.getByText('Yesterday')).toBeVisible();
+
+    // Without an API key on the server, the AI helpers say so.
+    await page.goto('/settings');
+    await expect(page.getByText(/Not set up on this server/)).toBeVisible();
+  });
+
   test('transfer between accounts updates both balances', async ({ signedIn: page }) => {
     await page.keyboard.press('t');
     const dialog = page.getByRole('dialog');

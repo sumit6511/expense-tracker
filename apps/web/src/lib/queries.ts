@@ -1,10 +1,13 @@
 import type {
   Account,
+  AiStatus,
+  AskAnswer,
   Attachment,
   BudgetMonth,
   BudgetVsActual,
   BulkTransactionAction,
   CashFlow,
+  CategorizeResult,
   Category,
   CategoryGroup,
   CategoryTrends,
@@ -42,6 +45,7 @@ import type {
   PushDevice,
   PushSettings,
   PushSubscribeInput,
+  ReceiptDraft,
   ReconcileState,
   Reconciliation,
   RecordRecurringInput,
@@ -59,9 +63,11 @@ import type {
   SplitGroup,
   SplitGroupSummary,
   SplitSettlementBody,
+  StatementExtract,
   Tag,
   Transaction,
   TransactionChange,
+  TransactionDraft,
   TransactionPage,
   UpcomingItem,
   UpdateAccountInput,
@@ -620,6 +626,53 @@ export function useRecurringSuggestions() {
     staleTime: 5 * 60_000,
   });
 }
+
+// ---------------------------------------------------------------------------------------------
+// AI helpers (optional)
+// ---------------------------------------------------------------------------------------------
+
+export function useAiStatus() {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'ai'],
+    queryFn: () => api<AiStatus>(`${base}/ai`),
+    staleTime: 60_000,
+  });
+}
+
+/** Read-only AI calls: nothing to refresh afterwards but today's usage. */
+function useAiCall<TInput, TResult>(fn: (base: string, input: TInput) => Promise<TResult>) {
+  const { wid, base } = useWs();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: TInput) => fn(base, input),
+    onSettled: () => qc.invalidateQueries({ queryKey: [...wsKey(wid), 'ai'] }),
+  });
+}
+
+export const useParseText = () =>
+  useAiCall((base, input: { text: string; accountId?: string | null }) =>
+    api<TransactionDraft>(`${base}/ai/parse`, { method: 'POST', body: input }),
+  );
+export const useScanReceipt = () =>
+  useAiCall((base, file: File | Blob) =>
+    apiUpload<ReceiptDraft>(`${base}/ai/receipt`, file, 'receipt'),
+  );
+export const useReadStatement = () =>
+  useAiCall((base, file: File) =>
+    apiUpload<StatementExtract>(`${base}/ai/statement`, file, file.name),
+  );
+export const useAskMoney = () =>
+  useAiCall((base, question: string) =>
+    api<AskAnswer>(`${base}/ai/ask`, { method: 'POST', body: { question } }),
+  );
+export const useSuggestCategories = () =>
+  useWsMutation((base, transactionIds?: string[]) =>
+    api<CategorizeResult>(`${base}/ai/categorize`, {
+      method: 'POST',
+      body: transactionIds ? { transactionIds } : {},
+    }),
+  );
 
 // ---------------------------------------------------------------------------------------------
 // Insights & forecast

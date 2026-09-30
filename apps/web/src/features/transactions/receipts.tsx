@@ -1,6 +1,6 @@
 import { MAX_ATTACHMENT_BYTES } from '@et/shared';
 import { Camera, FileText, Loader2, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/input';
@@ -195,11 +195,15 @@ function Thumb({
 }
 
 function QueuedThumb({ file, onRemove }: { file: File; onRemove: () => void }) {
-  const url = useMemo(
-    () => (file.type.startsWith('image/') ? URL.createObjectURL(file) : null),
-    [file],
-  );
-  useEffect(() => () => void (url && URL.revokeObjectURL(url)), [url]);
+  // Made and revoked by the same effect, so a re-run (React's development double run) gets a
+  // fresh URL instead of a revoked one.
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!file.type.startsWith('image/')) return;
+    const objectUrl = URL.createObjectURL(file);
+    setUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file]);
   return (
     <div className="relative">
       <div

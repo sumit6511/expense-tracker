@@ -80,6 +80,8 @@ export const WorkspaceSettingsSchema = z.object({
   weekStart: z.number().int().min(0).max(6),
   timezone: z.string().refine(isValidTimeZone, { error: 'Unknown time zone' }),
   budgetMode: BudgetModeSchema,
+  /** Optional AI helpers (see ai.ts); off until an owner or admin turns them on. */
+  aiEnabled: z.boolean(),
 });
 export type WorkspaceSettings = z.infer<typeof WorkspaceSettingsSchema>;
 
@@ -106,6 +108,7 @@ export const CreateWorkspaceSchema = WorkspaceSettingsSchema.partial({
   weekStart: true,
   timezone: true,
   budgetMode: true,
+  aiEnabled: true,
 }).extend({
   starterCategories: z.boolean().default(true),
   accounts: z.array(StarterAccountSchema).max(20).default([]),
@@ -727,7 +730,7 @@ export { MappingSchema as ImportMappingSchema };
 export const CommitImportSchema = z.object({
   accountId: Id,
   fileName: OptionalText(200).default('import'),
-  source: z.enum(['csv', 'xlsx', 'ofx', 'qif', 'camt', 'sms']),
+  source: z.enum(['csv', 'xlsx', 'ofx', 'qif', 'camt', 'sms', 'pdf']),
   mapping: MappingSchema.optional(),
   rows: z
     .array(

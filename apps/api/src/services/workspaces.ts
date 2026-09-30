@@ -38,6 +38,7 @@ export function toWorkspaceDto(row: WorkspaceRow, role: Workspace['role']): Work
     timezone: row.timezone,
     budgetMode: row.budgetMode,
     envelopeSince: row.envelopeSince,
+    aiEnabled: row.aiEnabled,
     role,
     createdAt: row.createdAt.toISOString(),
   };
@@ -54,6 +55,7 @@ export function ctxToDto(ws: WorkspaceCtx): Workspace {
     timezone: ws.timezone,
     budgetMode: ws.budgetMode,
     envelopeSince: ws.envelopeSince,
+    aiEnabled: ws.aiEnabled,
     role: ws.role,
     createdAt: ws.createdAt.toISOString(),
   };

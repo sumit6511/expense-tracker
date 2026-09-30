@@ -75,6 +75,7 @@ export async function memberContexts(db: Executor): Promise<WorkspaceCtx[]> {
       timezone: w.timezone,
       budgetMode: w.budgetMode,
       envelopeSince: w.envelopeSince,
+      aiEnabled: w.aiEnabled,
       userId,
       role,
       hiddenAccountIds: await loadHiddenAccountIds(db, w.id, userId),

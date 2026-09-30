@@ -15,6 +15,7 @@ import { originCheck, writeRateLimit } from './middleware/security';
 import { loadSession } from './middleware/session';
 import { loadWorkspace } from './middleware/workspace';
 import { accountsRouter } from './routes/accounts';
+import { aiRouter } from './routes/ai';
 import { budgetsRouter } from './routes/budgets';
 import { labelsRouter } from './routes/categories';
 import { goalsRouter } from './routes/goals';
@@ -118,6 +119,7 @@ export function createApp(deps: Deps) {
     membersRouter,
     splitRouter,
     insightsRouter,
+    aiRouter,
   ]) {
     api.route('/', router);
   }

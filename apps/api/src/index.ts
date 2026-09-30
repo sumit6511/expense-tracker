@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server';
+import { createAiProvider } from './ai/claude';
 import { createApp } from './app';
 import { createAuth } from './auth';
 import { createDb } from './db/client';
@@ -17,7 +18,8 @@ await runMigrations(db);
 const auth = createAuth(db, env);
 const mailer = createMailer(env, logger);
 const pusher = await createPusher(db, env, logger);
-const app = createApp({ db, env, auth, logger, mailer, pusher });
+const ai = createAiProvider(env, logger);
+const app = createApp({ db, env, auth, logger, mailer, pusher, ai });
 const boss = env.RUN_WORKER ? await startJobs(db, env, logger, mailer, pusher) : null;
 
 const server = serve({ fetch: app.fetch, port: env.PORT, hostname: env.HOST }, (info) => {

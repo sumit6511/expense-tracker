@@ -1,4 +1,5 @@
 import type { BudgetMode, CalendarSystem, Role } from '@et/shared';
+import type { AiProvider } from './ai/provider';
 import type { Auth } from './auth';
 import type { Db } from './db/client';
 import type { Env } from './env';
@@ -15,6 +16,8 @@ export interface Deps {
   mailer: Mailer | null;
   /** Null when Web Push is turned off. */
   pusher: Pusher | null;
+  /** Null when no AI provider is set up. */
+  ai: AiProvider | null;
 }
 
 export interface SessionUser {
@@ -35,6 +38,7 @@ export interface WorkspaceCtx {
   budgetMode: BudgetMode;
   /** First day of the budget month envelope budgeting started in. */
   envelopeSince: string | null;
+  aiEnabled: boolean;
   /** The person making the request (or, for background jobs, the person it's done for). */
   userId: string;
   role: Role;

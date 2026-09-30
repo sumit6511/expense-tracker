@@ -63,6 +63,16 @@ const EnvSchema = z.object({
         .map((h) => h.trim().toLowerCase())
         .filter(Boolean),
     ),
+  /**
+   * Claude API key for the optional AI helpers (receipt scan, quick add fallback, category
+   * suggestions, questions, PDF statements). Without it the helpers are unavailable; with it,
+   * each workspace still has to turn them on.
+   */
+  ANTHROPIC_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  /** Which Claude model the helpers use. */
+  AI_MODEL: z.string().default('claude-opus-5-5'),
+  /** AI requests allowed per workspace per day. */
+  AI_DAILY_LIMIT: z.coerce.number().int().min(0).default(200),
   /** Allow new sign-ups. Set to false on a personal server once your account exists. */
   ALLOW_SIGNUP: z
     .enum(['true', 'false'])

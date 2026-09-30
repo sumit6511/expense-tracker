@@ -161,6 +161,8 @@ export const workspaces = pgTable('workspaces', {
   budgetMode: budgetModeEnum().notNull().default('tracking'),
   /** First day of the budget month envelope budgeting started in. */
   envelopeSince: date({ mode: 'string' }),
+  /** Optional AI helpers (receipt scan, quick add, questions); off until an owner turns them on. */
+  aiEnabled: boolean().notNull().default(false),
   ...timestamps,
 });
 
@@ -343,6 +345,7 @@ export const importSourceEnum = pgEnum('import_source', [
   'qif',
   'camt',
   'sms',
+  'pdf',
 ]);
 
 export const importBatches = pgTable(
@@ -763,6 +766,19 @@ export const notificationPrefs = pgTable('notification_prefs', {
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
+
+/** AI requests per workspace per day, to keep costs in check. */
+export const aiUsage = pgTable(
+  'ai_usage',
+  {
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    day: date({ mode: 'string' }).notNull(),
+    count: integer().notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.day] })],
+);
 
 /** Insights (and recurring suggestions) someone has waved away. */
 export const insightDismissals = pgTable(

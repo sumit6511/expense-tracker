@@ -1,5 +1,5 @@
 import { formatAdDate, formatBsDate, formatMoney, WEEKDAY_NAMES } from '@et/shared';
-import { Loader2, Monitor, Moon, Sun } from 'lucide-react';
+import { Loader2, Monitor, Moon, Sparkles, Sun } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { toast } from 'sonner';
 import { useTheme } from '@/app/theme';
@@ -7,10 +7,10 @@ import { CurrencySelect } from '@/components/pickers';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, Input, NativeSelect } from '@/components/ui/input';
-import { Segmented } from '@/components/ui/menu';
+import { Segmented, Switch } from '@/components/ui/menu';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
-import { useUpdateMe, useUpdateWorkspace } from '@/lib/queries';
+import { useAiStatus, useUpdateMe, useUpdateWorkspace } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 
 const TIME_ZONES = [
@@ -189,70 +189,141 @@ export function GeneralSettings() {
         </CardContent>
       </Card>
 
-      <Card className="self-start">
-        <CardHeader>
-          <CardTitle>Display (just for you)</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-5">
-          <Field label="Number format">
-            <Segmented
-              value={me.user.numberGrouping}
-              onChange={(numberGrouping) =>
-                updateMe.mutate(
-                  { numberGrouping },
-                  { onError: (err) => toast.error(errorMessage(err)) },
-                )
-              }
-              label="Number format"
-              options={[
-                {
-                  value: 'lakh',
-                  label: formatMoney(sample, workspace.baseCurrency, { grouping: 'lakh' }),
-                },
-                {
-                  value: 'international',
-                  label: formatMoney(sample, workspace.baseCurrency, { grouping: 'international' }),
-                },
-              ]}
-              className="w-full"
-            />
-          </Field>
-          <Field label="Theme">
-            <Segmented
-              value={preference}
-              onChange={setPreference}
-              label="Theme"
-              options={[
-                {
-                  value: 'light',
-                  label: (
-                    <span className="flex items-center justify-center gap-1.5">
-                      <Sun className="size-4" /> Light
-                    </span>
-                  ),
-                },
-                {
-                  value: 'dark',
-                  label: (
-                    <span className="flex items-center justify-center gap-1.5">
-                      <Moon className="size-4" /> Dark
-                    </span>
-                  ),
-                },
-                {
-                  value: 'system',
-                  label: (
-                    <span className="flex items-center justify-center gap-1.5">
-                      <Monitor className="size-4" /> Auto
-                    </span>
-                  ),
-                },
-              ]}
-              className="w-full"
-            />
-          </Field>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 content-start gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Display (just for you)</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-5">
+            <Field label="Number format">
+              <Segmented
+                value={me.user.numberGrouping}
+                onChange={(numberGrouping) =>
+                  updateMe.mutate(
+                    { numberGrouping },
+                    { onError: (err) => toast.error(errorMessage(err)) },
+                  )
+                }
+                label="Number format"
+                options={[
+                  {
+                    value: 'lakh',
+                    label: formatMoney(sample, workspace.baseCurrency, { grouping: 'lakh' }),
+                  },
+                  {
+                    value: 'international',
+                    label: formatMoney(sample, workspace.baseCurrency, {
+                      grouping: 'international',
+                    }),
+                  },
+                ]}
+                className="w-full"
+              />
+            </Field>
+            <Field label="Theme">
+              <Segmented
+                value={preference}
+                onChange={setPreference}
+                label="Theme"
+                options={[
+                  {
+                    value: 'light',
+                    label: (
+                      <span className="flex items-center justify-center gap-1.5">
+                        <Sun className="size-4" /> Light
+                      </span>
+                    ),
+                  },
+                  {
+                    value: 'dark',
+                    label: (
+                      <span className="flex items-center justify-center gap-1.5">
+                        <Moon className="size-4" /> Dark
+                      </span>
+                    ),
+                  },
+                  {
+                    value: 'system',
+                    label: (
+                      <span className="flex items-center justify-center gap-1.5">
+                        <Monitor className="size-4" /> Auto
+                      </span>
+                    ),
+                  },
+                ]}
+                className="w-full"
+              />
+            </Field>
+          </CardContent>
+        </Card>
+        <AiCard canEdit={canEdit} />
+      </div>
     </div>
+  );
+}
+
+/** Opt in to the AI helpers, with a plain account of what gets sent where. */
+function AiCard({ canEdit }: { canEdit: boolean }) {
+  const { workspace } = useSession();
+  const status = useAiStatus();
+  const update = useUpdateWorkspace();
+  const data = status.data;
+  if (!data) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="size-4 text-primary" /> AI helpers
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 gap-3 text-sm">
+        {!data.available ? (
+          <p className="text-muted-foreground">
+            Not set up on this server. Whoever runs it can add a Claude API key (ANTHROPIC_API_KEY)
+            to offer them.
+          </p>
+        ) : (
+          <>
+            <label className="flex items-start justify-between gap-4">
+              <span>
+                <span className="block font-medium">Use AI helpers in this workspace</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Scan receipts, read PDF statements, suggest categories, answer questions about
+                  your money, and help quick add when the rules can’t read what you typed.
+                </span>
+              </span>
+              <Switch
+                checked={workspace.aiEnabled}
+                disabled={!canEdit || update.isPending}
+                onCheckedChange={(aiEnabled) =>
+                  update.mutate(
+                    { aiEnabled },
+                    {
+                      onSuccess: () =>
+                        toast.success(aiEnabled ? 'AI helpers are on' : 'AI helpers are off'),
+                      onError: (err) => toast.error(errorMessage(err)),
+                    },
+                  )
+                }
+              />
+            </label>
+            <div className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+              <p className="font-medium text-foreground">What’s shared, and with whom</p>
+              <p className="mt-1">
+                Nothing is sent until someone uses a helper. Then {data.provider} gets what that
+                helper needs: the receipt, statement, sentence or question itself, your account and
+                category names, and for questions the report figures that answer them. Never your
+                whole history. Results are drafts you check before saving.
+              </p>
+            </div>
+            {workspace.aiEnabled && (
+              <p className="text-xs text-muted-foreground">
+                Used today: {data.usedToday} of {data.dailyLimit} requests.
+              </p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
