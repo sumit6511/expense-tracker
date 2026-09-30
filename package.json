@@ -1,0 +1,27 @@
+{
+  "name": "expense-tracker",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @et/api --filter @et/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "pnpm -r test",
+    "test:unit": "pnpm --filter @et/shared test",
+    "test:integration": "pnpm --filter @et/api test",
+    "e2e": "pnpm --filter @et/web e2e",
+    "db:generate": "pnpm --filter @et/api db:generate",
+    "db:migrate": "pnpm --filter @et/api db:migrate",
+    "db:seed": "pnpm --filter @et/api db:seed",
+    "check": "pnpm lint && pnpm typecheck && pnpm test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "typescript": "6.0.3"
+  }
+}
