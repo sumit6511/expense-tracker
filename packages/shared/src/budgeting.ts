@@ -148,3 +148,78 @@ export function goalPlan(
       remaining === 0 ? 0 : monthsLeft === 0 ? remaining : Math.ceil(remaining / monthsLeft),
   };
 }
+
+// ---------------------------------------------------------------------------------------------
+// Envelope (zero-based) budgeting
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Envelope budgeting ("give every rupee a job"): money that comes in is Ready to assign; you
+ * assign it to categories. Whatever a category doesn't spend stays in it next month.
+ * Overspending resets the category to zero and is taken from next month's Ready to assign.
+ * Spending with no category comes straight out of Ready to assign.
+ */
+export interface EnvelopeMonthInput {
+  /** Money in: income categories and uncategorized money in. */
+  incomeMinor: Minor;
+  /** Money out with no category. */
+  uncategorizedSpentMinor: Minor;
+  lines: ReadonlyArray<{ categoryId: string; budgetedMinor: Minor; spentMinor: Minor }>;
+}
+
+export interface EnvelopeMonthResult {
+  readyToAssignMinor: Minor;
+  /** Last month's overspending, taken from this month's Ready to assign. */
+  overspentLastMonthMinor: Minor;
+  /** Overspending this month (taken from next month). */
+  overspentMinor: Minor;
+  assignedMinor: Minor;
+  lines: Map<string, { carryInMinor: Minor; availableMinor: Minor }>;
+}
+
+/** Runs the months in order from the start of envelope budgeting. */
+export function envelopeMonths(
+  startingFundsMinor: Minor,
+  months: readonly EnvelopeMonthInput[],
+): EnvelopeMonthResult[] {
+  let funds = startingFundsMinor;
+  let overspentBefore = 0;
+  let carry = new Map<string, number>();
+  return months.map((m) => {
+    const assigned = m.lines.reduce((s, l) => s + l.budgetedMinor, 0);
+    funds += m.incomeMinor - assigned - m.uncategorizedSpentMinor - overspentBefore;
+    const lines = new Map<string, { carryInMinor: number; availableMinor: number }>();
+    const ids = new Set([...carry.keys(), ...m.lines.map((l) => l.categoryId)]);
+    let overspent = 0;
+    const next = new Map<string, number>();
+    for (const id of ids) {
+      const line = m.lines.find((l) => l.categoryId === id);
+      const carryIn = carry.get(id) ?? 0;
+      const available = carryIn + (line?.budgetedMinor ?? 0) - (line?.spentMinor ?? 0);
+      lines.set(id, { carryInMinor: carryIn, availableMinor: available });
+      if (available < 0) overspent -= available;
+      else if (available > 0) next.set(id, available);
+    }
+    const result = {
+      readyToAssignMinor: funds,
+      overspentLastMonthMinor: overspentBefore,
+      overspentMinor: overspent,
+      assignedMinor: assigned,
+      lines,
+    };
+    overspentBefore = overspent;
+    carry = next;
+    return result;
+  });
+}
+
+export const MoveBudgetSchema = z
+  .object({
+    periodStart: IsoDateSchema,
+    /** null = Ready to assign. */
+    fromCategoryId: Id.nullable(),
+    toCategoryId: Id.nullable(),
+    amountMinor: z.number().int().positive(),
+  })
+  .refine((m) => m.fromCategoryId !== m.toCategoryId, { error: 'Choose two different places' });
+export type MoveBudgetInput = z.input<typeof MoveBudgetSchema>;

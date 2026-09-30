@@ -1,4 +1,4 @@
-import type { CalendarSystem, Role } from '@et/shared';
+import type { BudgetMode, CalendarSystem, Role } from '@et/shared';
 import type { Auth } from './auth';
 import type { Db } from './db/client';
 import type { Env } from './env';
@@ -29,6 +29,9 @@ export interface WorkspaceCtx {
   monthStartDay: number;
   weekStart: number;
   timezone: string;
+  budgetMode: BudgetMode;
+  /** First day of the budget month envelope budgeting started in. */
+  envelopeSince: string | null;
   /** The person making the request (or, for background jobs, the person it's done for). */
   userId: string;
   role: Role;

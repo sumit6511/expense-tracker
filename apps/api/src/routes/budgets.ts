@@ -10,6 +10,7 @@ import {
   DashboardSchema,
   FillAverageBudgetsSchema,
   IsoDateSchema,
+  MoveBudgetSchema,
   NetWorthSeriesSchema,
   ReportQuerySchema,
   SetBudgetCapSchema,
@@ -33,6 +34,7 @@ import {
   copyBudgets,
   fillAverageBudgets,
   getBudgetMonth,
+  moveBudget,
   setBudgetCap,
   setBudgets,
   setRollover,
@@ -238,6 +240,21 @@ budgetsRouter.openapi(
   async (c) => {
     const { periodStart, amountMinor } = c.req.valid('json');
     await setBudgetCap(c.get('deps').db, c.get('workspace'), periodStart, amountMinor);
+    return c.body(null, 204);
+  },
+);
+
+budgetsRouter.openapi(
+  createRoute({
+    method: 'post',
+    path: '/workspaces/{wid}/budgets/move',
+    tags: ['Budgets'],
+    summary: 'Move money between categories this month (or to/from Ready to assign)',
+    request: { params: WidParams, ...jsonBody(MoveBudgetSchema) },
+    responses: { 204: NoContent, ...errorResponses },
+  }),
+  async (c) => {
+    await moveBudget(c.get('deps').db, c.get('workspace'), c.req.valid('json'));
     return c.body(null, 204);
   },
 );

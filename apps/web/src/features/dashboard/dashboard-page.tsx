@@ -237,6 +237,21 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
                 <Link to="/budgets">Set a budget</Link>
               </Button>
             )}
+            {data.budget.readyToAssignMinor !== null && data.budget.readyToAssignMinor !== 0 && (
+              <Link
+                to="/budgets"
+                className={cn(
+                  'rounded-lg border px-3 py-2 text-sm font-medium',
+                  data.budget.readyToAssignMinor > 0
+                    ? 'border-positive/30 bg-positive/10 text-positive'
+                    : 'border-destructive/30 bg-destructive/10 text-destructive',
+                )}
+              >
+                {data.budget.readyToAssignMinor > 0
+                  ? `${f.money(data.budget.readyToAssignMinor, undefined, { trimZeroFraction: true })} ready to assign`
+                  : `${f.money(-data.budget.readyToAssignMinor, undefined, { trimZeroFraction: true })} more assigned than you have`}
+              </Link>
+            )}
           </div>
           {hasBudget && (
             <div className="grid grid-cols-1 gap-1.5">

@@ -1,11 +1,14 @@
 import {
+  addDays,
   type BudgetMonth,
   carryForward,
+  envelopeMonths,
   getCurrency,
   getMonthPeriod,
   type IsoDate,
   listMonthPeriods,
   type MonthPeriod,
+  type MoveBudgetSchema,
   maxDate,
   type SetRolloverSchema,
   shiftMonthPeriod,
@@ -16,9 +19,18 @@ import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { WorkspaceCtx } from '../context';
 import type { Db, Executor } from '../db/client';
-import { budgetCaps, budgets, categories, categoryGroups } from '../db/schema';
+import {
+  accounts,
+  budgetCaps,
+  budgets,
+  categories,
+  categoryGroups,
+  transactions,
+} from '../db/schema';
 import { badRequest } from '../lib/errors';
+import { loadRateBook } from './rates';
 import { loadFlows, periodSettings, toPeriodDto } from './reports';
+import { visibleAccount } from './visibility';
 
 /** Budget periods are identified by their first day; reject dates that aren't one. */
 function requirePeriodStart(ws: WorkspaceCtx, start: IsoDate): MonthPeriod {
@@ -80,6 +92,9 @@ async function capFor(db: Executor, workspaceId: string, period: MonthPeriod) {
  * overall limit. Shared by the budget page and the dashboard.
  */
 export async function budgetOverview(db: Executor, ws: WorkspaceCtx, period: MonthPeriod) {
+  if (ws.budgetMode === 'envelope' && ws.envelopeSince && period.start >= ws.envelopeSince) {
+    return envelopeOverview(db, ws, period, ws.envelopeSince);
+  }
   const settings = periodSettings(ws);
   const cats = await db
     .select({
@@ -171,7 +186,236 @@ export async function budgetOverview(db: Executor, ws: WorkspaceCtx, period: Mon
           remainingMinor: cap.amount - totalSpent,
         }
       : null,
+    envelope: null,
   };
+}
+
+/** On-budget money the person can see before `start`, in the base currency. */
+async function startingFunds(db: Executor, ws: WorkspaceCtx, start: IsoDate) {
+  const dayBefore = addDays(start, -1);
+  const rows = await db
+    .select({
+      currency: accounts.currency,
+      opening: accounts.openingBalanceMinor,
+      openingDate: accounts.openingDate,
+      moved: sql<number>`coalesce((
+        select sum(t.amount_minor) from ${transactions} t
+        where t.account_id = "accounts"."id" and t.deleted_at is null and t.date < ${start}
+      ), 0)::bigint`,
+    })
+    .from(accounts)
+    .where(
+      and(
+        eq(accounts.workspaceId, ws.id),
+        eq(accounts.onBudget, true),
+        visibleAccount(ws, accounts.id),
+      ),
+    );
+  const rates = await loadRateBook(
+    db,
+    ws.id,
+    rows.map((r) => r.currency),
+    ws.baseCurrency,
+    dayBefore,
+    dayBefore,
+  );
+  let total = 0;
+  for (const r of rows) {
+    const amount = (r.openingDate < start ? r.opening : 0) + Number(r.moved);
+    total += rates.convert(amount, r.currency, ws.baseCurrency, dayBefore) ?? 0;
+  }
+  return total;
+}
+
+/** Opening balances of on-budget accounts opened on or after `start`: money that arrived then. */
+async function laterOpenings(db: Executor, ws: WorkspaceCtx, start: IsoDate, end: IsoDate) {
+  const rows = await db
+    .select({
+      currency: accounts.currency,
+      opening: accounts.openingBalanceMinor,
+      openingDate: accounts.openingDate,
+    })
+    .from(accounts)
+    .where(
+      and(
+        eq(accounts.workspaceId, ws.id),
+        eq(accounts.onBudget, true),
+        gte(accounts.openingDate, start),
+        lte(accounts.openingDate, end),
+        visibleAccount(ws, accounts.id),
+      ),
+    );
+  if (rows.length === 0) return [];
+  const rates = await loadRateBook(
+    db,
+    ws.id,
+    rows.map((r) => r.currency),
+    ws.baseCurrency,
+    start,
+    end,
+  );
+  return rows.map((r) => ({
+    date: r.openingDate,
+    amount: rates.convert(r.opening, r.currency, ws.baseCurrency, r.openingDate) ?? 0,
+  }));
+}
+
+/**
+ * Envelope budgeting: runs every month from the start, so each category carries what it didn't
+ * spend, and works out Ready to assign.
+ */
+async function envelopeOverview(
+  db: Executor,
+  ws: WorkspaceCtx,
+  period: MonthPeriod,
+  since: IsoDate,
+) {
+  const settings = periodSettings(ws);
+  const cats = (await expenseCategoryIds(db, ws.id)).sort();
+  const periods = listMonthPeriods(since, period.start, settings);
+  const history = [-3, -2, -1].map((n) => shiftMonthPeriod(period, n, settings));
+  const [{ flows }, budgetRows, funds, openings, previous] = await Promise.all([
+    loadFlows(db, ws, {
+      from: periods[0]!.start,
+      to: period.end,
+      onBudgetOnly: true,
+      includeExcluded: true,
+    }),
+    db
+      .select({
+        categoryId: budgets.categoryId,
+        start: budgets.periodStart,
+        amount: budgets.amountMinor,
+      })
+      .from(budgets)
+      .where(
+        and(
+          eq(budgets.workspaceId, ws.id),
+          gte(budgets.periodStart, periods[0]!.start),
+          lte(budgets.periodStart, period.start),
+        ),
+      ),
+    startingFunds(db, ws, periods[0]!.start),
+    laterOpenings(db, ws, periods[0]!.start, period.end),
+    spendingByPeriod(db, ws, history),
+  ]);
+  const budgetOf = new Map(budgetRows.map((b) => [`${b.categoryId}|${b.start}`, b.amount]));
+  const spentIn = periods.map(() => new Map<string, number>());
+  const months = periods.map((p, i) => {
+    let income = 0;
+    let uncategorized = 0;
+    for (const f of flows) {
+      if (f.date < p.start || f.date > p.end) continue;
+      income += f.income;
+      if (f.categoryId === null) uncategorized += f.expense;
+      else if (f.expense !== 0)
+        spentIn[i]!.set(f.categoryId, (spentIn[i]!.get(f.categoryId) ?? 0) + f.expense);
+    }
+    for (const o of openings) if (o.date >= p.start && o.date <= p.end) income += o.amount;
+    return {
+      incomeMinor: income,
+      uncategorizedSpentMinor: uncategorized,
+      lines: cats.map((id) => ({
+        categoryId: id,
+        budgetedMinor: budgetOf.get(`${id}|${p.start}`) ?? 0,
+        spentMinor: spentIn[i]!.get(id) ?? 0,
+      })),
+    };
+  });
+  const results = envelopeMonths(funds, months);
+  const now = results.at(-1)!;
+  const month = months.at(-1)!;
+
+  const lines = month.lines.map((l) => {
+    const env = now.lines.get(l.categoryId) ?? { carryInMinor: 0, availableMinor: 0 };
+    const past = previous.map((m) => m.get(l.categoryId) ?? 0);
+    return {
+      categoryId: l.categoryId,
+      budgetedMinor: l.budgetedMinor,
+      spentMinor: l.spentMinor,
+      carryInMinor: env.carryInMinor,
+      availableMinor: env.carryInMinor + l.budgetedMinor,
+      remainingMinor: env.availableMinor,
+      rollover: 'surplus' as const,
+      averageMinor: Math.round(past.reduce((a, b) => a + b, 0) / 3),
+      lastPeriodSpentMinor: past[2]!,
+    };
+  });
+  const categorySpent = lines.reduce((s, l) => s + l.spentMinor, 0);
+  const totalSpent = categorySpent + month.uncategorizedSpentMinor;
+  const coveredSpent = lines
+    .filter((l) => l.availableMinor !== 0)
+    .reduce((s, l) => s + l.spentMinor, 0);
+  const totalBudgeted = lines.reduce((s, l) => s + l.budgetedMinor, 0);
+  const totalCarry = lines.reduce((s, l) => s + l.carryInMinor, 0);
+  return {
+    lines,
+    totals: {
+      budgetedMinor: totalBudgeted,
+      carryInMinor: totalCarry,
+      spentMinor: totalSpent,
+      remainingMinor: totalBudgeted + totalCarry - totalSpent,
+      unbudgetedSpentMinor: totalSpent - coveredSpent,
+    },
+    cap: null,
+    envelope: {
+      sincePeriodStart: periods[0]!.start,
+      readyToAssignMinor: now.readyToAssignMinor,
+      startingFundsMinor: funds,
+      incomeMinor: month.incomeMinor,
+      assignedMinor: now.assignedMinor,
+      uncategorizedSpentMinor: month.uncategorizedSpentMinor,
+      overspentLastMonthMinor: now.overspentLastMonthMinor,
+      overspentMinor: now.overspentMinor,
+    },
+  };
+}
+
+/**
+ * Moves money between two categories this month (or to/from Ready to assign when one side is
+ * null). A category's assigned amount can go below zero when moving money it carried over.
+ */
+export async function moveBudget(
+  db: Db,
+  ws: WorkspaceCtx,
+  input: z.output<typeof MoveBudgetSchema>,
+) {
+  requirePeriodStart(ws, input.periodStart);
+  const allowed = new Set(await expenseCategoryIds(db, ws.id));
+  const ids = [input.fromCategoryId, input.toCategoryId].filter((c): c is string => c !== null);
+  if (ids.some((id) => !allowed.has(id)))
+    throw badRequest('Money can only be moved between expense categories');
+  await db.transaction(async (tx) => {
+    const adjust = async (categoryId: string, delta: number) => {
+      await tx
+        .insert(budgets)
+        .values({
+          id: uuidv7(),
+          workspaceId: ws.id,
+          categoryId,
+          periodStart: input.periodStart,
+          amountMinor: delta,
+        })
+        .onConflictDoUpdate({
+          target: [budgets.workspaceId, budgets.categoryId, budgets.periodStart],
+          set: {
+            amountMinor: sql`${budgets.amountMinor} + excluded.amount_minor`,
+            updatedAt: new Date(),
+          },
+        });
+    };
+    if (input.fromCategoryId) await adjust(input.fromCategoryId, -input.amountMinor);
+    if (input.toCategoryId) await adjust(input.toCategoryId, input.amountMinor);
+    await tx
+      .delete(budgets)
+      .where(
+        and(
+          eq(budgets.workspaceId, ws.id),
+          eq(budgets.periodStart, input.periodStart),
+          eq(budgets.amountMinor, 0),
+        ),
+      );
+  });
 }
 
 export async function getBudgetMonth(
@@ -192,6 +436,7 @@ export async function getBudgetMonth(
     totals: { ...overview.totals, incomeMinor: flows.reduce((s, f) => s + f.income, 0) },
     cap: overview.cap,
     lines: overview.lines,
+    envelope: overview.envelope,
   };
 }
 

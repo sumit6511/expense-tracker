@@ -48,6 +48,8 @@ export const loadWorkspace: MiddlewareHandler<AppEnv> = async (c, next) => {
     monthStartDay: ws.monthStartDay,
     weekStart: ws.weekStart,
     timezone: ws.timezone,
+    budgetMode: ws.budgetMode,
+    envelopeSince: ws.envelopeSince,
     userId: user.id,
     role: row.role,
     hiddenAccountIds: row.hidden,

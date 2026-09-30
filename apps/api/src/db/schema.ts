@@ -148,6 +148,8 @@ export const passkey = pgTable(
 export const calendarEnum = pgEnum('calendar_system', ['bs', 'ad']);
 export const roleEnum = pgEnum('workspace_role', ['owner', 'admin', 'editor', 'viewer']);
 
+export const budgetModeEnum = pgEnum('budget_mode', ['tracking', 'envelope']);
+
 export const workspaces = pgTable('workspaces', {
   id: uuid().primaryKey(),
   name: text().notNull(),
@@ -156,6 +158,9 @@ export const workspaces = pgTable('workspaces', {
   monthStartDay: smallint().notNull().default(1),
   weekStart: smallint().notNull().default(0),
   timezone: text().notNull().default('Asia/Kathmandu'),
+  budgetMode: budgetModeEnum().notNull().default('tracking'),
+  /** First day of the budget month envelope budgeting started in. */
+  envelopeSince: date({ mode: 'string' }),
   ...timestamps,
 });
 

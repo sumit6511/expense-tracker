@@ -279,6 +279,49 @@ test.describe('everyday use', () => {
     await expect(page.getByText('Rs. 8,000').first()).toBeVisible();
   });
 
+  test('envelope budgeting: give every rupee a job', async ({ signedIn: page }) => {
+    await page.goto('/settings');
+    await page.getByRole('button', { name: 'Envelope' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Settings saved')).toBeVisible();
+
+    // The Rs. 60,000 in the accounts is waiting for a job.
+    await page.goto('/budgets');
+    const ready = page.getByText('Ready to assign', { exact: true }).locator('..');
+    await expect(ready).toContainText('Rs. 60,000');
+    const budget = page.getByLabel('Budget for Food & Groceries');
+    await budget.fill('10000');
+    await budget.press('Enter');
+    await expect(ready).toContainText('Rs. 50,000');
+
+    // Overspend, then cover it from Ready to assign.
+    await page.keyboard.press('n');
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Amount').fill('12000');
+    await dialog.getByRole('button', { name: 'Food & Groceries' }).click();
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Expense added')).toBeVisible();
+    await expect(page.getByText('Rs. 2,000 over', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Cover Rs. 2,000 from Ready to assign' }).click();
+    await expect(ready).toContainText('Rs. 48,000');
+    await expect(page.getByText('Rs. 0 left')).toBeVisible();
+
+    // Move some to Transport.
+    await page.getByRole('button', { name: 'Move money', exact: true }).click();
+    const move = page.getByRole('dialog', { name: 'Move money' });
+    await move.getByLabel('Amount').fill('5000');
+    const to = move.getByLabel('To');
+    await to.selectOption(
+      (await to.locator('option', { hasText: 'Transport' }).getAttribute('value'))!,
+    );
+    await move.getByRole('button', { name: 'Move', exact: true }).click();
+    await expect(page.getByText('Money moved')).toBeVisible();
+    await expect(ready).toContainText('Rs. 43,000');
+
+    await page.goto('/');
+    await expect(page.getByRole('link', { name: 'Rs. 43,000 ready to assign' })).toBeVisible();
+  });
+
   test('import a bank statement CSV, then undo it', async ({ signedIn: page }) => {
     await page.goto('/import');
     await page.getByLabel('Import into account').selectOption({ label: 'Nabil Bank (NPR)' });

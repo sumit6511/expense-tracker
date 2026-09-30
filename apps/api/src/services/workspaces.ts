@@ -2,6 +2,7 @@ import {
   ACCOUNT_PRESETS,
   type CreateWorkspaceSchema,
   DEFAULT_TIME_ZONE,
+  getMonthPeriod,
   type Me,
   STARTER_CATEGORY_GROUPS,
   todayIn,
@@ -35,6 +36,8 @@ export function toWorkspaceDto(row: WorkspaceRow, role: Workspace['role']): Work
     monthStartDay: row.monthStartDay,
     weekStart: row.weekStart,
     timezone: row.timezone,
+    budgetMode: row.budgetMode,
+    envelopeSince: row.envelopeSince,
     role,
     createdAt: row.createdAt.toISOString(),
   };
@@ -49,6 +52,8 @@ export function ctxToDto(ws: WorkspaceCtx): Workspace {
     monthStartDay: ws.monthStartDay,
     weekStart: ws.weekStart,
     timezone: ws.timezone,
+    budgetMode: ws.budgetMode,
+    envelopeSince: ws.envelopeSince,
     role: ws.role,
     createdAt: ws.createdAt.toISOString(),
   };
@@ -183,7 +188,28 @@ export async function updateWorkspace(
   input: UpdateWorkspaceInput,
 ): Promise<Workspace> {
   if (Object.keys(input).length === 0) throw badRequest('Nothing to update');
-  const [row] = await db.update(workspaces).set(input).where(eq(workspaces.id, ws.id)).returning();
+  const patch: Partial<typeof workspaces.$inferInsert> = { ...input };
+  // Envelope budgeting starts fresh from the current budget month each time it's turned on.
+  if (input.budgetMode && input.budgetMode !== ws.budgetMode) {
+    patch.envelopeSince =
+      input.budgetMode === 'envelope'
+        ? getMonthPeriod(todayIn(ws.timezone), {
+            calendar: input.calendar ?? ws.calendar,
+            monthStartDay: input.monthStartDay ?? ws.monthStartDay,
+          }).start
+        : null;
+  }
+  // A different calendar or month start moves the months; restart envelope budgeting on it.
+  const moved =
+    (input.calendar && input.calendar !== ws.calendar) ||
+    (input.monthStartDay && input.monthStartDay !== ws.monthStartDay);
+  if (moved && (input.budgetMode ?? ws.budgetMode) === 'envelope') {
+    patch.envelopeSince = getMonthPeriod(todayIn(ws.timezone), {
+      calendar: input.calendar ?? ws.calendar,
+      monthStartDay: input.monthStartDay ?? ws.monthStartDay,
+    }).start;
+  }
+  const [row] = await db.update(workspaces).set(patch).where(eq(workspaces.id, ws.id)).returning();
   return toWorkspaceDto(row!, ws.role);
 }
 

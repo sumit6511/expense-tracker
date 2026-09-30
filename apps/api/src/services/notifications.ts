@@ -550,6 +550,8 @@ export async function runNotifications(
       monthStartDay: w.monthStartDay,
       weekStart: w.weekStart,
       timezone: w.timezone,
+      budgetMode: w.budgetMode,
+      envelopeSince: w.envelopeSince,
       userId,
       role,
       hiddenAccountIds: await loadHiddenAccountIds(db, w.id, userId),

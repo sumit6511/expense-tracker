@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bsToAd } from './bs';
-import { carryForward, GoalBodySchema, goalPlan } from './budgeting';
+import { carryForward, envelopeMonths, GoalBodySchema, goalPlan } from './budgeting';
 
 const months = [
   { budgetedMinor: 10_000, spentMinor: 7_000 }, // +3,000
@@ -54,5 +54,37 @@ describe('GoalBodySchema', () => {
     expect(GoalBodySchema.safeParse({ name: 'Bike', kind: 'manual', targetMinor: 1 }).success).toBe(
       true,
     );
+  });
+});
+
+describe('envelopeMonths', () => {
+  it('assigns income, carries leftovers and charges overspending to next month', () => {
+    const [first, second, third] = envelopeMonths(10_000, [
+      {
+        incomeMinor: 50_000,
+        uncategorizedSpentMinor: 1_000,
+        lines: [
+          { categoryId: 'food', budgetedMinor: 20_000, spentMinor: 15_000 },
+          { categoryId: 'fun', budgetedMinor: 5_000, spentMinor: 8_000 },
+        ],
+      },
+      {
+        incomeMinor: 0,
+        uncategorizedSpentMinor: 0,
+        lines: [{ categoryId: 'food', budgetedMinor: 10_000, spentMinor: 12_000 }],
+      },
+      { incomeMinor: 0, uncategorizedSpentMinor: 0, lines: [] },
+    ]);
+    // 10,000 + 50,000 − 25,000 assigned − 1,000 uncategorized.
+    expect(first!.readyToAssignMinor).toBe(34_000);
+    expect(first!.overspentMinor).toBe(3_000);
+    expect(first!.lines.get('fun')).toEqual({ carryInMinor: 0, availableMinor: -3_000 });
+    // Food keeps its 5,000; fun's 3,000 overspending comes out of Ready to assign.
+    expect(second!.lines.get('food')).toEqual({ carryInMinor: 5_000, availableMinor: 3_000 });
+    expect(second!.lines.has('fun')).toBe(false);
+    expect(second!.overspentLastMonthMinor).toBe(3_000);
+    expect(second!.readyToAssignMinor).toBe(34_000 - 10_000 - 3_000);
+    expect(third!.lines.get('food')).toEqual({ carryInMinor: 3_000, availableMinor: 3_000 });
+    expect(third!.readyToAssignMinor).toBe(21_000);
   });
 });

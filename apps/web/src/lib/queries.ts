@@ -368,6 +368,19 @@ export function useBudgetMonth(date: string) {
   });
 }
 
+export const useMoveBudget = () =>
+  useWsMutation(
+    (
+      base,
+      input: {
+        periodStart: string;
+        fromCategoryId: string | null;
+        toCategoryId: string | null;
+        amountMinor: number;
+      },
+    ) => api<void>(`${base}/budgets/move`, { method: 'POST', body: input }),
+  );
+
 export const useSetBudgets = () =>
   useWsMutation(
     (

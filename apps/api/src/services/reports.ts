@@ -423,6 +423,7 @@ export async function dashboard(
       source,
       safePerDayMinor:
         budgeted > 0 && daysLeft > 0 ? Math.max(0, Math.floor(remaining / daysLeft)) : null,
+      readyToAssignMinor: overview.envelope?.readyToAssignMinor ?? null,
     },
     cashFlow: { incomeMinor: income, expenseMinor: expense, netMinor: income - expense },
     previousPeriodExpenseMinor: sum(inPrevious, (f) => f.expense),

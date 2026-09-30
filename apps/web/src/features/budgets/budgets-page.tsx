@@ -7,8 +7,17 @@ import {
   toDecimalString,
 } from '@et/shared';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { Check, ChevronLeft, ChevronRight, Copy, Repeat, Sigma, Target } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import {
+  ArrowRightLeft,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Repeat,
+  Sigma,
+  Target,
+} from 'lucide-react';
+import { type FormEvent, type ReactNode, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
@@ -16,7 +25,15 @@ import { EmptyState, ErrorState, PageHeader } from '@/components/page';
 import { AmountInput } from '@/components/pickers';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, Progress, Skeleton } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Field, Input, NativeSelect } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +51,7 @@ import {
   useCategories,
   useCopyBudgets,
   useFillAverageBudgets,
+  useMoveBudget,
   useSetBudgetCap,
   useSetBudgets,
   useSetRollover,
@@ -213,56 +231,68 @@ function BudgetBody({
     }))
     .filter((g) => g.categories.length > 0);
 
+  const [moving, setMoving] = useState<{ categoryId: string | null } | null>(null);
+  const expenseCategories = groups
+    .filter((g) => g.kind === 'expense')
+    .flatMap((g) => g.categories.filter((c) => !c.archived));
+  const showAllToggle = (
+    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+      <Switch checked={showAll} onCheckedChange={onShowAll} aria-label="Show all categories" /> Show
+      all categories
+    </label>
+  );
+
   return (
     <div className="grid grid-cols-1 gap-4">
-      <Card>
-        <CardContent className="grid grid-cols-1 gap-4 pt-5 sm:grid-cols-[1fr_auto] sm:items-end">
-          <div className="grid grid-cols-1 gap-3">
-            <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 sm:gap-4">
-              <Figure label="Budgeted" minor={available} />
-              <Figure label="Spent" minor={t.spentMinor} />
-              <Figure
-                label={t.remainingMinor < 0 ? 'Over budget' : 'Left'}
-                minor={Math.abs(t.remainingMinor)}
-                className={cn(t.remainingMinor < 0 && 'text-destructive')}
-              />
+      {data.envelope ? (
+        <EnvelopeSummary
+          data={data}
+          toggle={showAllToggle}
+          onMove={() => setMoving({ categoryId: null })}
+        />
+      ) : (
+        <Card>
+          <CardContent className="grid grid-cols-1 gap-4 pt-5 sm:grid-cols-[1fr_auto] sm:items-end">
+            <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 sm:gap-4">
+                <Figure label="Budgeted" minor={available} />
+                <Figure label="Spent" minor={t.spentMinor} />
+                <Figure
+                  label={t.remainingMinor < 0 ? 'Over budget' : 'Left'}
+                  minor={Math.abs(t.remainingMinor)}
+                  className={cn(t.remainingMinor < 0 && 'text-destructive')}
+                />
+              </div>
+              {anyBudget && (
+                <Progress
+                  value={ratio}
+                  tone={ratio > 100 ? 'destructive' : ratio > 85 ? 'warning' : 'primary'}
+                  label="Share of budget spent"
+                />
+              )}
+              <p className="text-xs text-muted-foreground">
+                {t.carryInMinor !== 0 && (
+                  <>
+                    Includes {f.money(t.carryInMinor, undefined, { trimZeroFraction: true })}{' '}
+                    {t.carryInMinor > 0 ? 'rolled over from' : 'of overspending carried from'} last
+                    month.{' '}
+                  </>
+                )}
+                {t.unbudgetedSpentMinor > 0 && (
+                  <>
+                    {f.money(t.unbudgetedSpentMinor, undefined, { trimZeroFraction: true })} spent
+                    in categories without a budget.{' '}
+                  </>
+                )}
+                Income this month: {f.money(t.incomeMinor, undefined, { trimZeroFraction: true })}.
+              </p>
             </div>
-            {anyBudget && (
-              <Progress
-                value={ratio}
-                tone={ratio > 100 ? 'destructive' : ratio > 85 ? 'warning' : 'primary'}
-                label="Share of budget spent"
-              />
-            )}
-            <p className="text-xs text-muted-foreground">
-              {t.carryInMinor !== 0 && (
-                <>
-                  Includes {f.money(t.carryInMinor, undefined, { trimZeroFraction: true })}{' '}
-                  {t.carryInMinor > 0 ? 'rolled over from' : 'of overspending carried from'} last
-                  month.{' '}
-                </>
-              )}
-              {t.unbudgetedSpentMinor > 0 && (
-                <>
-                  {f.money(t.unbudgetedSpentMinor, undefined, { trimZeroFraction: true })} spent in
-                  categories without a budget.{' '}
-                </>
-              )}
-              Income this month: {f.money(t.incomeMinor, undefined, { trimZeroFraction: true })}.
-            </p>
-          </div>
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Switch
-              checked={showAll}
-              onCheckedChange={onShowAll}
-              aria-label="Show all categories"
-            />{' '}
-            Show all categories
-          </label>
-        </CardContent>
-      </Card>
+            {showAllToggle}
+          </CardContent>
+        </Card>
+      )}
 
-      <MonthlyLimit data={data} />
+      {!data.envelope && <MonthlyLimit data={data} />}
 
       {!anyBudget && expenseGroups.length === 0 && (
         <Card>
@@ -297,13 +327,219 @@ function BudgetBody({
                   line={lines.get(c.id)!}
                   periodStart={data.period.start}
                   periodEnd={data.period.end}
+                  envelope={data.envelope !== null}
+                  onMove={() => setMoving({ categoryId: c.id })}
                 />
               ))}
             </ul>
           </Card>
         );
       })}
+      <Dialog open={moving !== null} onOpenChange={(o) => !o && setMoving(null)}>
+        {moving && (
+          <MoveDialog
+            data={data}
+            from={moving.categoryId}
+            categories={expenseCategories}
+            onDone={() => setMoving(null)}
+          />
+        )}
+      </Dialog>
     </div>
+  );
+}
+
+/** Envelope budgeting: how much money still needs a job, and where it came from. */
+function EnvelopeSummary({
+  data,
+  toggle,
+  onMove,
+}: {
+  data: BudgetMonth;
+  toggle: ReactNode;
+  onMove: () => void;
+}) {
+  const f = useFormat();
+  const canWrite = useCanWrite();
+  const e = data.envelope!;
+  const ready = e.readyToAssignMinor;
+  const money = (m: number) => f.money(m, undefined, { trimZeroFraction: true });
+  const inCategories = data.lines.reduce((s, l) => s + Math.max(0, l.remainingMinor), 0);
+  // What Ready to assign started the month with: your balances in the first month, otherwise
+  // whatever earlier months left unassigned.
+  const fromBefore =
+    ready - e.incomeMinor + e.assignedMinor + e.uncategorizedSpentMinor + e.overspentLastMonthMinor;
+  const firstMonth = data.period.start === e.sincePeriodStart;
+  return (
+    <Card>
+      <CardContent className="grid grid-cols-1 gap-4 pt-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-sm text-muted-foreground">Ready to assign</p>
+            <p
+              className={cn(
+                'text-3xl font-semibold tracking-tight tabular',
+                ready > 0 && 'text-positive',
+                ready < 0 && 'text-destructive',
+              )}
+            >
+              <Money minor={ready} trimZero />
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {ready > 0
+                ? 'Give it a job: assign it to the categories below.'
+                : ready < 0
+                  ? `You’ve assigned ${money(-ready)} more than you have. Take it back from a category.`
+                  : 'Every rupee has a job.'}
+            </p>
+          </div>
+          {canWrite && (
+            <Button variant="outline" onClick={onMove}>
+              <ArrowRightLeft /> Move money
+            </Button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-1 sm:grid-cols-4 sm:gap-4">
+          <Figure label="Money in this month" minor={e.incomeMinor} />
+          <Figure label="Assigned this month" minor={e.assignedMinor} />
+          <Figure label="Available in categories" minor={inCategories} />
+          <Figure label="Spent this month" minor={data.totals.spentMinor} />
+        </div>
+        <div className="grid grid-cols-1 gap-1 text-xs text-muted-foreground">
+          {fromBefore !== 0 && (
+            <p>
+              {firstMonth
+                ? `Includes ${money(fromBefore)} that was already in your accounts when you started envelope budgeting.`
+                : fromBefore > 0
+                  ? `Includes ${money(fromBefore)} left unassigned from earlier months.`
+                  : `Earlier months assigned ${money(-fromBefore)} more than you had.`}
+            </p>
+          )}
+          {e.overspentLastMonthMinor > 0 && (
+            <p>
+              {money(e.overspentLastMonthMinor)} overspent last month was taken from Ready to
+              assign.
+            </p>
+          )}
+          {e.uncategorizedSpentMinor > 0 && (
+            <p>
+              {money(e.uncategorizedSpentMinor)} spent without a category came straight out of Ready
+              to assign.
+            </p>
+          )}
+          {e.overspentMinor > 0 && (
+            <p className="text-warning">
+              {money(e.overspentMinor)} overspent this month will come out of next month’s Ready to
+              assign unless you cover it.
+            </p>
+          )}
+        </div>
+        <div className="flex justify-end">{toggle}</div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Moves money between categories (or to/from Ready to assign) this month. */
+function MoveDialog({
+  data,
+  from: initialFrom,
+  categories,
+  onDone,
+}: {
+  data: BudgetMonth;
+  from: string | null;
+  categories: Array<{ id: string; name: string }>;
+  onDone: () => void;
+}) {
+  const f = useFormat();
+  const move = useMoveBudget();
+  const line = (id: string | null) => data.lines.find((l) => l.categoryId === id);
+  const [from, setFrom] = useState(initialFrom ?? '');
+  // From Ready to assign: start with the first overspent category (the usual reason to move).
+  const overspent = categories.find((c) => (line(c.id)?.remainingMinor ?? 0) < 0);
+  const [to, setTo] = useState(initialFrom ? '' : ((overspent ?? categories[0])?.id ?? ''));
+  // Suggest what's left in the category you're moving from, or what the overspent one needs.
+  const suggested = initialFrom
+    ? Math.max(0, line(initialFrom)?.remainingMinor ?? 0)
+    : overspent
+      ? -(line(overspent.id)?.remainingMinor ?? 0)
+      : 0;
+  const [amount, setAmount] = useState(
+    suggested ? toDecimalString(suggested, f.digits()).replace(/\.0+$/, '') : '',
+  );
+  const place = (id: string) => (id ? line(id) : undefined);
+  const label = (c: { id: string; name: string }) => {
+    const l = place(c.id);
+    return l
+      ? `${c.name} (${f.money(l.remainingMinor, undefined, { trimZeroFraction: true })})`
+      : c.name;
+  };
+  const ready = `Ready to assign (${f.money(data.envelope?.readyToAssignMinor ?? 0, undefined, { trimZeroFraction: true })})`;
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    const value = parseAmountInput(amount, f.digits());
+    if (!value || value <= 0) return toast.error('Enter an amount');
+    if (from === to) return toast.error('Choose two different places');
+    try {
+      await move.mutateAsync({
+        periodStart: data.period.start,
+        fromCategoryId: from || null,
+        toCategoryId: to || null,
+        amountMinor: value,
+      });
+      toast.success('Money moved');
+      onDone();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  }
+
+  return (
+    <DialogContent aria-describedby={undefined}>
+      <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+        <DialogHeader>
+          <DialogTitle>Move money</DialogTitle>
+        </DialogHeader>
+        <DialogBody className="grid grid-cols-1 gap-4">
+          <Field label="Amount" htmlFor="move-amount">
+            <AmountInput
+              id="move-amount"
+              value={amount}
+              onChange={setAmount}
+              currency={f.base}
+              autoFocus
+            />
+          </Field>
+          <Field label="From" htmlFor="move-from">
+            <NativeSelect id="move-from" value={from} onChange={(e) => setFrom(e.target.value)}>
+              <option value="">{ready}</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {label(c)}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field label="To" htmlFor="move-to">
+            <NativeSelect id="move-to" value={to} onChange={(e) => setTo(e.target.value)}>
+              <option value="">{ready}</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {label(c)}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+        </DialogBody>
+        <DialogFooter>
+          <Button type="submit" disabled={move.isPending}>
+            Move
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
   );
 }
 
@@ -324,15 +560,20 @@ function BudgetRow({
   line,
   periodStart,
   periodEnd,
+  envelope,
+  onMove,
 }: {
   category: { id: string; name: string; icon: string; color: string };
   line: BudgetMonth['lines'][number];
   periodStart: string;
   periodEnd: string;
+  envelope: boolean;
+  onMove: () => void;
 }) {
   const f = useFormat();
   const canWrite = useCanWrite();
   const setBudgets = useSetBudgets();
+  const move = useMoveBudget();
   const digits = f.digits();
   const initial = line.budgetedMinor
     ? toDecimalString(line.budgetedMinor, digits).replace(/\.0+$/, '')
@@ -387,12 +628,27 @@ function BudgetRow({
           <span className="hidden text-right text-xs text-muted-foreground sm:block">
             <Money minor={line.spentMinor} trimZero /> spent
           </span>
-          <RolloverMenu
-            categoryName={category.name}
-            categoryId={category.id}
-            line={line}
-            periodStart={periodStart}
-          />
+          {envelope ? (
+            canWrite && (
+              <Tooltip content="Move money">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={onMove}
+                  aria-label={`Move money from ${category.name}`}
+                >
+                  <ArrowRightLeft />
+                </Button>
+              </Tooltip>
+            )
+          ) : (
+            <RolloverMenu
+              categoryName={category.name}
+              categoryId={category.id}
+              line={line}
+              periodStart={periodStart}
+            />
+          )}
           <Input
             value={
               editing
@@ -455,6 +711,26 @@ function BudgetRow({
             ? `+${f.money(line.carryInMinor, undefined, { trimZeroFraction: true })} rolled over from last month`
             : `${f.money(-line.carryInMinor, undefined, { trimZeroFraction: true })} overspent last month comes out of this one`}
         </p>
+      )}
+      {envelope && line.remainingMinor < 0 && canWrite && (
+        <button
+          type="button"
+          className="justify-self-start pl-10 text-xs font-medium text-primary hover:underline"
+          onClick={() =>
+            move.mutate(
+              {
+                periodStart,
+                fromCategoryId: null,
+                toCategoryId: category.id,
+                amountMinor: -line.remainingMinor,
+              },
+              { onError: (err) => toast.error(errorMessage(err)) },
+            )
+          }
+        >
+          Cover {f.money(-line.remainingMinor, undefined, { trimZeroFraction: true })} from Ready to
+          assign
+        </button>
       )}
       {line.averageMinor > 0 && line.budgetedMinor === 0 && canWrite && (
         <button

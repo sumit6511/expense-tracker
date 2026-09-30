@@ -41,6 +41,7 @@ export function GeneralSettings() {
   const [monthStartDay, setMonthStartDay] = useState(workspace.monthStartDay);
   const [weekStart, setWeekStart] = useState(workspace.weekStart);
   const [timezone, setTimezone] = useState(workspace.timezone);
+  const [budgetMode, setBudgetMode] = useState(workspace.budgetMode);
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -52,6 +53,7 @@ export function GeneralSettings() {
         monthStartDay,
         weekStart,
         timezone,
+        budgetMode,
       });
       toast.success('Settings saved');
     } catch (err) {
@@ -106,6 +108,26 @@ export function GeneralSettings() {
                   { value: 'ad', label: `Gregorian · ${formatAdDate(f.today, 'short')}` },
                 ]}
                 className="w-full"
+              />
+            </Field>
+            <Field
+              label="Budgeting style"
+              hint={
+                budgetMode === 'envelope'
+                  ? 'Assign the money you have to categories until nothing is left (“Ready to assign”). Leftovers stay in their category; overspending comes out of next month. Starts fresh from this month.'
+                  : 'Set a budget per category each month and see what’s left.'
+              }
+            >
+              <Segmented
+                value={budgetMode}
+                onChange={setBudgetMode}
+                label="Budgeting style"
+                options={[
+                  { value: 'tracking', label: 'Monthly budgets' },
+                  { value: 'envelope', label: 'Envelope' },
+                ]}
+                className="w-full"
+                disabled={!canEdit}
               />
             </Field>
             {calendar === 'ad' && (

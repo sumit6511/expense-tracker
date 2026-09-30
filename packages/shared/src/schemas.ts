@@ -68,6 +68,10 @@ export const TransactionTypeSchema = z.enum(['expense', 'income', 'transfer']);
 // Me / workspaces
 // ---------------------------------------------------------------------------------------------
 
+/** tracking: monthly budgets per category. envelope: zero-based, "give every rupee a job". */
+export const BudgetModeSchema = z.enum(['tracking', 'envelope']);
+export type BudgetMode = z.infer<typeof BudgetModeSchema>;
+
 export const WorkspaceSettingsSchema = z.object({
   name: Name(60),
   baseCurrency: CurrencyCode,
@@ -75,12 +79,15 @@ export const WorkspaceSettingsSchema = z.object({
   monthStartDay: z.number().int().min(1).max(28),
   weekStart: z.number().int().min(0).max(6),
   timezone: z.string().refine(isValidTimeZone, { error: 'Unknown time zone' }),
+  budgetMode: BudgetModeSchema,
 });
 export type WorkspaceSettings = z.infer<typeof WorkspaceSettingsSchema>;
 
 export const WorkspaceSchema = WorkspaceSettingsSchema.extend({
   id: Id,
   role: RoleSchema,
+  /** The budget month envelope budgeting started in (null when not using it). */
+  envelopeSince: z.string().nullable(),
   createdAt: z.string(),
 });
 export type Workspace = z.infer<typeof WorkspaceSchema>;
@@ -98,6 +105,7 @@ export const CreateWorkspaceSchema = WorkspaceSettingsSchema.partial({
   monthStartDay: true,
   weekStart: true,
   timezone: true,
+  budgetMode: true,
 }).extend({
   starterCategories: z.boolean().default(true),
   accounts: z.array(StarterAccountSchema).max(20).default([]),
@@ -529,6 +537,24 @@ export const BudgetMonthSchema = z.object({
     })
     .nullable(),
   lines: z.array(BudgetCategoryLineSchema),
+  /** Envelope budgeting figures (null when the workspace tracks budgets per month). */
+  envelope: z
+    .object({
+      /** The budget month envelope budgeting started in. */
+      sincePeriodStart: z.string(),
+      /** Money not yet given a job; negative means more is assigned than you have. */
+      readyToAssignMinor: MinorAmount,
+      /** On-budget money when envelope budgeting started. */
+      startingFundsMinor: MinorAmount,
+      incomeMinor: MinorAmount,
+      assignedMinor: MinorAmount,
+      uncategorizedSpentMinor: MinorAmount,
+      /** Last month's overspending, taken from this month's Ready to assign. */
+      overspentLastMonthMinor: MinorAmount,
+      /** Overspending so far this month (taken from next month). */
+      overspentMinor: MinorAmount,
+    })
+    .nullable(),
 });
 export type BudgetMonth = z.infer<typeof BudgetMonthSchema>;
 
@@ -618,6 +644,8 @@ export const DashboardSchema = z.object({
     source: z.enum(['cap', 'categories', 'none']),
     /** Remaining budget divided by the days left, or null with no budget. */
     safePerDayMinor: MinorAmount.nullable(),
+    /** Envelope budgeting: money not yet given a job (null otherwise). */
+    readyToAssignMinor: MinorAmount.nullable(),
   }),
   cashFlow: z.object({
     incomeMinor: MinorAmount,
