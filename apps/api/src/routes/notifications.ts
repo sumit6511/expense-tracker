@@ -1,7 +1,12 @@
 import {
+  Id,
   MarkNotificationsReadSchema,
   NotificationListSchema,
   NotificationSettingsSchema,
+  PushDeviceSchema,
+  PushEndpointSchema,
+  PushSettingsSchema,
+  PushSubscribeSchema,
   UpdateNotificationPrefsSchema,
 } from '@et/shared';
 import { createRoute } from '@hono/zod-openapi';
@@ -11,6 +16,7 @@ import {
   errorResponses,
   jsonBody,
   jsonContent,
+  NoContent,
   requireUser,
   WidParams,
 } from '../lib/openapi';
@@ -21,6 +27,13 @@ import {
   refreshNotifications,
   updateNotificationSettings,
 } from '../services/notifications';
+import {
+  pushSettings,
+  removePushDevice,
+  sendTestPush,
+  subscribePush,
+  unsubscribePush,
+} from '../services/push';
 
 export const notificationsRouter = createRouter();
 
@@ -92,5 +105,88 @@ notificationsRouter.openapi(
     const user = requireUser(c.get('user'));
     const { db, mailer } = c.get('deps');
     return c.json(await updateNotificationSettings(db, user.id, c.req.valid('json'), mailer), 200);
+  },
+);
+
+// Web Push ------------------------------------------------------------------------------------
+
+notificationsRouter.openapi(
+  createRoute({
+    method: 'get',
+    path: '/me/push',
+    tags,
+    summary: 'Whether push notifications are available, and your devices that get them',
+    responses: { 200: jsonContent(PushSettingsSchema), 401: errorResponses[401] },
+  }),
+  async (c) => {
+    const user = requireUser(c.get('user'));
+    const { db, pusher } = c.get('deps');
+    return c.json(await pushSettings(db, user.id, pusher), 200);
+  },
+);
+
+notificationsRouter.openapi(
+  createRoute({
+    method: 'post',
+    path: '/me/push/subscriptions',
+    tags,
+    summary: 'Get push notifications on this device',
+    request: jsonBody(PushSubscribeSchema),
+    responses: { 201: jsonContent(PushDeviceSchema, 'Subscribed'), ...errorResponses },
+  }),
+  async (c) => {
+    const user = requireUser(c.get('user'));
+    const { db, env, pusher } = c.get('deps');
+    return c.json(await subscribePush(db, env, pusher, user.id, c.req.valid('json')), 201);
+  },
+);
+
+notificationsRouter.openapi(
+  createRoute({
+    method: 'post',
+    path: '/me/push/unsubscribe',
+    tags,
+    summary: 'Stop push notifications on this device',
+    request: jsonBody(PushEndpointSchema),
+    responses: { 204: NoContent, ...errorResponses },
+  }),
+  async (c) => {
+    const user = requireUser(c.get('user'));
+    await unsubscribePush(c.get('deps').db, user.id, c.req.valid('json').endpoint);
+    return c.body(null, 204);
+  },
+);
+
+notificationsRouter.openapi(
+  createRoute({
+    method: 'delete',
+    path: '/me/push/subscriptions/{id}',
+    tags,
+    summary: 'Stop push notifications on one of your devices',
+    request: { params: z.object({ id: Id }) },
+    responses: { 204: NoContent, ...errorResponses },
+  }),
+  async (c) => {
+    const user = requireUser(c.get('user'));
+    await removePushDevice(c.get('deps').db, user.id, c.req.valid('param').id);
+    return c.body(null, 204);
+  },
+);
+
+notificationsRouter.openapi(
+  createRoute({
+    method: 'post',
+    path: '/me/push/test',
+    tags,
+    summary: 'Send a test notification to your devices',
+    responses: {
+      200: jsonContent(z.object({ sent: z.number() })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const user = requireUser(c.get('user'));
+    const { db, pusher } = c.get('deps');
+    return c.json(await sendTestPush(db, pusher, user.id), 200);
   },
 );

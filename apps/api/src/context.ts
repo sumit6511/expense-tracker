@@ -4,6 +4,7 @@ import type { Db } from './db/client';
 import type { Env } from './env';
 import type { Logger } from './logger';
 import type { Mailer } from './mailer';
+import type { Pusher } from './push';
 
 export interface Deps {
   db: Db;
@@ -12,6 +13,8 @@ export interface Deps {
   logger: Logger;
   /** Null when SMTP isn't configured. */
   mailer: Mailer | null;
+  /** Null when Web Push is turned off. */
+  pusher: Pusher | null;
 }
 
 export interface SessionUser {

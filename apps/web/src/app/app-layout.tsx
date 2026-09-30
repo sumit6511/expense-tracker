@@ -1,5 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Link, Navigate, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
+import {
+  Link,
+  Navigate,
+  Outlet,
+  useNavigate,
+  useRouter,
+  useRouterState,
+} from '@tanstack/react-router';
 import {
   ArrowLeftRight,
   ChartPie,
@@ -100,7 +107,19 @@ function ReviewBadge() {
 /** Loads the signed-in user and workspace, then renders the app chrome. */
 export function AppLayout() {
   const me = useMeQuery();
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const router = useRouter();
+  // Links from push notifications say which workspace they're about (?ws=…).
+  const [workspaceId, setWorkspaceId] = useState<string | null>(() => {
+    const ws = new URLSearchParams(window.location.search).get('ws');
+    if (ws) rememberWorkspace(ws);
+    return ws;
+  });
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('ws')) return;
+    url.searchParams.delete('ws');
+    router.history.replace(`${url.pathname}${url.search}${url.hash}`);
+  }, [router]);
   const switchWorkspace = useCallback((id: string) => {
     rememberWorkspace(id);
     setWorkspaceId(id);

@@ -126,6 +126,78 @@ test.describe('account security', () => {
   });
 });
 
+test.describe('push notifications', () => {
+  test('turn them on for this device; the service worker shows what arrives', async ({
+    signedIn: page,
+    baseURL,
+  }) => {
+    await page.context().grantPermissions(['notifications']);
+    // A real subscription needs the browser vendor's push service; stand in for it.
+    await page.addInitScript(() => {
+      const w = window as unknown as { __sub: PushSubscription | null };
+      w.__sub = null;
+      PushManager.prototype.getSubscription = async () => w.__sub;
+      PushManager.prototype.subscribe = async (options) => {
+        const endpoint = `https://fcm.googleapis.com/fcm/send/e2e-${Date.now()}`;
+        w.__sub = {
+          endpoint,
+          options,
+          toJSON: () => ({ endpoint, keys: { p256dh: 'BE2eBrowserKey', auth: 'e2eAuth' } }),
+          unsubscribe: async () => {
+            w.__sub = null;
+            return true;
+          },
+        } as unknown as PushSubscription;
+        return w.__sub;
+      };
+    });
+    await page.goto('/settings?tab=notifications');
+    await page.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration()));
+    const toggle = page.getByRole('switch', { name: /On this device/ });
+    await toggle.click();
+    await expect(page.getByText('Push notifications are on for this device')).toBeVisible();
+    await expect(toggle).toBeChecked();
+    await expect(page.getByRole('button', { name: 'Send a test' })).toBeVisible();
+
+    // Deliver a push straight to the service worker, once it has finished activating (a push
+    // that lands mid-activation can be dropped).
+    await page.waitForFunction(
+      async () => (await navigator.serviceWorker.ready).active?.state === 'activated',
+    );
+    const cdp = await page.context().newCDPSession(page);
+    const registrationIds = await new Promise<string[]>((resolve) => {
+      cdp.on('ServiceWorker.workerRegistrationUpdated', ({ registrations }) => {
+        const ours = registrations.filter((r) => !r.isDeleted && r.scopeURL.startsWith(baseURL!));
+        if (ours.length) resolve(ours.map((r) => r.registrationId));
+      });
+      void cdp.send('ServiceWorker.enable');
+    });
+    for (const registrationId of registrationIds) {
+      await cdp.send('ServiceWorker.deliverPushMessage', {
+        origin: baseURL!,
+        registrationId,
+        data: JSON.stringify({
+          title: 'Rent due tomorrow',
+          body: 'Rs. 25,000',
+          url: '/recurring',
+          tag: 't1',
+        }),
+      });
+    }
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const reg = await navigator.serviceWorker.getRegistration();
+          return (await reg!.getNotifications()).map((n) => `${n.title}: ${n.body}`);
+        }),
+      )
+      .toEqual(['Rent due tomorrow: Rs. 25,000']);
+
+    await toggle.click();
+    await expect(toggle).not.toBeChecked();
+  });
+});
+
 test.describe('sharing', () => {
   test('invite a partner, who signs up from the link and joins', async ({
     signedIn: page,

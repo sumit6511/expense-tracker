@@ -40,6 +40,29 @@ const EnvSchema = z.object({
   SMTP_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
   /** Sender address for email, e.g. "Expense Tracker <money@example.com>". */
   MAIL_FROM: z.string().default('Expense Tracker <no-reply@localhost>'),
+  /** Web Push notifications to browsers and installed apps. */
+  WEB_PUSH: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  /**
+   * VAPID keys identify this server to push services. Leave empty to have the server make a pair
+   * on first start and keep it in the database (changing keys means devices must re-subscribe).
+   */
+  VAPID_PUBLIC_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  VAPID_PRIVATE_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  /** Contact for push services: a mailto: or https: URL (defaults from MAIL_FROM or PUBLIC_URL). */
+  VAPID_SUBJECT: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  /** Push services besides the major browsers' ones to allow (comma separated host names). */
+  PUSH_EXTRA_HOSTS: z
+    .string()
+    .default('')
+    .transform((s) =>
+      s
+        .split(',')
+        .map((h) => h.trim().toLowerCase())
+        .filter(Boolean),
+    ),
   /** Allow new sign-ups. Set to false on a personal server once your account exists. */
   ALLOW_SIGNUP: z
     .enum(['true', 'false'])

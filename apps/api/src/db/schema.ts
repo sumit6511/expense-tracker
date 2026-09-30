@@ -709,13 +709,43 @@ export const notifications = pgTable(
     dedupeKey: text().notNull(),
     readAt: timestamp({ withTimezone: true }),
     emailedAt: timestamp({ withTimezone: true }),
+    /** Sent to the person's devices (or skipped because it was too old or already read). */
+    pushedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     uniqueIndex().on(t.userId, t.workspaceId, t.dedupeKey),
     index().on(t.userId, t.workspaceId, t.createdAt),
+    index('notifications_push_pending_idx').on(t.createdAt).where(sql`${t.pushedAt} is null`),
   ],
 );
+
+/** A browser or phone that asked for push notifications (Web Push). */
+export const pushSubscriptions = pgTable(
+  'push_subscriptions',
+  {
+    id: uuid().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** The push service URL for this device; unique per browser profile. */
+    endpoint: text().notNull(),
+    p256dh: text().notNull(),
+    auth: text().notNull(),
+    /** "Chrome on Android", to tell devices apart in settings. */
+    label: text().notNull().default(''),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    lastSentAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [uniqueIndex().on(t.endpoint), index().on(t.userId)],
+);
+
+/** Keys the server makes for itself on first use (e.g. Web Push VAPID keys). */
+export const serverKeys = pgTable('server_keys', {
+  name: text().primaryKey(),
+  value: text().notNull(),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});
 
 /** What each person wants to hear about, and whether by email too. */
 export const notificationPrefs = pgTable('notification_prefs', {

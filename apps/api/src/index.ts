@@ -7,6 +7,7 @@ import { loadEnv } from './env';
 import { startJobs } from './jobs';
 import { createLogger } from './logger';
 import { createMailer } from './mailer';
+import { createPusher } from './push';
 
 const env = loadEnv();
 const logger = createLogger(env.LOG_LEVEL, env.NODE_ENV === 'development');
@@ -15,8 +16,9 @@ const { db, pool } = createDb(env.DATABASE_URL);
 await runMigrations(db);
 const auth = createAuth(db, env);
 const mailer = createMailer(env, logger);
-const app = createApp({ db, env, auth, logger, mailer });
-const boss = env.RUN_WORKER ? await startJobs(db, env, logger, mailer) : null;
+const pusher = await createPusher(db, env, logger);
+const app = createApp({ db, env, auth, logger, mailer, pusher });
+const boss = env.RUN_WORKER ? await startJobs(db, env, logger, mailer, pusher) : null;
 
 const server = serve({ fetch: app.fetch, port: env.PORT, hostname: env.HOST }, (info) => {
   logger.info(`API listening on http://${info.address}:${info.port}`);

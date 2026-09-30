@@ -4,8 +4,10 @@ import type { Db } from '../db/client';
 import type { Env } from '../env';
 import type { Logger } from '../logger';
 import type { Mailer } from '../mailer';
+import type { Pusher } from '../push';
 import { runHeadsUp } from '../services/insights';
 import { pruneNotifications, runNotifications } from '../services/notifications';
+import { sendPendingPushes } from '../services/push';
 import { fetchNrbRates, storePublishedRates } from '../services/rates';
 import { postDueRecurring } from '../services/recurring';
 import { purgeTrash } from '../services/transactions';
@@ -16,6 +18,7 @@ export const QUEUES = {
   recurring: 'recurring-post',
   notifications: 'notifications',
   headsUp: 'heads-up',
+  push: 'push',
 } as const;
 
 /** Fetches the last `days` days of NRB rates and stores them. */
@@ -37,7 +40,13 @@ export async function refreshNrbRates(
  * Starts the background job runner. Jobs are stored in Postgres (pg-boss), so schedules survive
  * restarts and only one instance runs each job even with several workers.
  */
-export async function startJobs(db: Db, env: Env, logger: Logger, mailer: Mailer | null) {
+export async function startJobs(
+  db: Db,
+  env: Env,
+  logger: Logger,
+  mailer: Mailer | null,
+  pusher: Pusher | null,
+) {
   const boss = new PgBoss({ connectionString: env.DATABASE_URL, schema: 'pgboss' });
   boss.on('error', (err) => logger.error({ err }, 'job runner error'));
   await boss.start();
@@ -64,6 +73,15 @@ export async function startJobs(db: Db, env: Env, logger: Logger, mailer: Mailer
   await boss.work(QUEUES.notifications, async () => {
     await runNotifications(db, mailer, env.PUBLIC_URL, logger);
   });
+
+  // New notifications to people's phones and computers, soon after they're made.
+  if (pusher) {
+    await boss.createQueue(QUEUES.push);
+    await boss.schedule(QUEUES.push, '* * * * *');
+    await boss.work(QUEUES.push, async () => {
+      await sendPendingPushes(db, pusher, logger);
+    });
+  }
 
   // Accounts the bills could empty, prices that changed: once a day, in the morning.
   await boss.createQueue(QUEUES.headsUp);

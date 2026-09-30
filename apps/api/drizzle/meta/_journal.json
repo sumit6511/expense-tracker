@@ -106,6 +106,13 @@
       "when": 1790787171504,
       "tag": "0014_insights",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1790788378547,
+      "tag": "0015_web_push",
+      "breakpoints": true
     }
   ]
 }

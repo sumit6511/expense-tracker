@@ -6,6 +6,7 @@ import { createDb } from '../src/db/client';
 import { loadEnv } from '../src/env';
 import { createLogger } from '../src/logger';
 import type { Mail, Mailer } from '../src/mailer';
+import type { Pusher, PushMessage, PushTarget } from '../src/push';
 
 export const ORIGIN = 'http://localhost:5173';
 
@@ -31,8 +32,18 @@ function build() {
       outbox.push(mail);
     },
   };
-  const app = createApp({ db, env, auth, logger, mailer });
-  return { app, db, pool, env, mailer, outbox };
+  // Records pushes instead of sending them; endpoints containing "gone" act unsubscribed.
+  const pushed: Array<{ target: PushTarget; message: PushMessage }> = [];
+  const pusher: Pusher = {
+    publicKey: 'BTestPublicKey',
+    async send(target, message) {
+      if (target.endpoint.includes('gone')) return 'gone';
+      pushed.push({ target, message });
+      return 'sent';
+    },
+  };
+  const app = createApp({ db, env, auth, logger, mailer, pusher });
+  return { app, db, pool, env, mailer, outbox, pusher, pushed };
 }
 
 /** One app + pool per test file. */

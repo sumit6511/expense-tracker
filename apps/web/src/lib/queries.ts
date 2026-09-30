@@ -39,6 +39,9 @@ import type {
   NotificationList,
   NotificationSettings,
   Payee,
+  PushDevice,
+  PushSettings,
+  PushSubscribeInput,
   ReconcileState,
   Reconciliation,
   RecordRecurringInput,
@@ -841,6 +844,37 @@ export function useUpdateNotificationSettings() {
       api<NotificationSettings>('/me/notification-settings', { method: 'PATCH', body: input }),
     onSuccess: (settings) => qc.setQueryData(notificationSettingsKey, settings),
   });
+}
+
+const pushKey = ['me', 'push'] as const;
+
+export function usePushSettings() {
+  return useQuery({ queryKey: pushKey, queryFn: () => api<PushSettings>('/me/push') });
+}
+
+export function usePushMutations() {
+  const qc = useQueryClient();
+  const refresh = () => qc.invalidateQueries({ queryKey: pushKey });
+  return {
+    subscribe: useMutation({
+      mutationFn: (input: PushSubscribeInput) =>
+        api<PushDevice>('/me/push/subscriptions', { method: 'POST', body: input }),
+      onSuccess: refresh,
+    }),
+    unsubscribe: useMutation({
+      mutationFn: (endpoint: string) =>
+        api<void>('/me/push/unsubscribe', { method: 'POST', body: { endpoint } }),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({
+      mutationFn: (id: string) => api<void>(`/me/push/subscriptions/${id}`, { method: 'DELETE' }),
+      onSuccess: refresh,
+    }),
+    test: useMutation({
+      mutationFn: () => api<{ sent: number }>('/me/push/test', { method: 'POST' }),
+      onSuccess: refresh,
+    }),
+  };
 }
 
 // ---------------------------------------------------------------------------------------------

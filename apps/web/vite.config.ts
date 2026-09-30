@@ -11,7 +11,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['favicon.svg', 'theme-init.js'],
+      includeAssets: ['favicon.svg', 'theme-init.js', 'push-sw.js'],
       manifest: {
         name: 'Expense Tracker',
         short_name: 'Expenses',
@@ -34,6 +34,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Shows push notifications and opens the app when one is tapped.
+        importScripts: ['/push-sw.js'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
         // So the app opens and quick add works offline, keep the last copy of the reference data

@@ -67,3 +67,39 @@ export const PREF_FOR_KIND: Record<NotificationKind, keyof Omit<NotificationPref
   goal: 'goals',
   insight: 'insights',
 };
+
+// ---------------------------------------------------------------------------------------------
+// Web Push: notifications on your phone or computer, even with the app closed
+// ---------------------------------------------------------------------------------------------
+
+/** What the browser's PushSubscription.toJSON() gives, plus a name for the device. */
+export const PushSubscribeSchema = z.object({
+  endpoint: z.url().max(2000),
+  keys: z.object({
+    p256dh: z.string().min(1).max(200),
+    auth: z.string().min(1).max(100),
+  }),
+  label: z.string().trim().max(80).default(''),
+});
+export type PushSubscribeInput = z.input<typeof PushSubscribeSchema>;
+
+export const PushEndpointSchema = z.object({ endpoint: z.url().max(2000) });
+
+export const PushDeviceSchema = z.object({
+  id: Id,
+  label: z.string(),
+  /** The push service's endpoint, so a device can find its own entry. */
+  endpoint: z.string(),
+  createdAt: z.string(),
+  lastSentAt: z.string().nullable(),
+});
+export type PushDevice = z.infer<typeof PushDeviceSchema>;
+
+export const PushSettingsSchema = z.object({
+  /** Whether this server can send push notifications at all. */
+  available: z.boolean(),
+  /** The server's VAPID public key (base64url), for PushManager.subscribe(). */
+  publicKey: z.string().nullable(),
+  devices: z.array(PushDeviceSchema),
+});
+export type PushSettings = z.infer<typeof PushSettingsSchema>;
