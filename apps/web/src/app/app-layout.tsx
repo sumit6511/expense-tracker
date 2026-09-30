@@ -210,9 +210,9 @@ function Shell() {
   }, [openNew, canWrite]);
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_1fr]">
+    <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_1fr] print:block">
       {/* Sidebar (desktop) */}
-      <aside className="sticky top-0 hidden h-dvh flex-col border-r bg-card/50 px-3 py-4 lg:flex">
+      <aside className="sticky top-0 hidden h-dvh flex-col border-r bg-card/50 px-3 py-4 lg:flex print:hidden">
         <div className="flex items-center gap-1">
           <div className="min-w-0 flex-1">
             <WorkspaceMenu />
@@ -263,8 +263,8 @@ function Shell() {
       </aside>
 
       {/* Main */}
-      <div className="min-w-0 pb-24 lg:pb-8">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/85 px-4 backdrop-blur lg:hidden">
+      <div className="min-w-0 pb-24 lg:pb-8 print:pb-0">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/85 px-4 backdrop-blur lg:hidden print:hidden">
           <WorkspaceMenu compact />
           <NotificationBell align="end" className="ml-auto" />
           <Button
@@ -276,7 +276,7 @@ function Shell() {
             <Search />
           </Button>
         </header>
-        <main className="mx-auto w-full max-w-6xl px-4 pt-5 sm:px-6 lg:pt-8">
+        <main className="mx-auto w-full max-w-6xl px-4 pt-5 sm:px-6 lg:pt-8 print:max-w-none print:p-0">
           <OutboxBanner />
           <Outlet />
         </main>
@@ -285,7 +285,7 @@ function Shell() {
       {/* Bottom navigation (phones & tablets) */}
       <nav
         aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t bg-card/95 backdrop-blur safe-bottom lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t bg-card/95 backdrop-blur safe-bottom lg:hidden print:hidden"
       >
         {BOTTOM_NAV.slice(0, 2).map((item) => (
           <BottomLink key={item.to} item={item} active={isActive(pathname, item.to)} />

@@ -4,6 +4,7 @@ import {
   CalendarDays,
   ChartColumn,
   ChartPie,
+  FileText,
   GitCompareArrows,
   Hash,
   Landmark,
@@ -19,6 +20,7 @@ import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
 import { EmptyState, ErrorState, PageHeader } from '@/components/page';
 import { AccountSelect } from '@/components/pickers';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, Progress, Skeleton } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/menu';
 import { useFormat } from '@/lib/format';
@@ -67,6 +69,14 @@ export function ReportsPage() {
         description={`${f.date(range.from, 'medium')} – ${f.date(range.to, 'medium')} · amounts in ${f.base}`}
         actions={
           <>
+            <Button variant="outline" size="sm" asChild>
+              <Link
+                to="/reports/monthly"
+                search={{ date: range.to > f.today ? f.today : range.to }}
+              >
+                <FileText /> Monthly report
+              </Link>
+            </Button>
             <DateRangePicker
               value={{ from: range.from, to: range.to }}
               allowAllTime={false}

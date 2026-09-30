@@ -163,3 +163,49 @@
     color: oklch(0.82 0.11 var(--hue));
   }
 }
+
+/* Printing (and "Save as PDF"): A4 pages, light colours whatever the theme, no toasts. */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+  :root,
+  .dark {
+    --background: oklch(0.985 0.003 247);
+    --foreground: oklch(0.2 0.02 262);
+    --card: oklch(1 0 0);
+    --card-foreground: var(--foreground);
+    --popover: oklch(1 0 0);
+    --popover-foreground: var(--foreground);
+    --muted: oklch(0.965 0.004 255);
+    --muted-foreground: oklch(0.5 0.02 258);
+    --border: oklch(0.92 0.006 255);
+    --input: oklch(0.88 0.008 255);
+    --primary: oklch(0.51 0.086 186);
+    --primary-foreground: oklch(0.985 0.01 180);
+    --accent: oklch(0.96 0.02 180);
+    --accent-foreground: oklch(0.36 0.07 186);
+    --secondary: oklch(0.955 0.006 255);
+    --secondary-foreground: oklch(0.25 0.02 262);
+    --positive: oklch(0.55 0.14 152);
+    --warning: oklch(0.7 0.15 65);
+    --destructive: oklch(0.577 0.2 27);
+    --destructive-foreground: oklch(0.985 0 0);
+    --ring: oklch(0.51 0.086 186 / 0.45);
+    /* Chart series: validated categorical slots (blue, orange), CVD-safe on the card surface. */
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --chart-grid: #eceef1;
+    --chart-axis: #c9ced6;
+    --chart-reference: #6b7280;
+  }
+  html,
+  body {
+    background: white;
+    color-scheme: light;
+  }
+  [data-sonner-toaster] {
+    display: none;
+  }
+}

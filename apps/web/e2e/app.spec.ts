@@ -735,6 +735,31 @@ test.describe('everyday use', () => {
     await expect(page.getByRole('button', { name: /Tea stall/ })).toContainText('-Rs. 340.00');
   });
 
+  test('a monthly report that prints to PDF', async ({ signedIn: page }) => {
+    await page.keyboard.press('n');
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Amount').fill('2500');
+    await dialog.getByRole('button', { name: 'Dining Out' }).click();
+    await dialog.getByLabel('Payee').fill('Bhojan Griha');
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Expense added')).toBeVisible();
+
+    await page.goto('/reports');
+    await page.getByRole('link', { name: 'Monthly report' }).click();
+    await expect(page.getByText('Monthly report · Home')).toBeVisible();
+    await expect(page.getByText('Where the money went')).toBeVisible();
+    await expect(page.getByRole('row', { name: /^Dining Out/ })).toContainText('Rs. 2,500');
+    await expect(page.getByRole('row', { name: /Bhojan Griha/ })).toBeVisible();
+
+    // On paper: no app chrome, only the report.
+    await page.emulateMedia({ media: 'print' });
+    await expect(page.getByRole('navigation', { name: 'Main' }).first()).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Download PDF' })).toBeHidden();
+    const pdf = await page.pdf({ format: 'A4' });
+    expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+    expect(pdf.length).toBeGreaterThan(10_000);
+  });
+
   test('reports and settings pages load', async ({ signedIn: page }) => {
     await page.goto('/reports?tab=cashflow');
     await expect(page.getByText('Income and spending per month')).toBeVisible();
