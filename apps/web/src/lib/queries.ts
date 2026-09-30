@@ -13,6 +13,7 @@ import type {
   CreateAccountInput,
   CreateCategoryInput,
   CreateInvitationInput,
+  CreateSplitGroupInput,
   CreateTransactionInput,
   CreateTransferInput,
   CreateWorkspaceInput,
@@ -49,6 +50,10 @@ import type {
   SetRolloverInput,
   SpendingByCategory,
   SpendingByGroup,
+  SplitExpenseBody,
+  SplitGroup,
+  SplitGroupSummary,
+  SplitSettlementBody,
   Tag,
   Transaction,
   TransactionChange,
@@ -835,3 +840,100 @@ export function useTransferOwnership() {
     },
   });
 }
+
+// ---------------------------------------------------------------------------------------------
+// Split groups
+// ---------------------------------------------------------------------------------------------
+
+export function useSplitGroups() {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'split-groups'],
+    queryFn: () => api<SplitGroupSummary[]>(`${base}/split-groups`),
+  });
+}
+
+export function useSplitGroup(id: string) {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'split-group', id],
+    queryFn: () => api<SplitGroup>(`${base}/split-groups/${id}`),
+  });
+}
+
+/** Every change returns the whole group; show it right away, then refresh everything else. */
+function useSplitMutation<TInput>(
+  fn: (base: string, input: TInput) => Promise<SplitGroup | undefined>,
+) {
+  const { wid, base } = useWs();
+  const qc = useQueryClient();
+  const invalidate = useInvalidateWorkspace();
+  return useMutation({
+    mutationFn: (input: TInput) => fn(base, input),
+    onSuccess: async (group) => {
+      if (group) qc.setQueryData([...wsKey(wid), 'split-group', group.id], group);
+      await invalidate();
+    },
+  });
+}
+
+export const useCreateSplitGroup = () =>
+  useSplitMutation((base, input: CreateSplitGroupInput) =>
+    api<SplitGroup>(`${base}/split-groups`, { method: 'POST', body: input }),
+  );
+export const useUpdateSplitGroup = () =>
+  useSplitMutation(
+    (
+      base,
+      {
+        id,
+        ...input
+      }: {
+        id: string;
+        name?: string;
+        simplifyDebts?: boolean;
+        categoryId?: string | null;
+        archived?: boolean;
+      },
+    ) => api<SplitGroup>(`${base}/split-groups/${id}`, { method: 'PATCH', body: input }),
+  );
+export const useDeleteSplitGroup = () =>
+  useSplitMutation((base, id: string) =>
+    api<undefined>(`${base}/split-groups/${id}`, { method: 'DELETE' }),
+  );
+export const useAddSplitMember = () =>
+  useSplitMutation(
+    (base, { groupId, ...input }: { groupId: string; name: string; userId?: string | null }) =>
+      api<SplitGroup>(`${base}/split-groups/${groupId}/members`, { method: 'POST', body: input }),
+  );
+export const useRemoveSplitMember = () =>
+  useSplitMutation((base, { groupId, memberId }: { groupId: string; memberId: string }) =>
+    api<SplitGroup>(`${base}/split-groups/${groupId}/members/${memberId}`, { method: 'DELETE' }),
+  );
+export const useSaveSplitExpense = () =>
+  useSplitMutation(
+    (
+      base,
+      { groupId, expenseId, ...body }: SplitExpenseBody & { groupId: string; expenseId?: string },
+    ) =>
+      expenseId
+        ? api<SplitGroup>(`${base}/split-groups/${groupId}/expenses/${expenseId}`, {
+            method: 'PUT',
+            body,
+          })
+        : api<SplitGroup>(`${base}/split-groups/${groupId}/expenses`, { method: 'POST', body }),
+  );
+export const useDeleteSplitExpense = () =>
+  useSplitMutation((base, { groupId, expenseId }: { groupId: string; expenseId: string }) =>
+    api<SplitGroup>(`${base}/split-groups/${groupId}/expenses/${expenseId}`, {
+      method: 'DELETE',
+    }),
+  );
+export const useCreateSettlement = () =>
+  useSplitMutation((base, { groupId, ...body }: SplitSettlementBody & { groupId: string }) =>
+    api<SplitGroup>(`${base}/split-groups/${groupId}/settlements`, { method: 'POST', body }),
+  );
+export const useDeleteSettlement = () =>
+  useSplitMutation((base, { groupId, id }: { groupId: string; id: string }) =>
+    api<SplitGroup>(`${base}/split-groups/${groupId}/settlements/${id}`, { method: 'DELETE' }),
+  );

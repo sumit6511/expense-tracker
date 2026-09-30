@@ -17,4 +17,5 @@ export * from './recurrence';
 export * from './rules';
 export * from './schemas';
 export * from './sms';
+export * from './split';
 export * from './text';

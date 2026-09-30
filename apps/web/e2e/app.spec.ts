@@ -181,6 +181,39 @@ test.describe('sharing', () => {
   });
 });
 
+test.describe('split with friends', () => {
+  test('share a trip’s costs and settle up', async ({ signedIn: page }) => {
+    await page.goto('/split');
+    await page.getByRole('button', { name: 'New group' }).first().click();
+    const form = page.getByRole('dialog');
+    await form.getByLabel('Name', { exact: true }).fill('Pokhara trip');
+    await form.getByLabel('Person 1', { exact: true }).fill('Bikash');
+    await form.getByRole('button', { name: 'Add a person' }).click();
+    await form.getByLabel('Person 2', { exact: true }).fill('Chandra');
+    await form.getByRole('button', { name: 'Create group' }).click();
+    await expect(page.getByRole('heading', { name: 'Pokhara trip' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Add expense' }).click();
+    const expense = page.getByRole('dialog');
+    await expense.getByLabel('What for').fill('Dinner');
+    await expense.getByLabel('Amount').fill('3000');
+    await expense.getByRole('switch').click();
+    await expense.getByLabel('Paid from').selectOption({ label: 'Cash' });
+    await expense.getByRole('button', { name: 'Add expense' }).click();
+    await expect(page.getByText('You’re owed Rs. 2,000')).toBeVisible();
+    await expect(page.getByText('you lent Rs. 2,000')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Record', exact: true }).first().click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Record payment' }).click();
+    await expect(page.getByText('Payment recorded')).toBeVisible();
+    await expect(page.getByText('You’re owed Rs. 1,000')).toBeVisible();
+
+    // What was paid from Cash is in the ledger.
+    await page.goto('/transactions');
+    await expect(page.getByText('Dinner · Pokhara trip')).toBeVisible();
+  });
+});
+
 test.describe('everyday use', () => {
   test('quick add with the keyboard, edit, delete and undo', async ({ signedIn: page }) => {
     await page.keyboard.press('n');

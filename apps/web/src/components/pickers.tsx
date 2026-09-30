@@ -146,19 +146,25 @@ export function AccountSelect({
   includeArchived = false,
   exclude,
   emptyLabel,
+  currency,
   ...props
 }: Omit<ComponentProps<'select'>, 'onChange' | 'value' | 'children'> & {
   value: string;
   onChange: (id: string) => void;
   includeArchived?: boolean;
   exclude?: string;
+  /** Only accounts in this currency. */
+  currency?: string;
   /** Adds a first option with an empty value (e.g. "All accounts" in filters). */
   emptyLabel?: string;
 }) {
   const { data: accounts = [] } = useAccounts();
   const f = useFormat();
   const list = accounts.filter(
-    (a) => (includeArchived || !a.archived || a.id === value) && a.id !== exclude,
+    (a) =>
+      (includeArchived || !a.archived || a.id === value) &&
+      a.id !== exclude &&
+      (!currency || a.currency === currency),
   );
   return (
     <NativeSelect value={value} onChange={(e) => onChange(e.target.value)} {...props}>

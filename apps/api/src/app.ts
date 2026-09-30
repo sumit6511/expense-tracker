@@ -25,6 +25,7 @@ import { membersRouter } from './routes/members';
 import { notificationsRouter } from './routes/notifications';
 import { recurringRouter } from './routes/recurring';
 import { rulesRouter } from './routes/rules';
+import { splitRouter } from './routes/split';
 import { transactionsRouter } from './routes/transactions';
 import { workspaceRouter } from './routes/workspace';
 
@@ -114,6 +115,7 @@ export function createApp(deps: Deps) {
     ledgerRouter,
     notificationsRouter,
     membersRouter,
+    splitRouter,
   ]) {
     api.route('/', router);
   }

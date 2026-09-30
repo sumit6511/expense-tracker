@@ -171,6 +171,18 @@ const inboxRoute = createRoute({
   component: lazyRouteComponent(() => import('./features/inbox/inbox-page'), 'InboxPage'),
 });
 
+const splitRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/split',
+  component: lazyRouteComponent(() => import('./features/split/split-page'), 'SplitPage'),
+});
+
+const splitGroupRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/split/$groupId',
+  component: lazyRouteComponent(() => import('./features/split/group-page'), 'SplitGroupPage'),
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/settings',
@@ -208,6 +220,8 @@ const routeTree = rootRoute.addChildren([
     importRoute,
     inboxRoute,
     recurringRoute,
+    splitRoute,
+    splitGroupRoute,
     settingsRoute,
   ]),
 ]);

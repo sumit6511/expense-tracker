@@ -728,6 +728,112 @@ export const notificationPrefs = pgTable('notification_prefs', {
 });
 
 // ---------------------------------------------------------------------------------------------
+// Split groups (shared costs with friends, flatmates, trips)
+// ---------------------------------------------------------------------------------------------
+
+export const splitMethodEnum = pgEnum('split_method', ['equal', 'exact', 'percent', 'shares']);
+
+export const splitGroups = pgTable(
+  'split_groups',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    currency: char({ length: 3 }).notNull(),
+    simplifyDebts: boolean().notNull().default(true),
+    /** Used when recording the group's costs in your own accounts. */
+    categoryId: uuid().references(() => categories.id, { onDelete: 'set null' }),
+    createdBy: text().references(() => user.id, { onDelete: 'set null' }),
+    archivedAt: timestamp({ withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index().on(t.workspaceId)],
+);
+
+/** Someone in a group: an app user in the workspace, or just a name. */
+export const splitMembers = pgTable(
+  'split_members',
+  {
+    id: uuid().primaryKey(),
+    groupId: uuid()
+      .notNull()
+      .references(() => splitGroups.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    userId: text().references(() => user.id, { onDelete: 'set null' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index().on(t.groupId),
+    uniqueIndex().on(t.groupId, t.userId).where(sql`${t.userId} is not null`),
+  ],
+);
+
+export const splitExpenses = pgTable(
+  'split_expenses',
+  {
+    id: uuid().primaryKey(),
+    groupId: uuid()
+      .notNull()
+      .references(() => splitGroups.id, { onDelete: 'cascade' }),
+    date: date({ mode: 'string' }).notNull(),
+    description: text().notNull(),
+    amountMinor: money().notNull(),
+    // No ON DELETE action: a member with expenses can't be removed (checked at statement end, so
+    // deleting a whole group still cascades).
+    paidByMemberId: uuid()
+      .notNull()
+      .references(() => splitMembers.id),
+    method: splitMethodEnum().notNull(),
+    /** The transaction recorded in the payer's own accounts, if they chose to. */
+    linkedTransactionId: uuid().references(() => transactions.id, { onDelete: 'set null' }),
+    createdBy: text().references(() => user.id, { onDelete: 'set null' }),
+    ...timestamps,
+  },
+  (t) => [index().on(t.groupId, t.date)],
+);
+
+export const splitShares = pgTable(
+  'split_shares',
+  {
+    expenseId: uuid()
+      .notNull()
+      .references(() => splitExpenses.id, { onDelete: 'cascade' }),
+    memberId: uuid()
+      .notNull()
+      .references(() => splitMembers.id),
+    amountMinor: money().notNull(),
+    /** What was entered: exact amount, basis points, or number of shares. */
+    value: integer(),
+  },
+  (t) => [primaryKey({ columns: [t.expenseId, t.memberId] }), index().on(t.memberId)],
+);
+
+export const splitSettlements = pgTable(
+  'split_settlements',
+  {
+    id: uuid().primaryKey(),
+    groupId: uuid()
+      .notNull()
+      .references(() => splitGroups.id, { onDelete: 'cascade' }),
+    date: date({ mode: 'string' }).notNull(),
+    fromMemberId: uuid()
+      .notNull()
+      .references(() => splitMembers.id),
+    toMemberId: uuid()
+      .notNull()
+      .references(() => splitMembers.id),
+    amountMinor: money().notNull(),
+    notes: text().notNull().default(''),
+    linkedTransactionId: uuid().references(() => transactions.id, { onDelete: 'set null' }),
+    createdBy: text().references(() => user.id, { onDelete: 'set null' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.groupId, t.date)],
+);
+
+// ---------------------------------------------------------------------------------------------
 // Exchange rates
 // ---------------------------------------------------------------------------------------------
 

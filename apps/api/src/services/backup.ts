@@ -26,6 +26,11 @@ import {
   payees,
   recurring,
   rules,
+  splitExpenses,
+  splitGroups,
+  splitMembers,
+  splitSettlements,
+  splitShares,
   tags,
   transactionSplits,
   transactions,
@@ -332,6 +337,52 @@ export const BackupSchema = z.object({
       }),
     )
     .default([]),
+  splitGroups: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(60),
+        currency: z.string().length(3),
+        simplifyDebts: z.boolean(),
+        categoryId: id.nullable(),
+        archived: z.boolean(),
+        members: z.array(
+          z.object({
+            id,
+            name: z.string().min(1).max(60),
+            /** The person who made the backup (linked to whoever restores it). */
+            you: z.boolean(),
+          }),
+        ),
+        expenses: z.array(
+          z.object({
+            date,
+            description: z.string(),
+            amountMinor: z.number().int().positive(),
+            paidByMemberId: id,
+            method: z.enum(['equal', 'exact', 'percent', 'shares']),
+            shares: z.array(
+              z.object({
+                memberId: id,
+                amountMinor: z.number().int(),
+                value: z.number().int().nullable(),
+              }),
+            ),
+            linkedTransactionId: id.nullable(),
+          }),
+        ),
+        settlements: z.array(
+          z.object({
+            date,
+            fromMemberId: id,
+            toMemberId: id,
+            amountMinor: z.number().int().positive(),
+            notes: z.string(),
+            linkedTransactionId: id.nullable(),
+          }),
+        ),
+      }),
+    )
+    .default([]),
 });
 export type Backup = z.infer<typeof BackupSchema>;
 
@@ -408,6 +459,7 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
   ]);
   const splitsByTx = Map.groupBy(splitRows, (s) => s.transactionId);
   const tagsByTx = Map.groupBy(txTagRows, (t) => t.transactionId);
+  const splitGroupData = await exportSplitGroups(db, ws);
   // Backups hold only what the person can see. A transfer whose other side is someone else's
   // private account is kept as a plain, uncategorized transaction.
   const live = txRows.filter((t) => t.deletedAt === null);
@@ -533,7 +585,97 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
       archived: g.archivedAt !== null,
     })),
     recurring: recurringRows.map(({ workspaceId: _, createdAt, updatedAt, ...r }) => r),
+    splitGroups: splitGroupData.map((g) => ({
+      ...g,
+      // A link to a transaction that isn't in this backup is dropped.
+      expenses: g.expenses.map((e) => ({
+        ...e,
+        linkedTransactionId: live.some((t) => t.id === e.linkedTransactionId)
+          ? e.linkedTransactionId
+          : null,
+      })),
+      settlements: g.settlements.map((x) => ({
+        ...x,
+        linkedTransactionId: live.some((t) => t.id === x.linkedTransactionId)
+          ? x.linkedTransactionId
+          : null,
+      })),
+    })),
   };
+}
+
+async function exportSplitGroups(db: Db, ws: WorkspaceCtx): Promise<Backup['splitGroups']> {
+  const groups = await db
+    .select()
+    .from(splitGroups)
+    .where(eq(splitGroups.workspaceId, ws.id))
+    .orderBy(asc(splitGroups.createdAt));
+  if (groups.length === 0) return [];
+  const ids = groups.map((g) => g.id);
+  const [members, expenses, settlements] = await Promise.all([
+    db
+      .select()
+      .from(splitMembers)
+      .where(inArray(splitMembers.groupId, ids))
+      .orderBy(asc(splitMembers.createdAt)),
+    db
+      .select()
+      .from(splitExpenses)
+      .where(inArray(splitExpenses.groupId, ids))
+      .orderBy(asc(splitExpenses.date), asc(splitExpenses.createdAt)),
+    db
+      .select()
+      .from(splitSettlements)
+      .where(inArray(splitSettlements.groupId, ids))
+      .orderBy(asc(splitSettlements.date), asc(splitSettlements.createdAt)),
+  ]);
+  const shares = expenses.length
+    ? await db
+        .select()
+        .from(splitShares)
+        .where(
+          inArray(
+            splitShares.expenseId,
+            expenses.map((e) => e.id),
+          ),
+        )
+    : [];
+  const sharesBy = Map.groupBy(shares, (x) => x.expenseId);
+  return groups.map((g) => ({
+    name: g.name,
+    currency: g.currency,
+    simplifyDebts: g.simplifyDebts,
+    categoryId: g.categoryId,
+    archived: g.archivedAt !== null,
+    members: members
+      .filter((m) => m.groupId === g.id)
+      .map((m) => ({ id: m.id, name: m.name, you: m.userId === ws.userId })),
+    expenses: expenses
+      .filter((e) => e.groupId === g.id)
+      .map((e) => ({
+        date: e.date,
+        description: e.description,
+        amountMinor: e.amountMinor,
+        paidByMemberId: e.paidByMemberId,
+        method: e.method,
+        shares: (sharesBy.get(e.id) ?? []).map((x) => ({
+          memberId: x.memberId,
+          amountMinor: x.amountMinor,
+          value: x.value,
+        })),
+        linkedTransactionId: e.linkedTransactionId,
+      })),
+    settlements: settlements
+      .filter((x) => x.groupId === g.id)
+      .map((x) => ({
+        date: x.date,
+        fromMemberId: x.fromMemberId,
+        toMemberId: x.toMemberId,
+        amountMinor: x.amountMinor,
+        notes: x.notes,
+        linkedTransactionId: x.linkedTransactionId,
+      })),
+  }));
 }
 
 /** Points a rule at the restored copies of its accounts, categories and tags. */
@@ -745,6 +887,71 @@ export async function restoreBackup(
         })),
       ),
     );
+    for (const g of b.splitGroups) {
+      const groupId = uuidv7();
+      await tx.insert(splitGroups).values({
+        id: groupId,
+        workspaceId,
+        name: g.name,
+        currency: g.currency,
+        simplifyDebts: g.simplifyDebts,
+        categoryId: g.categoryId ? (remap.get(g.categoryId) ?? null) : null,
+        createdBy: userId,
+        archivedAt: archivedAt(g.archived),
+      });
+      const now = Date.now();
+      if (g.members.length) {
+        await tx.insert(splitMembers).values(
+          g.members.map((m, i) => ({
+            id: newId(m.id),
+            groupId,
+            name: m.name,
+            userId: m.you ? userId : null,
+            createdAt: new Date(now + i),
+          })),
+        );
+      }
+      const linked = (old: string | null) => (old ? (remap.get(old) ?? null) : null);
+      for (const e of g.expenses) {
+        const expenseId = uuidv7();
+        await tx.insert(splitExpenses).values({
+          id: expenseId,
+          groupId,
+          date: e.date,
+          description: e.description,
+          amountMinor: e.amountMinor,
+          paidByMemberId: ref(e.paidByMemberId, 'group member')!,
+          method: e.method,
+          linkedTransactionId: linked(e.linkedTransactionId),
+          createdBy: userId,
+        });
+        if (e.shares.length) {
+          await tx.insert(splitShares).values(
+            e.shares.map((x) => ({
+              expenseId,
+              memberId: ref(x.memberId, 'group member')!,
+              amountMinor: x.amountMinor,
+              value: x.value,
+            })),
+          );
+        }
+      }
+      await chunk(g.settlements, (part) =>
+        tx.insert(splitSettlements).values(
+          part.map((x) => ({
+            id: uuidv7(),
+            groupId,
+            date: x.date,
+            fromMemberId: ref(x.fromMemberId, 'group member')!,
+            toMemberId: ref(x.toMemberId, 'group member')!,
+            amountMinor: x.amountMinor,
+            notes: x.notes,
+            linkedTransactionId: linked(x.linkedTransactionId),
+            createdBy: userId,
+          })),
+        ),
+      );
+    }
     const restoredRules = b.rules.flatMap((r) => remapRule(r, (old) => remap.get(old)) ?? []);
     await chunk(restoredRules, (part) =>
       tx
