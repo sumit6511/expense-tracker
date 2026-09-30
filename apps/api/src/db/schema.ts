@@ -1,0 +1,423 @@
+import { sql } from 'drizzle-orm';
+import {
+  bigint,
+  boolean,
+  char,
+  date,
+  index,
+  integer,
+  jsonb,
+  numeric,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  smallint,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
+
+// Column names are snake_case in the database (see `casing` in db/client.ts and drizzle.config.ts).
+
+const timestamps = {
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp({ withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+};
+
+const money = (name?: string) =>
+  name ? bigint(name, { mode: 'number' }) : bigint({ mode: 'number' });
+
+// ---------------------------------------------------------------------------------------------
+// Auth (tables required by Better Auth; ids are strings it generates)
+// ---------------------------------------------------------------------------------------------
+
+export const numberGroupingEnum = pgEnum('number_grouping', ['lakh', 'international']);
+
+export const user = pgTable('user', {
+  id: text().primaryKey(),
+  name: text().notNull(),
+  email: text().notNull().unique(),
+  emailVerified: boolean().notNull().default(false),
+  image: text(),
+  numberGrouping: numberGroupingEnum().notNull().default('lakh'),
+  defaultWorkspaceId: uuid(),
+  ...timestamps,
+});
+
+export const session = pgTable(
+  'session',
+  {
+    id: text().primaryKey(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    token: text().notNull().unique(),
+    ipAddress: text(),
+    userAgent: text(),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    ...timestamps,
+  },
+  (t) => [index().on(t.userId)],
+);
+
+export const account = pgTable(
+  'account',
+  {
+    id: text().primaryKey(),
+    accountId: text().notNull(),
+    providerId: text().notNull(),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    accessToken: text(),
+    refreshToken: text(),
+    idToken: text(),
+    accessTokenExpiresAt: timestamp({ withTimezone: true }),
+    refreshTokenExpiresAt: timestamp({ withTimezone: true }),
+    scope: text(),
+    password: text(),
+    ...timestamps,
+  },
+  (t) => [index().on(t.userId)],
+);
+
+export const verification = pgTable(
+  'verification',
+  {
+    id: text().primaryKey(),
+    identifier: text().notNull(),
+    value: text().notNull(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    ...timestamps,
+  },
+  (t) => [index().on(t.identifier)],
+);
+
+// ---------------------------------------------------------------------------------------------
+// Workspaces
+// ---------------------------------------------------------------------------------------------
+
+export const calendarEnum = pgEnum('calendar_system', ['bs', 'ad']);
+export const roleEnum = pgEnum('workspace_role', ['owner', 'admin', 'editor', 'viewer']);
+
+export const workspaces = pgTable('workspaces', {
+  id: uuid().primaryKey(),
+  name: text().notNull(),
+  baseCurrency: char({ length: 3 }).notNull(),
+  calendar: calendarEnum().notNull().default('bs'),
+  monthStartDay: smallint().notNull().default(1),
+  weekStart: smallint().notNull().default(0),
+  timezone: text().notNull().default('Asia/Kathmandu'),
+  ...timestamps,
+});
+
+export const workspaceMembers = pgTable(
+  'workspace_members',
+  {
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    role: roleEnum().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.userId] }), index().on(t.userId)],
+);
+
+// ---------------------------------------------------------------------------------------------
+// Accounts, categories, payees, tags
+// ---------------------------------------------------------------------------------------------
+
+export const accountTypeEnum = pgEnum('account_type', [
+  'cash',
+  'checking',
+  'savings',
+  'credit_card',
+  'e_wallet',
+  'loan',
+  'investment',
+  'other',
+]);
+
+export const accounts = pgTable(
+  'accounts',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    type: accountTypeEnum().notNull(),
+    currency: char({ length: 3 }).notNull(),
+    openingBalanceMinor: money().notNull().default(0),
+    openingDate: date({ mode: 'string' }).notNull(),
+    creditLimitMinor: money(),
+    institution: text(),
+    icon: text().notNull().default('wallet'),
+    color: text().notNull().default('#64748b'),
+    onBudget: boolean().notNull().default(true),
+    inNetWorth: boolean().notNull().default(true),
+    sortOrder: integer().notNull().default(0),
+    archivedAt: timestamp({ withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index().on(t.workspaceId)],
+);
+
+export const categoryKindEnum = pgEnum('category_kind', ['expense', 'income']);
+
+export const categoryGroups = pgTable(
+  'category_groups',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    kind: categoryKindEnum().notNull(),
+    sortOrder: integer().notNull().default(0),
+    archivedAt: timestamp({ withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index().on(t.workspaceId)],
+);
+
+export const categories = pgTable(
+  'categories',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    groupId: uuid()
+      .notNull()
+      .references(() => categoryGroups.id),
+    name: text().notNull(),
+    icon: text().notNull().default('tag'),
+    color: text().notNull().default('#64748b'),
+    sortOrder: integer().notNull().default(0),
+    archivedAt: timestamp({ withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index().on(t.workspaceId), index().on(t.groupId)],
+);
+
+export const payees = pgTable(
+  'payees',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    normalizedName: text().notNull(),
+    defaultCategoryId: uuid().references(() => categories.id, { onDelete: 'set null' }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex().on(t.workspaceId, t.normalizedName)],
+);
+
+export const tags = pgTable(
+  'tags',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    color: text().notNull().default('#64748b'),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('tags_workspace_name_idx').on(t.workspaceId, sql`lower(${t.name})`)],
+);
+
+// ---------------------------------------------------------------------------------------------
+// Transactions
+// ---------------------------------------------------------------------------------------------
+
+export const transactionStatusEnum = pgEnum('transaction_status', [
+  'pending',
+  'cleared',
+  'reconciled',
+]);
+
+export const importSourceEnum = pgEnum('import_source', ['csv', 'xlsx', 'backup']);
+
+export const importBatches = pgTable(
+  'import_batches',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    accountId: uuid()
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    source: importSourceEnum().notNull(),
+    fileName: text().notNull(),
+    mapping: jsonb(),
+    createdCount: integer().notNull().default(0),
+    skippedCount: integer().notNull().default(0),
+    createdBy: text().references(() => user.id, { onDelete: 'set null' }),
+    revertedAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.workspaceId, t.createdAt)],
+);
+
+export const importProfiles = pgTable(
+  'import_profiles',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    mapping: jsonb().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.workspaceId)],
+);
+
+export const transactions = pgTable(
+  'transactions',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    accountId: uuid()
+      .notNull()
+      // No ON DELETE action: deleting an account with transactions fails, but deleting the whole
+      // workspace (which cascades to both) works, because the check runs at the end of the statement.
+      .references(() => accounts.id),
+    date: date({ mode: 'string' }).notNull(),
+    /** Signed amount in the account currency (negative = money out). */
+    amountMinor: money().notNull(),
+    payeeId: uuid().references(() => payees.id, { onDelete: 'set null' }),
+    rawDescription: text().notNull().default(''),
+    notes: text().notNull().default(''),
+    originalAmountMinor: money(),
+    originalCurrency: char({ length: 3 }),
+    status: transactionStatusEnum().notNull().default('cleared'),
+    needsReview: boolean().notNull().default(false),
+    /** Both legs of a transfer share this id. Transfers have no splits. */
+    transferGroupId: uuid(),
+    importBatchId: uuid().references(() => importBatches.id, { onDelete: 'set null' }),
+    externalId: text(),
+    createdBy: text().references(() => user.id, { onDelete: 'set null' }),
+    updatedBy: text().references(() => user.id, { onDelete: 'set null' }),
+    deletedAt: timestamp({ withTimezone: true }),
+    version: integer().notNull().default(1),
+    ...timestamps,
+  },
+  (t) => [
+    index().on(t.workspaceId, t.date.desc(), t.id.desc()),
+    index().on(t.accountId, t.date),
+    index().on(t.payeeId),
+    index().on(t.transferGroupId),
+    index().on(t.importBatchId),
+    uniqueIndex()
+      .on(t.accountId, t.externalId)
+      .where(sql`${t.externalId} is not null and ${t.deletedAt} is null`),
+    index('transactions_search_idx').using(
+      'gin',
+      sql`(${t.rawDescription} || ' ' || ${t.notes}) gin_trgm_ops`,
+    ),
+  ],
+);
+
+export const transactionSplits = pgTable(
+  'transaction_splits',
+  {
+    id: uuid().primaryKey(),
+    transactionId: uuid()
+      .notNull()
+      .references(() => transactions.id, { onDelete: 'cascade' }),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    categoryId: uuid().references(() => categories.id),
+    amountMinor: money().notNull(),
+    memo: text().notNull().default(''),
+    sortOrder: smallint().notNull().default(0),
+  },
+  (t) => [index().on(t.transactionId), index().on(t.categoryId)],
+);
+
+export const transactionTags = pgTable(
+  'transaction_tags',
+  {
+    transactionId: uuid()
+      .notNull()
+      .references(() => transactions.id, { onDelete: 'cascade' }),
+    tagId: uuid()
+      .notNull()
+      .references(() => tags.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.transactionId, t.tagId] }), index().on(t.tagId)],
+);
+
+// ---------------------------------------------------------------------------------------------
+// Budgets
+// ---------------------------------------------------------------------------------------------
+
+export const budgets = pgTable(
+  'budgets',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    categoryId: uuid()
+      .notNull()
+      .references(() => categories.id, { onDelete: 'cascade' }),
+    /** First day (AD) of the budget month, in the workspace's calendar. */
+    periodStart: date({ mode: 'string' }).notNull(),
+    amountMinor: money().notNull(),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex().on(t.workspaceId, t.categoryId, t.periodStart)],
+);
+
+// ---------------------------------------------------------------------------------------------
+// Exchange rates
+// ---------------------------------------------------------------------------------------------
+
+export const rateSourceEnum = pgEnum('rate_source', ['nrb', 'peg']);
+
+/** Published rates, shared by all workspaces. `rate` = units of quote per 1 unit of base. */
+export const exchangeRates = pgTable(
+  'exchange_rates',
+  {
+    base: char({ length: 3 }).notNull(),
+    quote: char({ length: 3 }).notNull(),
+    date: date({ mode: 'string' }).notNull(),
+    rate: numeric({ precision: 20, scale: 10 }).notNull(),
+    source: rateSourceEnum().notNull(),
+    fetchedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.base, t.quote, t.date, t.source] })],
+);
+
+/** Rates a user entered themselves; they take precedence over published rates. */
+export const manualRates = pgTable(
+  'manual_rates',
+  {
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    base: char({ length: 3 }).notNull(),
+    quote: char({ length: 3 }).notNull(),
+    date: date({ mode: 'string' }).notNull(),
+    rate: numeric({ precision: 20, scale: 10 }).notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.base, t.quote, t.date] })],
+);

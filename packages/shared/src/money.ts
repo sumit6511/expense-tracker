@@ -260,6 +260,35 @@ function rateToString(rate: number): string {
   return rate.toFixed(12).replace(/\.?0+$/, '');
 }
 
+/** Exact decimal string for a rational, rounded half away from zero to `precision` places. */
+function rationalToDecimal(r: Rational, precision: number): string {
+  const scaled = roundHalfAwayFromZero(rat(r.n * pow10(precision), r.d));
+  const negative = scaled < 0n;
+  const digits = (negative ? -scaled : scaled).toString().padStart(precision + 1, '0');
+  const whole = digits.slice(0, digits.length - precision);
+  const frac = digits.slice(digits.length - precision).replace(/0+$/, '');
+  return `${negative ? '-' : ''}${whole}${frac ? `.${frac}` : ''}`;
+}
+
+/**
+ * Divides two decimal rates exactly (to 12 places): used to cross currencies through NPR, e.g.
+ * USD→INR = (NPR per USD) / (NPR per INR).
+ */
+export function divideRates(numerator: string, denominator: string, precision = 12): string {
+  const a = parseRational(numerator.trim());
+  const b = parseRational(denominator.trim());
+  if (!a || !b || b.n === 0n) throw new RangeError('Invalid rate');
+  return rationalToDecimal(rat(a.n * b.d, a.d * b.n), precision);
+}
+
+/** Mean of two decimal strings, exact (used for NRB mid rates from buying and selling rates). */
+export function averageDecimals(a: string, b: string, divisor = 1, precision = 10): string {
+  const x = parseRational(a.trim());
+  const y = parseRational(b.trim());
+  if (!x || !y || divisor <= 0) throw new RangeError('Invalid decimal');
+  return rationalToDecimal(rat(x.n * y.d + y.n * x.d, x.d * y.d * 2n * BigInt(divisor)), precision);
+}
+
 export function convertBetween(
   minor: Minor,
   fromCurrency: string,

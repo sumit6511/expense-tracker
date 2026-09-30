@@ -2,8 +2,10 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
   allocate,
+  averageDecimals,
   convertBetween,
   convertMinor,
+  divideRates,
   formatAmount,
   formatMoney,
   formatMoneyCompact,
@@ -195,5 +197,19 @@ describe('formatting', () => {
     expect(formatMoneyCompact(95000, 'NPR')).toBe('Rs. 950');
     expect(formatMoneyCompact(150000000, 'USD', { grouping: 'international' })).toBe('$1.5M');
     expect(formatMoneyCompact(-15000000, 'NPR')).toBe('-Rs. 1.5L');
+  });
+});
+
+describe('rate arithmetic', () => {
+  it('divides rates exactly', () => {
+    expect(divideRates('133.25', '1.6')).toBe('83.28125');
+    expect(divideRates('1', '3')).toBe('0.333333333333');
+    expect(divideRates('2', '3', 4)).toBe('0.6667');
+    expect(() => divideRates('1', '0')).toThrow();
+  });
+
+  it('averages buy/sell rates per unit', () => {
+    expect(averageDecimals('160.00', '160.15', 100)).toBe('1.60075');
+    expect(averageDecimals('133.10', '133.70')).toBe('133.4');
   });
 });
