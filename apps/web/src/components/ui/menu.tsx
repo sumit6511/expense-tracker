@@ -184,6 +184,7 @@ export function Segmented<T extends string>({
   className,
   size = 'md',
   label,
+  disabled,
 }: {
   value: T;
   onChange: (value: T) => void;
@@ -191,9 +192,17 @@ export function Segmented<T extends string>({
   className?: string;
   size?: 'sm' | 'md';
   label?: string;
+  disabled?: boolean;
 }) {
   return (
-    <fieldset className={cn('inline-flex min-w-0 rounded-lg bg-muted p-1', className)}>
+    <fieldset
+      disabled={disabled}
+      className={cn(
+        'inline-flex min-w-0 rounded-lg bg-muted p-1',
+        disabled && 'opacity-60',
+        className,
+      )}
+    >
       {label && <legend className="sr-only">{label}</legend>}
       {options.map((o) => (
         <button

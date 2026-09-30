@@ -23,7 +23,7 @@ import {
   transactions,
   transactionTags,
 } from '../db/schema';
-import { ApiError, badRequest, conflict, notFound } from '../lib/errors';
+import { ApiError, badRequest, conflict, forbidden, notFound } from '../lib/errors';
 import { requireAccount } from './accounts';
 import { logAction, withAudit } from './audit';
 import { assertCategoriesExist } from './categories';
@@ -31,6 +31,7 @@ import { findOrCreatePayee } from './payees';
 import { loadRateBook } from './rates';
 import { loadActiveRules, recordHits } from './rules';
 import { assertTagsExist } from './tags';
+import { isHidden, type Scope, scopeId, visibleAccount } from './visibility';
 
 type TxRow = typeof transactions.$inferSelect;
 
@@ -142,41 +143,39 @@ async function hydrate(
   });
 }
 
-async function requireTransactionRow(
-  db: Executor,
-  workspaceId: string,
-  id: string,
-): Promise<TxRow> {
+async function requireTransactionRow(db: Executor, scope: Scope, id: string): Promise<TxRow> {
   const [row] = await db
     .select()
     .from(transactions)
-    .where(and(eq(transactions.workspaceId, workspaceId), eq(transactions.id, id)))
+    .where(and(eq(transactions.workspaceId, scopeId(scope)), eq(transactions.id, id)))
     .limit(1);
-  if (!row) throw notFound('Transaction');
+  if (!row || isHidden(scope, row.accountId)) throw notFound('Transaction');
   return row;
 }
 
-export async function getTransaction(
-  db: Executor,
-  workspaceId: string,
-  id: string,
-): Promise<Transaction> {
-  const row = await requireTransactionRow(db, workspaceId, id);
+export async function getTransaction(db: Executor, scope: Scope, id: string): Promise<Transaction> {
+  const row = await requireTransactionRow(db, scope, id);
   const [tx] = await hydrate(db, [row]);
   return tx!;
 }
 
-/** Several transactions, in the order of `ids`. */
+/** Several transactions, in the order of `ids` (ones the person can't see are left out). */
 export async function getTransactions(
   db: Executor,
-  workspaceId: string,
+  scope: Scope,
   ids: string[],
 ): Promise<Transaction[]> {
   if (ids.length === 0) return [];
   const rows = await db
     .select()
     .from(transactions)
-    .where(and(eq(transactions.workspaceId, workspaceId), inArray(transactions.id, ids)));
+    .where(
+      and(
+        eq(transactions.workspaceId, scopeId(scope)),
+        inArray(transactions.id, ids),
+        visibleAccount(scope, transactions.accountId),
+      ),
+    );
   const hydrated = new Map((await hydrate(db, rows)).map((t) => [t.id, t]));
   return ids.flatMap((id) => hydrated.get(id) ?? []);
 }
@@ -214,12 +213,11 @@ function idsCondition(column: SQL | typeof transactions.payeeId, ids: string[]) 
 const txColumn = (column: 'id' | 'payee_id') => sql.raw(`"transactions"."${column}"`);
 
 /** Filter conditions shared by the list, totals and CSV export. */
-export function transactionFilters(
-  workspaceId: string,
-  q: Omit<ListQuery, 'cursor' | 'limit'>,
-): SQL[] {
+export function transactionFilters(scope: Scope, q: Omit<ListQuery, 'cursor' | 'limit'>): SQL[] {
   const t = transactions;
-  const where: SQL[] = [eq(t.workspaceId, workspaceId)];
+  const where: SQL[] = [eq(t.workspaceId, scopeId(scope))];
+  const visible = visibleAccount(scope, t.accountId);
+  if (visible) where.push(visible);
   where.push(q.deleted === 'true' ? isNotNull(t.deletedAt) : isNull(t.deletedAt));
   if (q.from) where.push(sql`${t.date} >= ${q.from}`);
   if (q.to) where.push(sql`${t.date} <= ${q.to}`);
@@ -262,7 +260,7 @@ export async function listTransactions(
   ws: WorkspaceCtx,
   query: ListQuery,
 ): Promise<TransactionPage> {
-  const where = transactionFilters(ws.id, query);
+  const where = transactionFilters(ws, query);
   const pageWhere = [...where];
   if (query.cursor) {
     const c = decodeCursor(query.cursor);
@@ -477,12 +475,13 @@ export async function createTransaction(
       .where(eq(transactions.id, input.id))
       .limit(1);
     if (existing) {
-      if (existing.workspaceId !== ws.id) throw conflict('Transaction id already in use');
+      if (existing.workspaceId !== ws.id || isHidden(ws, existing.accountId))
+        throw conflict('Transaction id already in use');
       return { transaction: (await hydrate(db, [existing]))[0]!, created: false };
     }
   }
   const id = await db.transaction(async (tx) => {
-    const account = await requireAccount(tx, ws.id, input.accountId);
+    const account = await requireAccount(tx, ws, input.accountId);
     const categoryIds = input.splits
       ? input.splits.map((s) => s.categoryId)
       : [input.categoryId ?? null];
@@ -498,7 +497,7 @@ export async function createTransaction(
       payeeId,
     );
   });
-  return { transaction: await getTransaction(db, ws.id, id), created: true };
+  return { transaction: await getTransaction(db, ws, id), created: true };
 }
 
 /**
@@ -539,8 +538,9 @@ export async function updateTransaction(
   input: z.output<typeof UpdateTransactionSchema>,
 ): Promise<Transaction> {
   await db.transaction(async (tx) => {
-    const row = await requireTransactionRow(tx, ws.id, id);
+    const row = await requireTransactionRow(tx, ws, id);
     if (row.deletedAt) throw notFound('Transaction');
+    await assertTransferVisible(tx, ws, row.transferGroupId);
     if (input.version !== undefined && input.version !== row.version) {
       throw conflict('This transaction was changed elsewhere. Reload and try again.', {
         currentVersion: row.version,
@@ -560,7 +560,7 @@ export async function updateTransaction(
     const ids = await withTransferPeers(tx, ws.id, [id]);
     await withAudit(tx, ws.id, userId, ids, () => applyUpdate(tx, ws, userId, row, input));
   });
-  return getTransaction(db, ws.id, id);
+  return getTransaction(db, ws, id);
 }
 
 async function applyUpdate(
@@ -584,7 +584,7 @@ async function applyUpdate(
   };
   let accountCurrency: string | null = null;
   if (input.accountId !== undefined && input.accountId !== row.accountId) {
-    const account = await requireAccount(tx, ws.id, input.accountId);
+    const account = await requireAccount(tx, ws, input.accountId);
     patch.accountId = account.id;
     accountCurrency = account.currency;
   }
@@ -597,7 +597,7 @@ async function applyUpdate(
   if (input.original !== undefined) {
     const currency =
       accountCurrency ??
-      (await requireAccount(tx, ws.id, patch.accountId ?? row.accountId, { allowArchived: true }))
+      (await requireAccount(tx, ws, patch.accountId ?? row.accountId, { allowArchived: true }))
         .currency;
     Object.assign(patch, normalizedOriginal(input.original, currency));
   }
@@ -754,10 +754,45 @@ export async function restoreTransactions(
   return updated.length;
 }
 
-export async function deleteTransaction(db: Db, workspaceId: string, userId: string, id: string) {
-  const row = await requireTransactionRow(db, workspaceId, id);
+export async function deleteTransaction(db: Db, scope: Scope, userId: string, id: string) {
+  const row = await requireTransactionRow(db, scope, id);
   if (row.deletedAt) return;
-  await db.transaction((tx) => softDeleteTransactions(tx, workspaceId, userId, [id]));
+  await assertTransferVisible(db, scope, row.transferGroupId);
+  await db.transaction((tx) => softDeleteTransactions(tx, scopeId(scope), userId, [id]));
+}
+
+export async function restoreTransaction(db: Db, scope: Scope, userId: string, id: string) {
+  const row = await requireTransactionRow(db, scope, id);
+  if (row.deletedAt) {
+    await assertTransferVisible(db, scope, row.transferGroupId);
+    await db.transaction((tx) => restoreTransactions(tx, scopeId(scope), userId, [id]));
+  }
+  return getTransaction(db, scope, id);
+}
+
+/**
+ * A transfer between a shared account and someone else's private one shows up (one leg) but
+ * can't be changed or deleted by others: that would change the private leg too.
+ */
+async function assertTransferVisible(db: Executor, scope: Scope, groupId: string | null) {
+  if (!groupId || scope.hiddenAccountIds.length === 0) return;
+  const legs = await db
+    .select({ accountId: transactions.accountId })
+    .from(transactions)
+    .where(eq(transactions.transferGroupId, groupId));
+  if (legs.some((l) => isHidden(scope, l.accountId))) {
+    throw forbidden('This transfer involves a private account; only its owner can change it');
+  }
+}
+
+/** Transfer groups among `groups` that have a leg in an account hidden from `scope`. */
+async function groupsTouchingHidden(db: Executor, scope: Scope, groups: string[]) {
+  if (groups.length === 0 || scope.hiddenAccountIds.length === 0) return new Set<string>();
+  const legs = await db
+    .select({ group: transactions.transferGroupId, accountId: transactions.accountId })
+    .from(transactions)
+    .where(inArray(transactions.transferGroupId, groups));
+  return new Set(legs.filter((l) => isHidden(scope, l.accountId)).map((l) => l.group!));
 }
 
 /** Permanently removes transactions that have been in the trash for more than `days` days. */
@@ -796,7 +831,13 @@ async function bulkEdit(
       amount: transactions.amountMinor,
     })
     .from(transactions)
-    .where(and(eq(transactions.workspaceId, ws.id), inArray(transactions.id, action.ids)));
+    .where(
+      and(
+        eq(transactions.workspaceId, ws.id),
+        inArray(transactions.id, action.ids),
+        visibleAccount(ws, transactions.accountId),
+      ),
+    );
   const ids = rows.map((r) => r.id);
   const missing = action.ids.length - ids.length;
   const bump = { updatedBy: userId, version: sql`${transactions.version} + 1` };
@@ -858,13 +899,20 @@ async function bulkEdit(
       }
       return { updated: ids.length, skipped: missing };
     }
-    case 'delete': {
-      const n = await softDeleteTransactions(tx, ws.id, userId, ids);
-      return { updated: n, skipped: missing };
-    }
+    case 'delete':
     case 'restore': {
-      const n = await restoreTransactions(tx, ws.id, userId, ids);
-      return { updated: n, skipped: missing };
+      // Transfers into someone else's private account are left alone (see assertTransferVisible).
+      const blocked = await groupsTouchingHidden(
+        tx,
+        ws,
+        rows.map((r) => r.group).filter((g): g is string => g !== null),
+      );
+      const allowed = rows.filter((r) => !r.group || !blocked.has(r.group)).map((r) => r.id);
+      const n =
+        action.action === 'delete'
+          ? await softDeleteTransactions(tx, ws.id, userId, allowed)
+          : await restoreTransactions(tx, ws.id, userId, allowed);
+      return { updated: n, skipped: action.ids.length - n };
     }
     case 'markReviewed': {
       if (ids.length) {
@@ -900,17 +948,14 @@ export interface TransferResult {
   to: Transaction;
 }
 
-async function transferLegs(
-  db: Executor,
-  workspaceId: string,
-  groupId: string,
-): Promise<TransferResult> {
+async function transferLegs(db: Executor, scope: Scope, groupId: string): Promise<TransferResult> {
   const rows = await db
     .select()
     .from(transactions)
     .where(
-      and(eq(transactions.workspaceId, workspaceId), eq(transactions.transferGroupId, groupId)),
+      and(eq(transactions.workspaceId, scopeId(scope)), eq(transactions.transferGroupId, groupId)),
     );
+  if (rows.some((r) => isHidden(scope, r.accountId))) throw notFound('Transfer');
   const hydrated = await hydrate(db, rows);
   const from = hydrated.find((t) => t.amountMinor < 0);
   const to = hydrated.find((t) => t.amountMinor > 0);
@@ -918,13 +963,13 @@ async function transferLegs(
   return { from, to };
 }
 
-export async function getTransfer(db: Db, workspaceId: string, groupId: string) {
-  return transferLegs(db, workspaceId, groupId);
+export async function getTransfer(db: Db, scope: Scope, groupId: string) {
+  return transferLegs(db, scope, groupId);
 }
 
 async function resolveTransferAmounts(
   db: Executor,
-  workspaceId: string,
+  scope: Scope,
   input: {
     fromAccountId: string;
     toAccountId: string;
@@ -934,8 +979,8 @@ async function resolveTransferAmounts(
 ) {
   if (input.fromAccountId === input.toAccountId) throw badRequest('Choose two different accounts');
   const [from, to] = await Promise.all([
-    requireAccount(db, workspaceId, input.fromAccountId),
-    requireAccount(db, workspaceId, input.toAccountId),
+    requireAccount(db, scope, input.fromAccountId),
+    requireAccount(db, scope, input.toAccountId),
   ]);
   if (from.currency !== to.currency && input.toAmountMinor === undefined) {
     throw badRequest(`Enter the amount received in ${to.currency}`, { field: 'toAmountMinor' });
@@ -950,22 +995,22 @@ export async function createTransfer(
   userId: string,
   input: z.output<typeof CreateTransferSchema>,
 ): Promise<TransferResult> {
-  const groupId = await db.transaction((tx) => insertTransfer(tx, ws.id, userId, input));
-  return transferLegs(db, ws.id, groupId);
+  const groupId = await db.transaction((tx) => insertTransfer(tx, ws, userId, input));
+  return transferLegs(db, ws, groupId);
 }
 
 /** Inserts both legs of a transfer and returns their group id. */
 export async function insertTransfer(
   db: Executor,
-  workspaceId: string,
+  scope: Scope,
   userId: string | null,
   input: z.output<typeof CreateTransferSchema>,
   extra: { recurringId?: string } = {},
 ): Promise<string> {
   const groupId = uuidv7();
-  const { from, to, toAmount } = await resolveTransferAmounts(db, workspaceId, input);
+  const { from, to, toAmount } = await resolveTransferAmounts(db, scope, input);
   const common = {
-    workspaceId,
+    workspaceId: scopeId(scope),
     date: input.date,
     notes: input.notes ?? '',
     transferGroupId: groupId,
@@ -987,7 +1032,7 @@ export async function updateTransfer(
   groupId: string,
   input: Partial<z.output<typeof CreateTransferSchema>>,
 ): Promise<TransferResult> {
-  const current = await transferLegs(db, ws.id, groupId);
+  const current = await transferLegs(db, ws, groupId);
   if (current.from.deleted) throw notFound('Transfer');
   const merged = {
     fromAccountId: input.fromAccountId ?? current.from.accountId,
@@ -1000,7 +1045,7 @@ export async function updateTransfer(
   };
   await db.transaction((tx) =>
     withAudit(tx, ws.id, userId, [current.from.id, current.to.id], async () => {
-      const { from, to, toAmount } = await resolveTransferAmounts(tx, ws.id, merged);
+      const { from, to, toAmount } = await resolveTransferAmounts(tx, ws, merged);
       const common = {
         date: merged.date,
         notes: merged.notes,
@@ -1017,7 +1062,7 @@ export async function updateTransfer(
         .where(eq(transactions.id, current.to.id));
     }),
   );
-  return transferLegs(db, ws.id, groupId);
+  return transferLegs(db, ws, groupId);
 }
 
 /** Today in the workspace's time zone. */

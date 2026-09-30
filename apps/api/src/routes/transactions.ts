@@ -27,7 +27,7 @@ import {
   getTransaction,
   getTransfer,
   listTransactions,
-  restoreTransactions,
+  restoreTransaction,
   updateTransaction,
   updateTransfer,
 } from '../services/transactions';
@@ -107,7 +107,7 @@ transactionsRouter.openapi(
   }),
   async (c) =>
     c.json(
-      await getTransaction(c.get('deps').db, c.get('workspace').id, c.req.valid('param').id),
+      await getTransaction(c.get('deps').db, c.get('workspace'), c.req.valid('param').id),
       200,
     ),
 );
@@ -146,7 +146,7 @@ transactionsRouter.openapi(
   async (c) => {
     await deleteTransaction(
       c.get('deps').db,
-      c.get('workspace').id,
+      c.get('workspace'),
       c.get('user')!.id,
       c.req.valid('param').id,
     );
@@ -164,11 +164,11 @@ transactionsRouter.openapi(
     responses: { 200: jsonContent(TransactionSchema), ...errorResponses },
   }),
   async (c) => {
-    const { db } = c.get('deps');
-    const ws = c.get('workspace');
     const { id } = c.req.valid('param');
-    await db.transaction((tx) => restoreTransactions(tx, ws.id, c.get('user')!.id, [id]));
-    return c.json(await getTransaction(db, ws.id, id), 200);
+    return c.json(
+      await restoreTransaction(c.get('deps').db, c.get('workspace'), c.get('user')!.id, id),
+      200,
+    );
   },
 );
 
@@ -208,7 +208,7 @@ transactionsRouter.openapi(
   }),
   async (c) =>
     c.json(
-      await getTransfer(c.get('deps').db, c.get('workspace').id, c.req.valid('param').groupId),
+      await getTransfer(c.get('deps').db, c.get('workspace'), c.req.valid('param').groupId),
       200,
     ),
 );

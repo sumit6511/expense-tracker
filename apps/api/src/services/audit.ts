@@ -3,6 +3,7 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Db, Executor } from '../db/client';
 import { auditLog, transactions, user } from '../db/schema';
 import { notFound } from '../lib/errors';
+import { isHidden, type Scope } from './visibility';
 
 /** The parts of a transaction people care about when asking "who changed this?". */
 interface Snapshot {
@@ -120,14 +121,14 @@ export async function logAction(
 
 export async function transactionHistory(
   db: Db,
-  workspaceId: string,
+  scope: Scope,
   transactionId: string,
 ): Promise<TransactionChange[]> {
   const [tx] = await db
-    .select({ id: transactions.id })
+    .select({ accountId: transactions.accountId })
     .from(transactions)
-    .where(and(eq(transactions.workspaceId, workspaceId), eq(transactions.id, transactionId)));
-  if (!tx) throw notFound('Transaction');
+    .where(and(eq(transactions.workspaceId, scope.id), eq(transactions.id, transactionId)));
+  if (!tx || isHidden(scope, tx.accountId)) throw notFound('Transaction');
   const rows = await db
     .select({
       id: auditLog.id,

@@ -1,6 +1,6 @@
 import { ACCOUNT_TYPE_LABELS, type Account, type AccountType } from '@et/shared';
 import { Link } from '@tanstack/react-router';
-import { ChevronRight, Landmark, Plus } from 'lucide-react';
+import { ChevronRight, Landmark, Lock, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
@@ -152,7 +152,17 @@ function AccountRow({ account: a }: { account: Account }) {
     >
       <CategoryIcon icon={a.icon} color={a.color} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">{a.name}</span>
+        <span className="flex items-center gap-1.5 text-sm font-medium">
+          <span className="truncate">{a.name}</span>
+          {a.visibility === 'private' && (
+            <Lock
+              className="size-3.5 shrink-0 text-muted-foreground"
+              aria-label="Private: only you can see it"
+            >
+              <title>Private: only you can see it</title>
+            </Lock>
+          )}
+        </span>
         <span className="block truncate text-xs text-muted-foreground">
           {ACCOUNT_TYPE_LABELS[a.type]}
           {a.institution ? ` · ${a.institution}` : ''}

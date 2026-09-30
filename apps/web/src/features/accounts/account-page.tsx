@@ -8,6 +8,7 @@ import {
   CheckCheck,
   Ellipsis,
   Loader2,
+  Lock,
   Pencil,
   Plus,
   Trash2,
@@ -19,7 +20,7 @@ import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
 import { EmptyState, ErrorState } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, Skeleton } from '@/components/ui/card';
+import { Badge, Card, Skeleton } from '@/components/ui/card';
 import { Dialog, useConfirm } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -130,6 +131,11 @@ export function AccountPage() {
               <span className="ml-2 text-sm font-normal text-muted-foreground">(archived)</span>
             )}
           </h1>
+          {account.visibility === 'private' && (
+            <Badge className="mt-1">
+              <Lock className="size-3" /> Private: only you can see it
+            </Badge>
+          )}
           <p className="text-sm text-muted-foreground">
             {ACCOUNT_TYPE_LABELS[account.type]} · {account.currency}
             {account.institution ? ` · ${account.institution}` : ''}

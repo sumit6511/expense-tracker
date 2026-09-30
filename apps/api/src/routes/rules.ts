@@ -134,7 +134,7 @@ rulesRouter.openapi(
   async (c) => {
     const { rule, onlyUncategorized } = c.req.valid('json');
     return c.json(
-      await previewRule(c.get('deps').db, c.get('workspace').id, rule, onlyUncategorized),
+      await previewRule(c.get('deps').db, c.get('workspace'), rule, onlyUncategorized),
       200,
     );
   },

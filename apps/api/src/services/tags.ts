@@ -3,8 +3,10 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db, Executor } from '../db/client';
 import { tags, transactions, transactionTags } from '../db/schema';
 import { badRequest, conflict, notFound } from '../lib/errors';
+import { type Scope, visibleAccount } from './visibility';
 
-export async function listTags(db: Db, workspaceId: string): Promise<Tag[]> {
+export async function listTags(db: Db, scope: Scope): Promise<Tag[]> {
+  const workspaceId = scope.id;
   const rows = await db
     .select({
       tag: tags,
@@ -12,7 +14,13 @@ export async function listTags(db: Db, workspaceId: string): Promise<Tag[]> {
     })
     .from(tags)
     .leftJoin(transactionTags, eq(transactionTags.tagId, tags.id))
-    .leftJoin(transactions, eq(transactions.id, transactionTags.transactionId))
+    .leftJoin(
+      transactions,
+      and(
+        eq(transactions.id, transactionTags.transactionId),
+        visibleAccount(scope, transactions.accountId),
+      ),
+    )
     .where(eq(tags.workspaceId, workspaceId))
     .groupBy(tags.id)
     .orderBy(sql`lower(${tags.name})`);

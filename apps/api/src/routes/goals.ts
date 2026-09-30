@@ -72,7 +72,7 @@ goalsRouter.openapi(
     responses: { 204: NoContent, ...errorResponses },
   }),
   async (c) => {
-    await deleteGoal(c.get('deps').db, c.get('workspace').id, c.req.valid('param').id);
+    await deleteGoal(c.get('deps').db, c.get('workspace'), c.req.valid('param').id);
     return c.body(null, 204);
   },
 );

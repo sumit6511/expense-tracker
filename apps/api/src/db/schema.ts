@@ -214,6 +214,8 @@ export const invitations = pgTable(
   ],
 );
 
+export const accountVisibilityEnum = pgEnum('account_visibility', ['shared', 'private']);
+
 export const accounts = pgTable(
   'accounts',
   {
@@ -232,6 +234,10 @@ export const accounts = pgTable(
     color: text().notNull().default('#64748b'),
     onBudget: boolean().notNull().default(true),
     inNetWorth: boolean().notNull().default(true),
+    /** Private accounts (and their transactions) are seen only by their owner. */
+    visibility: accountVisibilityEnum().notNull().default('shared'),
+    /** Who added the account; for a private one, the only person who can see it. */
+    ownerUserId: text().references(() => user.id, { onDelete: 'set null' }),
     sortOrder: integer().notNull().default(0),
     archivedAt: timestamp({ withTimezone: true }),
     ...timestamps,

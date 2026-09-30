@@ -50,7 +50,7 @@ labelsRouter.openapi(
     request: { params: WidParams },
     responses: { 200: Groups, ...errorResponses },
   }),
-  async (c) => c.json(await listCategoryGroups(c.get('deps').db, c.get('workspace').id), 200),
+  async (c) => c.json(await listCategoryGroups(c.get('deps').db, c.get('workspace')), 200),
 );
 
 labelsRouter.openapi(
@@ -177,7 +177,7 @@ labelsRouter.openapi(
     request: { params: WidParams },
     responses: { 200: jsonContent(z.array(PayeeSchema)), ...errorResponses },
   }),
-  async (c) => c.json(await listPayees(c.get('deps').db, c.get('workspace').id), 200),
+  async (c) => c.json(await listPayees(c.get('deps').db, c.get('workspace')), 200),
 );
 
 labelsRouter.openapi(
@@ -246,7 +246,7 @@ labelsRouter.openapi(
     request: { params: WidParams },
     responses: { 200: jsonContent(z.array(TagSchema)), ...errorResponses },
   }),
-  async (c) => c.json(await listTags(c.get('deps').db, c.get('workspace').id), 200),
+  async (c) => c.json(await listTags(c.get('deps').db, c.get('workspace')), 200),
 );
 
 labelsRouter.openapi(

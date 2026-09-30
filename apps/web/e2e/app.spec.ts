@@ -164,6 +164,20 @@ test.describe('sharing', () => {
     await page.goto('/settings?tab=members');
     await expect(page.getByLabel('Role for Partner')).toHaveValue('editor');
     await expect(page.getByText('Waiting to join')).toBeHidden();
+
+    // A private account stays the partner's own.
+    await partner.goto('/accounts');
+    await partner.getByRole('button', { name: 'Add account' }).first().click();
+    const form = partner.getByRole('dialog');
+    await form.getByLabel('Name').fill('Partner savings');
+    await form.getByRole('button', { name: 'Only me' }).click();
+    await form.getByRole('button', { name: 'Add account' }).click();
+    await expect(partner.getByText('Account added')).toBeVisible();
+    await expect(partner.getByText('Partner savings')).toBeVisible();
+    await expect(partner.getByLabel('Private: only you can see it')).toBeVisible();
+    await page.goto('/accounts');
+    await expect(page.getByText('Nabil Bank')).toBeVisible();
+    await expect(page.getByText('Partner savings')).toBeHidden();
   });
 });
 

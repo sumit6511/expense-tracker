@@ -115,7 +115,7 @@ recurringRouter.openapi(
     responses: { 204: NoContent, ...errorResponses },
   }),
   async (c) => {
-    await deleteRecurring(c.get('deps').db, c.get('workspace').id, c.req.valid('param').id);
+    await deleteRecurring(c.get('deps').db, c.get('workspace'), c.req.valid('param').id);
     return c.body(null, 204);
   },
 );

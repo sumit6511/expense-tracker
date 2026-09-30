@@ -22,10 +22,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Field, Input, NativeSelect } from '@/components/ui/input';
-import { Switch } from '@/components/ui/menu';
+import { Segmented, Switch } from '@/components/ui/menu';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
-import { useCreateAccount, useUpdateAccount } from '@/lib/queries';
+import { useCreateAccount, useMemberNames, useUpdateAccount } from '@/lib/queries';
+import { useSession } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
 const ACCOUNT_ICONS = [
@@ -72,6 +73,13 @@ export function AccountFormDialog({
   const [color, setColor] = useState(account?.color ?? preset?.color ?? COLOR_SWATCHES[0]!);
   const [onBudget, setOnBudget] = useState(account?.onBudget ?? true);
   const [inNetWorth, setInNetWorth] = useState(account?.inNetWorth ?? true);
+  const [visibility, setVisibility] = useState(account?.visibility ?? 'shared');
+  const { me } = useSession();
+  const people = useMemberNames();
+  // Only worth asking in a shared workspace (or to undo a private account).
+  const askVisibility = people !== null || account?.visibility === 'private';
+  const canChangeVisibility = !account || account.ownerUserId === me.user.id;
+  const ownerName = account?.ownerUserId ? people?.get(account.ownerUserId) : undefined;
   const [error, setError] = useState<string | null>(null);
   const pending = create.isPending || update.isPending;
 
@@ -93,6 +101,7 @@ export function AccountFormDialog({
       color,
       onBudget,
       inNetWorth,
+      ...(canChangeVisibility && { visibility }),
     };
     if (!body.name) return setError('Give the account a name');
     try {
@@ -251,6 +260,30 @@ export function AccountFormDialog({
             <span>Include in net worth</span>
             <Switch checked={inNetWorth} onCheckedChange={setInNetWorth} />
           </label>
+          {askVisibility && (
+            <Field
+              label="Who can see it"
+              hint={
+                !canChangeVisibility
+                  ? `Only ${ownerName ?? 'the person who added it'} can change this.`
+                  : visibility === 'private'
+                    ? 'Others in this workspace won’t see it, its balance or its transactions, and it’s left out of their reports and budgets.'
+                    : 'Everyone in this workspace sees it and its transactions.'
+              }
+            >
+              <Segmented
+                value={visibility}
+                onChange={setVisibility}
+                label="Who can see it"
+                disabled={!canChangeVisibility}
+                options={[
+                  { value: 'shared', label: 'Everyone here' },
+                  { value: 'private', label: 'Only me' },
+                ]}
+                className="w-full"
+              />
+            </Field>
+          )}
           {error && (
             <p className="text-sm text-destructive" role="alert">
               {error}

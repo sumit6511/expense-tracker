@@ -74,7 +74,7 @@ export async function seedDemo(db: Db, auth: Auth, options: { months?: number } 
     .set({ openingDate: first.start })
     .where(eq(accounts.workspaceId, created.id));
   const [row] = await db.select().from(workspaces).where(eq(workspaces.id, created.id));
-  const ws: WorkspaceCtx = { ...row!, role: 'owner', userId };
+  const ws: WorkspaceCtx = { ...row!, role: 'owner', userId, hiddenAccountIds: [] };
 
   const acct = Object.fromEntries(
     (await db.select().from(accounts).where(eq(accounts.workspaceId, ws.id))).map((a) => [

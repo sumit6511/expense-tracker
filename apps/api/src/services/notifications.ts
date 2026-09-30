@@ -33,6 +33,7 @@ import { budgetOverview } from './budgets';
 import { listGoals } from './goals';
 import { periodSettings } from './reports';
 import { workspaceToday } from './transactions';
+import { loadHiddenAccountIds, visibleAccount } from './visibility';
 
 /** Something worth telling the workspace's members about. */
 export interface Candidate {
@@ -91,6 +92,8 @@ async function billCandidates(db: Executor, ws: WorkspaceCtx, today: IsoDate) {
         eq(recurring.active, true),
         eq(recurring.mode, 'remind'),
         sql`${recurring.nextDate} <= ${today}::date + ${recurring.remindDaysBefore}`,
+        visibleAccount(ws, recurring.accountId),
+        visibleAccount(ws, recurring.toAccountId),
       ),
     );
   return rows.map((r): Candidate => {
@@ -549,6 +552,7 @@ export async function runNotifications(
       timezone: w.timezone,
       userId,
       role,
+      hiddenAccountIds: await loadHiddenAccountIds(db, w.id, userId),
       createdAt: w.createdAt,
     };
     try {

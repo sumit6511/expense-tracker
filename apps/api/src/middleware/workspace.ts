@@ -1,8 +1,8 @@
 import type { Role } from '@et/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { MiddlewareHandler } from 'hono';
 import type { AppEnv } from '../context';
-import { workspaceMembers, workspaces } from '../db/schema';
+import { accounts, workspaceMembers, workspaces } from '../db/schema';
 import { forbidden, notFound, unauthorized } from '../lib/errors';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -21,7 +21,15 @@ export const loadWorkspace: MiddlewareHandler<AppEnv> = async (c, next) => {
 
   const { db } = c.get('deps');
   const [row] = await db
-    .select({ workspace: workspaces, role: workspaceMembers.role })
+    .select({
+      workspace: workspaces,
+      role: workspaceMembers.role,
+      hidden: sql<string[]>`array(
+        select a.id::text from ${accounts} a
+        where a.workspace_id = ${workspaces.id} and a.visibility = 'private'
+          and a.owner_user_id is distinct from ${user.id}
+      )`,
+    })
     .from(workspaceMembers)
     .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
     .where(and(eq(workspaceMembers.workspaceId, wid), eq(workspaceMembers.userId, user.id)))
@@ -42,6 +50,7 @@ export const loadWorkspace: MiddlewareHandler<AppEnv> = async (c, next) => {
     timezone: ws.timezone,
     userId: user.id,
     role: row.role,
+    hiddenAccountIds: row.hidden,
     createdAt: ws.createdAt,
   });
   await next();

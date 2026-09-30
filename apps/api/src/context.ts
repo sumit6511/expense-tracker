@@ -32,6 +32,8 @@ export interface WorkspaceCtx {
   /** The person making the request (or, for background jobs, the person it's done for). */
   userId: string;
   role: Role;
+  /** Other members' private accounts: this person can't see them or their transactions. */
+  hiddenAccountIds: string[];
   createdAt: Date;
 }
 

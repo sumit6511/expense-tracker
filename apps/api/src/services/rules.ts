@@ -19,6 +19,7 @@ import { assertCategoriesExist } from './categories';
 import { findOrCreatePayee } from './payees';
 import { assertTagsExist } from './tags';
 import { applyEffects, getTransactions, type TransactionEffects } from './transactions';
+import { type Scope, visibleAccountSql } from './visibility';
 
 type RuleRow = typeof rules.$inferSelect;
 
@@ -203,7 +204,7 @@ interface Candidate {
 }
 
 /** Live, non-transfer transactions with what rules look at, newest first. */
-async function loadCandidates(db: Executor, workspaceId: string): Promise<Candidate[]> {
+async function loadCandidates(db: Executor, scope: Scope): Promise<Candidate[]> {
   const result = await db.execute<{
     id: string;
     account_id: string;
@@ -223,9 +224,10 @@ async function loadCandidates(db: Executor, workspaceId: string): Promise<Candid
         from transaction_tags tt where tt.transaction_id = t.id), '{}') as tag_ids
     from transactions t
     left join payees p on p.id = t.payee_id
-    where t.workspace_id = ${workspaceId}
+    where t.workspace_id = ${scope.id}
       and t.deleted_at is null
       and t.transfer_group_id is null
+      ${visibleAccountSql(scope, sql`t.account_id`)}
     order by t.date desc, t.id desc
   `);
   return result.rows.map((r) => ({
@@ -280,11 +282,11 @@ const PREVIEW_ITEMS = 25;
 
 export async function previewRule(
   db: Db,
-  workspaceId: string,
+  scope: Scope,
   body: RuleBody,
   onlyUncategorized: boolean,
 ): Promise<RulePreview> {
-  const candidates = await loadCandidates(db, workspaceId);
+  const candidates = await loadCandidates(db, scope);
   const rule = { ...body, id: 'preview', enabled: true };
   let count = 0;
   let changeCount = 0;
@@ -297,7 +299,7 @@ export async function previewRule(
     if (diff(c, result)) changeCount++;
     if (sample.length < PREVIEW_ITEMS) sample.push(c.id);
   }
-  return { count, changeCount, items: await getTransactions(db, workspaceId, sample) };
+  return { count, changeCount, items: await getTransactions(db, scope, sample) };
 }
 
 /** Runs one saved rule over existing transactions. */
@@ -313,7 +315,7 @@ export async function applyRule(
       ...(await getRule(tx, ws.id, id)),
       enabled: true,
     };
-    const candidates = await loadCandidates(tx, ws.id);
+    const candidates = await loadCandidates(tx, ws);
     const todo = candidates.flatMap((c) => {
       if (onlyUncategorized && !isUncategorized(c)) return [];
       const result = evaluateRules([{ ...rule, enabled: true }], subjectOf(c));

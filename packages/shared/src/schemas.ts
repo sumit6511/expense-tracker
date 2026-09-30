@@ -132,6 +132,10 @@ export type UpdateMeInput = z.infer<typeof UpdateMeSchema>;
 // Accounts
 // ---------------------------------------------------------------------------------------------
 
+/** Shared: everyone in the workspace sees it. Private: only the person who owns it. */
+export const AccountVisibilitySchema = z.enum(['shared', 'private']);
+export type AccountVisibility = z.infer<typeof AccountVisibilitySchema>;
+
 export const CreateAccountSchema = z.object({
   name: Name(),
   type: AccountTypeSchema,
@@ -144,6 +148,7 @@ export const CreateAccountSchema = z.object({
   color: Color.optional(),
   onBudget: z.boolean().default(true),
   inNetWorth: z.boolean().default(true),
+  visibility: AccountVisibilitySchema.default('shared'),
 });
 export type CreateAccountInput = z.input<typeof CreateAccountSchema>;
 
@@ -155,6 +160,7 @@ export const UpdateAccountSchema = CreateAccountSchema.omit({ currency: true })
     openingBalanceMinor: MinorAmount.optional(),
     onBudget: z.boolean().optional(),
     inNetWorth: z.boolean().optional(),
+    visibility: AccountVisibilitySchema.optional(),
     archived: z.boolean().optional(),
     sortOrder: z.number().int().min(0).max(10_000).optional(),
   });
@@ -173,6 +179,9 @@ export const AccountSchema = z.object({
   color: z.string(),
   onBudget: z.boolean(),
   inNetWorth: z.boolean(),
+  visibility: AccountVisibilitySchema,
+  /** Who added it (and, when private, the only person who sees it). */
+  ownerUserId: z.string().nullable(),
   archived: z.boolean(),
   sortOrder: z.number(),
   balanceMinor: MinorAmount,

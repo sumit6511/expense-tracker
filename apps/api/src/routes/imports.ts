@@ -75,7 +75,7 @@ importsRouter.openapi(
     request: { params: WidParams },
     responses: { 200: jsonContent(z.array(ImportBatchSchema)), ...errorResponses },
   }),
-  async (c) => c.json(await listBatches(c.get('deps').db, c.get('workspace').id), 200),
+  async (c) => c.json(await listBatches(c.get('deps').db, c.get('workspace')), 200),
 );
 
 importsRouter.openapi(
@@ -91,7 +91,7 @@ importsRouter.openapi(
     c.json(
       await revertBatch(
         c.get('deps').db,
-        c.get('workspace').id,
+        c.get('workspace'),
         c.get('user')!.id,
         c.req.valid('param').id,
       ),

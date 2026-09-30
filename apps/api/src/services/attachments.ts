@@ -3,6 +3,7 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { attachments, transactions } from '../db/schema';
 import { ApiError, badRequest, notFound } from '../lib/errors';
+import { isHidden, type Scope } from './visibility';
 
 /** Per workspace, so one account can't fill the disk. */
 export const WORKSPACE_ATTACHMENT_QUOTA = 1024 * 1024 * 1024;
@@ -62,16 +63,17 @@ const listColumns = {
   createdAt: attachments.createdAt,
 };
 
-async function requireLiveTransaction(db: Db, workspaceId: string, transactionId: string) {
+async function requireLiveTransaction(db: Db, scope: Scope, transactionId: string) {
   const [tx] = await db
-    .select({ id: transactions.id, deletedAt: transactions.deletedAt })
+    .select({ accountId: transactions.accountId, deletedAt: transactions.deletedAt })
     .from(transactions)
-    .where(and(eq(transactions.workspaceId, workspaceId), eq(transactions.id, transactionId)));
-  if (!tx || tx.deletedAt) throw notFound('Transaction');
+    .where(and(eq(transactions.workspaceId, scope.id), eq(transactions.id, transactionId)));
+  if (!tx || tx.deletedAt || isHidden(scope, tx.accountId)) throw notFound('Transaction');
 }
 
-export async function listAttachments(db: Db, workspaceId: string, transactionId: string) {
-  await requireLiveTransaction(db, workspaceId, transactionId);
+export async function listAttachments(db: Db, scope: Scope, transactionId: string) {
+  const workspaceId = scope.id;
+  await requireLiveTransaction(db, scope, transactionId);
   const rows = await db
     .select(listColumns)
     .from(attachments)
@@ -84,12 +86,13 @@ export async function listAttachments(db: Db, workspaceId: string, transactionId
 
 export async function addAttachment(
   db: Db,
-  workspaceId: string,
+  scope: Scope,
   userId: string,
   transactionId: string,
   file: { name: string; data: Buffer },
 ): Promise<Attachment> {
-  await requireLiveTransaction(db, workspaceId, transactionId);
+  const workspaceId = scope.id;
+  await requireLiveTransaction(db, scope, transactionId);
   if (file.data.length === 0) throw badRequest('The file is empty');
   if (file.data.length > MAX_ATTACHMENT_BYTES)
     throw new ApiError(413, 'too_large', 'Files can be at most 5 MB');
@@ -126,19 +129,26 @@ export async function addAttachment(
   return toDto(row!);
 }
 
-export async function getAttachmentFile(db: Db, workspaceId: string, id: string) {
+/** An attachment on a transaction the person can see. */
+async function requireAttachment(db: Db, scope: Scope, id: string) {
+  const [row] = await db
+    .select({ id: attachments.id, accountId: transactions.accountId })
+    .from(attachments)
+    .innerJoin(transactions, eq(transactions.id, attachments.transactionId))
+    .where(and(eq(attachments.workspaceId, scope.id), eq(attachments.id, id)));
+  if (!row || isHidden(scope, row.accountId)) throw notFound('Attachment');
+}
+
+export async function getAttachmentFile(db: Db, scope: Scope, id: string) {
+  await requireAttachment(db, scope, id);
   const [row] = await db
     .select({ ...listColumns, data: attachments.data })
     .from(attachments)
-    .where(and(eq(attachments.workspaceId, workspaceId), eq(attachments.id, id)));
-  if (!row) throw notFound('Attachment');
-  return row;
+    .where(eq(attachments.id, id));
+  return row!;
 }
 
-export async function deleteAttachment(db: Db, workspaceId: string, id: string) {
-  const deleted = await db
-    .delete(attachments)
-    .where(and(eq(attachments.workspaceId, workspaceId), eq(attachments.id, id)))
-    .returning({ id: attachments.id });
-  if (deleted.length === 0) throw notFound('Attachment');
+export async function deleteAttachment(db: Db, scope: Scope, id: string) {
+  await requireAttachment(db, scope, id);
+  await db.delete(attachments).where(eq(attachments.id, id));
 }

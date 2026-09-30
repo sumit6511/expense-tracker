@@ -15,11 +15,21 @@ import {
   uuidv7,
   type Workspace,
 } from '@et/shared';
-import { and, asc, eq, gt, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { SessionUser, WorkspaceCtx } from '../context';
 import type { Db, Executor } from '../db/client';
-import { invitations, notifications, user, workspaceMembers, workspaces } from '../db/schema';
+import {
+  accounts,
+  goals,
+  invitations,
+  notifications,
+  transactionSplits,
+  transactions,
+  user,
+  workspaceMembers,
+  workspaces,
+} from '../db/schema';
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors';
 import type { Logger } from '../logger';
 import type { Mailer } from '../mailer';
@@ -191,6 +201,61 @@ export async function handOverOwnedWorkspaces(db: Executor, userId: string) {
     ) heir
     where m.workspace_id = heir.workspace_id and m.user_id = heir.user_id
   `);
+}
+
+/**
+ * Before an account is deleted: its private accounts go too (nobody else could ever see them).
+ * A transfer between one of them and a shared account stays in the shared account as a plain
+ * transaction, so shared balances don't change.
+ */
+export async function deletePrivateAccountsOf(db: Db, userId: string) {
+  await db.transaction(async (tx) => {
+    const owned = (
+      await tx
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(and(eq(accounts.ownerUserId, userId), eq(accounts.visibility, 'private')))
+    ).map((a) => a.id);
+    if (owned.length === 0) return;
+    const groups = (
+      await tx
+        .selectDistinct({ group: transactions.transferGroupId })
+        .from(transactions)
+        .where(and(inArray(transactions.accountId, owned), isNotNull(transactions.transferGroupId)))
+    ).map((g) => g.group!);
+    const peers = groups.length
+      ? await tx
+          .select()
+          .from(transactions)
+          .where(
+            and(
+              inArray(transactions.transferGroupId, groups),
+              notInArray(transactions.accountId, owned),
+            ),
+          )
+      : [];
+    for (const leg of peers) {
+      await tx
+        .update(transactions)
+        .set({
+          transferGroupId: null,
+          notes: leg.notes || 'Transfer (the other account was deleted)',
+        })
+        .where(eq(transactions.id, leg.id));
+      await tx.insert(transactionSplits).values({
+        id: uuidv7(),
+        transactionId: leg.id,
+        workspaceId: leg.workspaceId,
+        categoryId: null,
+        amountMinor: leg.amountMinor,
+        memo: '',
+        sortOrder: 0,
+      });
+    }
+    await tx.delete(goals).where(inArray(goals.accountId, owned));
+    await tx.delete(transactions).where(inArray(transactions.accountId, owned));
+    await tx.delete(accounts).where(inArray(accounts.id, owned));
+  });
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -29,6 +29,7 @@ import { findOrCreatePayee } from './payees';
 import { loadRateBook } from './rates';
 import { assertTagsExist } from './tags';
 import { getTransaction, insertTransaction, insertTransfer, workspaceToday } from './transactions';
+import { isHidden, type Scope, systemScope, visibleAccount, visibleAccountSql } from './visibility';
 
 type Row = typeof recurring.$inferSelect;
 
@@ -136,28 +137,34 @@ async function toDtos(db: Executor, ws: WorkspaceCtx, rows: Row[]): Promise<Recu
   });
 }
 
-async function requireRow(db: Executor, workspaceId: string, id: string, lock = false) {
+/** A series the person can see: one moving money in or out of a hidden account is hidden too. */
+async function requireRow(db: Executor, scope: Scope, id: string, lock = false) {
   const query = db
     .select()
     .from(recurring)
-    .where(and(eq(recurring.workspaceId, workspaceId), eq(recurring.id, id)))
+    .where(and(eq(recurring.workspaceId, scope.id), eq(recurring.id, id)))
     .limit(1);
   const [row] = lock ? await query.for('update') : await query;
-  if (!row) throw notFound('Recurring transaction');
+  if (!row || isHidden(scope, row.accountId) || isHidden(scope, row.toAccountId))
+    throw notFound('Recurring transaction');
   return row;
 }
+
+/** Only series the person can see. */
+const visibleSeries = (scope: Scope) =>
+  and(visibleAccount(scope, recurring.accountId), visibleAccount(scope, recurring.toAccountId));
 
 export async function listRecurring(db: Executor, ws: WorkspaceCtx): Promise<Recurring[]> {
   const rows = await db
     .select()
     .from(recurring)
-    .where(eq(recurring.workspaceId, ws.id))
+    .where(and(eq(recurring.workspaceId, ws.id), visibleSeries(ws)))
     .orderBy(sql`${recurring.nextDate} asc nulls last`, asc(recurring.name));
   return toDtos(db, ws, rows);
 }
 
 export async function getRecurring(db: Executor, ws: WorkspaceCtx, id: string) {
-  const [dto] = await toDtos(db, ws, [await requireRow(db, ws.id, id)]);
+  const [dto] = await toDtos(db, ws, [await requireRow(db, ws, id)]);
   return dto!;
 }
 
@@ -175,6 +182,7 @@ export async function upcoming(db: Db, ws: WorkspaceCtx, days: number): Promise<
         eq(recurring.active, true),
         isNotNull(recurring.nextDate),
         sql`${recurring.nextDate} <= ${until}`,
+        visibleSeries(ws),
       ),
     );
   const items: UpcomingItem[] = [];
@@ -208,9 +216,9 @@ export async function upcoming(db: Db, ws: WorkspaceCtx, days: number): Promise<
 // ---------------------------------------------------------------------------------------------
 
 async function validateRefs(db: Executor, ws: WorkspaceCtx, body: RecurringBody) {
-  const from = await requireAccount(db, ws.id, body.accountId);
+  const from = await requireAccount(db, ws, body.accountId);
   if (body.kind === 'transfer') {
-    const to = await requireAccount(db, ws.id, body.toAccountId!);
+    const to = await requireAccount(db, ws, body.toAccountId!);
     if (from.currency !== to.currency && body.toAmountMinor === null && !body.variableAmount) {
       throw badRequest(`Enter the amount received in ${to.currency}`, { field: 'toAmountMinor' });
     }
@@ -279,7 +287,7 @@ export async function updateRecurring(
   patch: Partial<RecurringBody>,
 ) {
   await db.transaction(async (tx) => {
-    const row = await requireRow(tx, ws.id, id, true);
+    const row = await requireRow(tx, ws, id, true);
     const [current] = await toDtos(tx, ws, [row]);
     const parsed = RecurringBodySchema.safeParse({
       ...current,
@@ -322,17 +330,15 @@ export async function updateRecurring(
   return getRecurring(db, ws, id);
 }
 
-export async function deleteRecurring(db: Db, workspaceId: string, id: string) {
-  const deleted = await db
-    .delete(recurring)
-    .where(and(eq(recurring.workspaceId, workspaceId), eq(recurring.id, id)))
-    .returning({ id: recurring.id });
-  if (deleted.length === 0) throw notFound('Recurring transaction');
+export async function deleteRecurring(db: Db, scope: Scope, id: string) {
+  await requireRow(db, scope, id);
+  await db.delete(recurring).where(and(eq(recurring.workspaceId, scope.id), eq(recurring.id, id)));
 }
 
 /** Records one occurrence as a transaction (or transfer) and returns its id. */
 async function post(
   tx: Executor,
+  scope: Scope,
   r: Row,
   userId: string | null,
   occurrence: { date: IsoDate; amountMinor: number; toAmountMinor?: number; accountId?: string },
@@ -341,7 +347,7 @@ async function post(
   if (r.kind === 'transfer') {
     const groupId = await insertTransfer(
       tx,
-      r.workspaceId,
+      scope,
       userId,
       {
         fromAccountId: accountId,
@@ -360,7 +366,7 @@ async function post(
       .then((res) => res.rows);
     return leg!.id;
   }
-  const account = await requireAccount(tx, r.workspaceId, accountId);
+  const account = await requireAccount(tx, scope, accountId);
   // Tags deleted since the series was set up are dropped.
   const liveTags = r.tagIds.length
     ? (
@@ -396,9 +402,9 @@ export async function recordOccurrence(
   input: z.output<typeof RecordRecurringSchema>,
 ) {
   const transactionId = await db.transaction(async (tx) => {
-    const r = await requireRow(tx, ws.id, id, true);
+    const r = await requireRow(tx, ws, id, true);
     if (!r.nextDate) throw conflict('This series has ended');
-    const txId = await post(tx, r, userId, {
+    const txId = await post(tx, ws, r, userId, {
       date: input.date ?? r.nextDate,
       amountMinor: input.amountMinor ?? r.amountMinor,
       ...(input.toAmountMinor !== undefined && { toAmountMinor: input.toAmountMinor }),
@@ -411,14 +417,14 @@ export async function recordOccurrence(
     return txId;
   });
   return {
-    transaction: await getTransaction(db, ws.id, transactionId),
+    transaction: await getTransaction(db, ws, transactionId),
     recurring: await getRecurring(db, ws, id),
   };
 }
 
 export async function skipOccurrence(db: Db, ws: WorkspaceCtx, id: string) {
   await db.transaction(async (tx) => {
-    const r = await requireRow(tx, ws.id, id, true);
+    const r = await requireRow(tx, ws, id, true);
     if (!r.nextDate) throw conflict('This series has ended');
     await tx.update(recurring).set(advanced(r)).where(eq(recurring.id, r.id));
   });
@@ -452,7 +458,8 @@ export async function postDueRecurring(db: Db, logger?: Logger, now: Date = new 
   for (const item of due) {
     try {
       const done = await db.transaction(async (tx) => {
-        let r = await requireRow(tx, item.workspaceId, item.id, true);
+        const system = systemScope(item.workspaceId);
+        let r = await requireRow(tx, system, item.id, true);
         const today = await tx
           .execute<{ d: string }>(
             sql`select ((${now.toISOString()}::timestamptz at time zone ${item.timezone})::date)::text as d`,
@@ -460,7 +467,7 @@ export async function postDueRecurring(db: Db, logger?: Logger, now: Date = new 
           .then((res) => res.rows[0]!.d);
         let n = 0;
         while (r.active && r.mode === 'auto' && r.nextDate && r.nextDate <= today && n < 60) {
-          await post(tx, r, null, { date: r.nextDate, amountMinor: r.amountMinor });
+          await post(tx, system, r, null, { date: r.nextDate, amountMinor: r.amountMinor });
           const next = advanced(r);
           await tx
             .update(recurring)
@@ -473,22 +480,44 @@ export async function postDueRecurring(db: Db, logger?: Logger, now: Date = new 
       });
       posted += done.n;
       if (done.n > 0) {
-        const [account] = await db
-          .select({ currency: accounts.currency })
+        const involved = await db
+          .select({
+            id: accounts.id,
+            currency: accounts.currency,
+            visibility: accounts.visibility,
+            owner: accounts.ownerUserId,
+          })
           .from(accounts)
-          .where(eq(accounts.id, done.r.accountId));
-        await deliver(db, item.workspaceId, [
-          recordedCandidate({
-            recurringId: done.r.id,
-            name: done.r.name,
-            kind: done.r.kind,
-            count: done.n,
-            lastDate: done.r.lastPostedDate!,
-            amountMinor: done.r.amountMinor,
-            currency: account?.currency ?? 'NPR',
-            calendar: item.calendar,
-          }),
-        ]);
+          .where(
+            inArray(
+              accounts.id,
+              [done.r.accountId, done.r.toAccountId].filter((a): a is string => !!a),
+            ),
+          );
+        const account = involved.find((a) => a.id === done.r.accountId);
+        // Money in or out of a private account is news only for its owner.
+        const owners = [
+          ...new Set(involved.filter((a) => a.visibility === 'private').map((a) => a.owner)),
+        ];
+        const onlyFor =
+          owners.length === 0 ? undefined : owners.length === 1 && owners[0] ? [owners[0]] : [];
+        await deliver(
+          db,
+          item.workspaceId,
+          [
+            recordedCandidate({
+              recurringId: done.r.id,
+              name: done.r.name,
+              kind: done.r.kind,
+              count: done.n,
+              lastDate: done.r.lastPostedDate!,
+              amountMinor: done.r.amountMinor,
+              currency: account?.currency ?? 'NPR',
+              calendar: item.calendar,
+            }),
+          ],
+          onlyFor,
+        );
       }
     } catch (err) {
       // e.g. the account was archived: leave it due so the person sees it.
@@ -534,6 +563,7 @@ export async function suggestRecurring(db: Db, ws: WorkspaceCtx): Promise<Recurr
       and t.deleted_at is null
       and t.transfer_group_id is null
       and t.date >= ${addDays(today, -400)}
+      ${visibleAccountSql(ws, sql`t.account_id`)}
       and not exists (
         select 1 from recurring r
         where r.workspace_id = t.workspace_id and r.payee_id = t.payee_id and r.next_date is not null

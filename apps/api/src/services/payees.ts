@@ -4,6 +4,7 @@ import type { Db, Executor } from '../db/client';
 import { payees, transactions } from '../db/schema';
 import { badRequest, notFound } from '../lib/errors';
 import { assertCategoriesExist } from './categories';
+import { type Scope, visibleAccount } from './visibility';
 
 /**
  * Returns the id of the payee with this name (matching case- and punctuation-insensitively),
@@ -57,7 +58,8 @@ export async function learnedCategories(db: Executor, workspaceId: string, payee
   return new Map(result.rows.map((r) => [r.payee_id, r.category_id]));
 }
 
-export async function listPayees(db: Db, workspaceId: string): Promise<Payee[]> {
+export async function listPayees(db: Db, scope: Scope): Promise<Payee[]> {
+  const workspaceId = scope.id;
   const rows = await db
     .select({
       payee: payees,
@@ -67,7 +69,10 @@ export async function listPayees(db: Db, workspaceId: string): Promise<Payee[]> 
       >`max(${transactions.date}) filter (where ${transactions.deletedAt} is null)::text`,
     })
     .from(payees)
-    .leftJoin(transactions, eq(transactions.payeeId, payees.id))
+    .leftJoin(
+      transactions,
+      and(eq(transactions.payeeId, payees.id), visibleAccount(scope, transactions.accountId)),
+    )
     .where(eq(payees.workspaceId, workspaceId))
     .groupBy(payees.id)
     .orderBy(sql`max(${transactions.date}) desc nulls last`, payees.name);

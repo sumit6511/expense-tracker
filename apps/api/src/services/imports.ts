@@ -21,6 +21,7 @@ import { assertCategoriesExist } from './categories';
 import { findOrCreatePayee, learnedCategories } from './payees';
 import { countHits, loadActiveRules, recordHits } from './rules';
 import { insertTransaction, softDeleteTransactions } from './transactions';
+import { isHidden, type Scope, visibleAccount } from './visibility';
 
 type ImportRowInput = z.output<typeof ImportRowSchema>;
 
@@ -95,7 +96,7 @@ export async function previewImport(
   accountId: string,
   rows: ImportRowInput[],
 ): Promise<ImportPreview> {
-  await requireAccount(db, ws.id, accountId);
+  await requireAccount(db, ws, accountId);
   const existing = await existingForDuplicates(db, accountId, rows);
   const duplicates = findDuplicates(rows, existing);
   const ruled = await applyRulesToRows(db, ws.id, accountId, rows);
@@ -161,7 +162,7 @@ export async function commitImport(
 ): Promise<ImportBatch> {
   const batchId = uuidv7();
   await db.transaction(async (tx) => {
-    const account = await requireAccount(tx, ws.id, input.accountId);
+    const account = await requireAccount(tx, ws, input.accountId);
     await assertCategoriesExist(
       tx,
       ws.id,
@@ -252,7 +253,7 @@ export async function commitImport(
       .set({ createdCount: created, skippedCount: skipped })
       .where(eq(importBatches.id, batchId));
   });
-  return getBatch(db, ws.id, batchId);
+  return getBatch(db, ws, batchId);
 }
 
 function toBatchDto(b: typeof importBatches.$inferSelect): ImportBatch {
@@ -268,28 +269,31 @@ function toBatchDto(b: typeof importBatches.$inferSelect): ImportBatch {
   };
 }
 
-async function getBatch(db: Executor, workspaceId: string, id: string) {
+async function getBatch(db: Executor, scope: Scope, id: string) {
   const [row] = await db
     .select()
     .from(importBatches)
-    .where(and(eq(importBatches.workspaceId, workspaceId), eq(importBatches.id, id)));
-  if (!row) throw notFound('Import');
+    .where(and(eq(importBatches.workspaceId, scope.id), eq(importBatches.id, id)));
+  if (!row || isHidden(scope, row.accountId)) throw notFound('Import');
   return toBatchDto(row);
 }
 
-export async function listBatches(db: Db, workspaceId: string): Promise<ImportBatch[]> {
+export async function listBatches(db: Db, scope: Scope): Promise<ImportBatch[]> {
   const rows = await db
     .select()
     .from(importBatches)
-    .where(eq(importBatches.workspaceId, workspaceId))
+    .where(
+      and(eq(importBatches.workspaceId, scope.id), visibleAccount(scope, importBatches.accountId)),
+    )
     .orderBy(desc(importBatches.createdAt))
     .limit(100);
   return rows.map(toBatchDto);
 }
 
 /** Undoes an import: its transactions go to the trash (restorable) and the batch is marked. */
-export async function revertBatch(db: Db, workspaceId: string, userId: string, id: string) {
-  await getBatch(db, workspaceId, id);
+export async function revertBatch(db: Db, scope: Scope, userId: string, id: string) {
+  const workspaceId = scope.id;
+  await getBatch(db, scope, id);
   await db.transaction(async (tx) => {
     const ids = await tx
       .select({ id: transactions.id })
@@ -303,7 +307,7 @@ export async function revertBatch(db: Db, workspaceId: string, userId: string, i
     );
     await tx.update(importBatches).set({ revertedAt: sql`now()` }).where(eq(importBatches.id, id));
   });
-  return getBatch(db, workspaceId, id);
+  return getBatch(db, scope, id);
 }
 
 export async function listProfiles(db: Db, workspaceId: string): Promise<ImportProfile[]> {

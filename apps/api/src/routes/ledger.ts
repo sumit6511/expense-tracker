@@ -41,7 +41,7 @@ ledgerRouter.openapi(
   }),
   async (c) =>
     c.json(
-      await transactionHistory(c.get('deps').db, c.get('workspace').id, c.req.valid('param').id),
+      await transactionHistory(c.get('deps').db, c.get('workspace'), c.req.valid('param').id),
       200,
     ),
 );
@@ -104,7 +104,7 @@ ledgerRouter.openapi(
   }),
   async (c) =>
     c.json(
-      await listReconciliations(c.get('deps').db, c.get('workspace').id, c.req.valid('param').id),
+      await listReconciliations(c.get('deps').db, c.get('workspace'), c.req.valid('param').id),
       200,
     ),
 );
@@ -122,7 +122,7 @@ ledgerRouter.openapi(
   }),
   async (c) =>
     c.json(
-      await listAttachments(c.get('deps').db, c.get('workspace').id, c.req.valid('param').id),
+      await listAttachments(c.get('deps').db, c.get('workspace'), c.req.valid('param').id),
       200,
     ),
 );
@@ -157,7 +157,7 @@ ledgerRouter.openapi(
     if (!(file instanceof File)) throw badRequest('Send the file in a "file" form field');
     const attachment = await addAttachment(
       c.get('deps').db,
-      c.get('workspace').id,
+      c.get('workspace'),
       c.get('user')!.id,
       c.req.valid('param').id,
       { name: file.name, data: Buffer.from(await file.arrayBuffer()) },
@@ -186,7 +186,7 @@ ledgerRouter.openapi(
   async (c) => {
     const file = await getAttachmentFile(
       c.get('deps').db,
-      c.get('workspace').id,
+      c.get('workspace'),
       c.req.valid('param').attachmentId,
     );
     const image = file.contentType.startsWith('image/');
@@ -211,11 +211,7 @@ ledgerRouter.openapi(
     responses: { 204: NoContent, ...errorResponses },
   }),
   async (c) => {
-    await deleteAttachment(
-      c.get('deps').db,
-      c.get('workspace').id,
-      c.req.valid('param').attachmentId,
-    );
+    await deleteAttachment(c.get('deps').db, c.get('workspace'), c.req.valid('param').attachmentId);
     return c.body(null, 204);
   },
 );

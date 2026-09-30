@@ -37,6 +37,7 @@ import {
 import { badRequest } from '../lib/errors';
 import { listRules } from './rules';
 import { transactionFilters } from './transactions';
+import { visibleAccount } from './visibility';
 import { toWorkspaceDto } from './workspaces';
 
 // ---------------------------------------------------------------------------------------------
@@ -57,12 +58,15 @@ export async function exportTransactionsCsv(
   const rows = await db
     .select()
     .from(transactions)
-    .where(and(...transactionFilters(ws.id, query)))
+    .where(and(...transactionFilters(ws, query)))
     .orderBy(asc(transactions.date), asc(transactions.id));
   const ids = rows.map((r) => r.id);
   const [accountRows, catRows, groupRows, payeeRows, tagRows, splitRows, txTagRows, peers] =
     await Promise.all([
-      db.select().from(accounts).where(eq(accounts.workspaceId, ws.id)),
+      db
+        .select()
+        .from(accounts)
+        .where(and(eq(accounts.workspaceId, ws.id), visibleAccount(ws, accounts.id))),
       db.select().from(categories).where(eq(categories.workspaceId, ws.id)),
       db.select().from(categoryGroups).where(eq(categoryGroups.workspaceId, ws.id)),
       db.select().from(payees).where(eq(payees.workspaceId, ws.id)),
@@ -150,7 +154,8 @@ export async function exportTransactionsCsv(
 
     if (t.transferGroupId) {
       const peer = peers.find((p) => p.group === t.transferGroupId && p.id !== t.id);
-      const other = peer ? (account.get(peer.accountId)?.name ?? '') : '';
+      // The other side may be someone else's private account: don't name it.
+      const other = (peer && account.get(peer.accountId)?.name) || 'another account';
       const label = t.amountMinor < 0 ? `Transfer to ${other}` : `Transfer from ${other}`;
       lines.push(common(t.amountMinor, '', '', 'Transfer', label));
       continue;
@@ -218,6 +223,8 @@ export const BackupSchema = z.object({
       color: z.string(),
       onBudget: z.boolean(),
       inNetWorth: z.boolean(),
+      /** Added with sharing; older backups have only shared accounts. */
+      visibility: z.enum(['shared', 'private']).default('shared'),
       sortOrder: z.number().int(),
       archived: z.boolean(),
     }),
@@ -347,7 +354,11 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
     capRows,
     goalRows,
   ] = await Promise.all([
-    db.select().from(accounts).where(eq(accounts.workspaceId, w)).orderBy(asc(accounts.sortOrder)),
+    db
+      .select()
+      .from(accounts)
+      .where(and(eq(accounts.workspaceId, w), visibleAccount(ws, accounts.id)))
+      .orderBy(asc(accounts.sortOrder)),
     db
       .select()
       .from(categoryGroups)
@@ -363,7 +374,7 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
     db
       .select()
       .from(transactions)
-      .where(and(eq(transactions.workspaceId, w)))
+      .where(and(eq(transactions.workspaceId, w), visibleAccount(ws, transactions.accountId)))
       .orderBy(asc(transactions.date), asc(transactions.id)),
     db
       .select()
@@ -379,12 +390,34 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
     db.select().from(manualRates).where(eq(manualRates.workspaceId, w)),
     db.select().from(importProfiles).where(eq(importProfiles.workspaceId, w)),
     listRules(db, w),
-    db.select().from(recurring).where(eq(recurring.workspaceId, w)),
+    db
+      .select()
+      .from(recurring)
+      .where(
+        and(
+          eq(recurring.workspaceId, w),
+          visibleAccount(ws, recurring.accountId),
+          visibleAccount(ws, recurring.toAccountId),
+        ),
+      ),
     db.select().from(budgetCaps).where(eq(budgetCaps.workspaceId, w)),
-    db.select().from(goals).where(eq(goals.workspaceId, w)),
+    db
+      .select()
+      .from(goals)
+      .where(and(eq(goals.workspaceId, w), visibleAccount(ws, goals.accountId))),
   ]);
   const splitsByTx = Map.groupBy(splitRows, (s) => s.transactionId);
   const tagsByTx = Map.groupBy(txTagRows, (t) => t.transactionId);
+  // Backups hold only what the person can see. A transfer whose other side is someone else's
+  // private account is kept as a plain, uncategorized transaction.
+  const live = txRows.filter((t) => t.deletedAt === null);
+  const legs = Map.groupBy(
+    live.filter((t) => t.transferGroupId),
+    (t) => t.transferGroupId!,
+  );
+  const lone = new Set(
+    [...legs].filter(([, rows]) => rows.length < 2).flatMap(([, rows]) => rows.map((r) => r.id)),
+  );
   return {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
@@ -410,6 +443,7 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
       color: a.color,
       onBudget: a.onBudget,
       inNetWorth: a.inNetWorth,
+      visibility: a.visibility,
       sortOrder: a.sortOrder,
       archived: a.archivedAt !== null,
     })),
@@ -438,9 +472,9 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
     })),
     tags: tagRows.map((t) => ({ id: t.id, name: t.name, color: t.color })),
     // Transactions in the trash are left out of backups.
-    transactions: txRows
-      .filter((t) => t.deletedAt === null)
-      .map((t) => ({
+    transactions: live.map((t) => {
+      const alone = lone.has(t.id);
+      return {
         id: t.id,
         accountId: t.accountId,
         date: t.date,
@@ -452,16 +486,19 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
         originalCurrency: t.originalCurrency,
         status: t.status,
         needsReview: t.needsReview,
-        transferGroupId: t.transferGroupId,
+        transferGroupId: alone ? null : t.transferGroupId,
         externalId: t.externalId,
-        recurringId: t.recurringId,
-        splits: (splitsByTx.get(t.id) ?? []).map((s) => ({
-          categoryId: s.categoryId,
-          amountMinor: s.amountMinor,
-          memo: s.memo,
-        })),
+        recurringId: alone ? null : t.recurringId,
+        splits: alone
+          ? [{ categoryId: null, amountMinor: t.amountMinor, memo: 'Transfer' }]
+          : (splitsByTx.get(t.id) ?? []).map((s) => ({
+              categoryId: s.categoryId,
+              amountMinor: s.amountMinor,
+              memo: s.memo,
+            })),
         tagIds: (tagsByTx.get(t.id) ?? []).map((x) => x.tagId),
-      })),
+      };
+    }),
     budgets: budgetRows.map((b) => ({
       categoryId: b.categoryId,
       periodStart: b.periodStart,
@@ -576,6 +613,7 @@ export async function restoreBackup(
           ...a,
           id: newId(old),
           workspaceId,
+          ownerUserId: userId,
           archivedAt: archivedAt(archived),
         })),
       ),

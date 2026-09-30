@@ -38,6 +38,7 @@ import {
 import { badRequest } from '../lib/errors';
 import { budgetOverview } from './budgets';
 import { loadRateBook } from './rates';
+import { visibleAccount, visibleAccountSql } from './visibility';
 
 export function periodSettings(ws: WorkspaceCtx): PeriodSettings {
   return { calendar: ws.calendar, monthStartDay: ws.monthStartDay };
@@ -92,6 +93,8 @@ export async function loadFlows(
   ];
   const ids = options.accountIds?.filter((id) => id !== 'none');
   if (ids?.length) where.push(inArray(transactions.accountId, ids));
+  const visible = visibleAccount(ws, transactions.accountId);
+  if (visible) where.push(visible);
   if (options.onBudgetOnly) where.push(eq(accounts.onBudget, true));
   if (!options.includeExcluded)
     where.push(sql`coalesce(${categories.excludeFromReports}, false) = false`);
@@ -404,6 +407,7 @@ export async function dashboard(
       count(*) filter (where t.needs_review)::int as review
     from ${transactions} t
     where t.workspace_id = ${ws.id} and t.deleted_at is null and t.transfer_group_id is null
+      ${visibleAccountSql(ws, sql`t.account_id`)}
   `)
     .then((r) => r.rows);
 
@@ -451,7 +455,13 @@ export async function netWorth(db: Executor, ws: WorkspaceCtx, date: IsoDate): P
         lte(transactions.date, date),
       ),
     )
-    .where(and(eq(accounts.workspaceId, ws.id), eq(accounts.inNetWorth, true)))
+    .where(
+      and(
+        eq(accounts.workspaceId, ws.id),
+        eq(accounts.inNetWorth, true),
+        visibleAccount(ws, accounts.id),
+      ),
+    )
     .groupBy(accounts.id);
   const rates = await loadRateBook(
     db,
@@ -526,7 +536,13 @@ export async function netWorthSeries(
       openingDate: accounts.openingDate,
     })
     .from(accounts)
-    .where(and(eq(accounts.workspaceId, ws.id), eq(accounts.inNetWorth, true)));
+    .where(
+      and(
+        eq(accounts.workspaceId, ws.id),
+        eq(accounts.inNetWorth, true),
+        visibleAccount(ws, accounts.id),
+      ),
+    );
   // Everything before the first point collapses into one opening sum per account.
   const sums = await db.execute<{ account_id: string; date: string; amount: number }>(sql`
     select t.account_id, greatest(t.date, ${dates[0]}::date)::text as date,
@@ -534,7 +550,7 @@ export async function netWorthSeries(
     from transactions t
     join accounts a on a.id = t.account_id
     where t.workspace_id = ${ws.id} and t.deleted_at is null and a.in_net_worth
-      and t.date <= ${last}
+      and t.date <= ${last} ${visibleAccountSql(ws, sql`t.account_id`)}
     group by 1, 2
   `);
   const byAccount = Map.groupBy(sums.rows, (r) => r.account_id);

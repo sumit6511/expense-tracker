@@ -202,6 +202,10 @@ function EditorForm({
 
   const isEdit = existing !== null;
   const isTransfer = existing?.transfer != null;
+  // A transfer with someone else's private account: only they can change it.
+  const lockedTransfer =
+    isTransfer && accounts.length > 0 && !accountMap.has(existing!.transfer!.peerAccountId);
+  const editable = canWrite && !lockedTransfer;
   const initialMode: Mode = existing
     ? isTransfer
       ? 'transfer'
@@ -326,7 +330,7 @@ function EditorForm({
   async function submit(event: FormEvent, another = false, confirmReconciled = false) {
     event.preventDefault();
     setError(null);
-    if (!canWrite) return;
+    if (!editable) return;
     if (parsed === null || parsed <= 0) {
       setError('Enter an amount greater than zero');
       return;
@@ -491,7 +495,9 @@ function EditorForm({
 
   const title = isEdit
     ? isTransfer
-      ? 'Edit transfer'
+      ? lockedTransfer
+        ? 'Transfer'
+        : 'Edit transfer'
       : 'Edit transaction'
     : mode === 'transfer'
       ? 'New transfer'
@@ -511,6 +517,13 @@ function EditorForm({
           )}
         </DialogHeader>
         <DialogBody className="grid grid-cols-1 content-start gap-4">
+          {lockedTransfer && (
+            <p className="flex gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+              <Lock className="mt-0.5 size-4 shrink-0" />
+              The other side of this transfer is someone’s private account, so only they can change
+              or delete it.
+            </p>
+          )}
           {!isEdit && (
             <Segmented
               label="Transaction type"
@@ -537,7 +550,7 @@ function EditorForm({
               large
               autoFocus={!isEdit}
               placeholder="0"
-              disabled={!canWrite}
+              disabled={!editable}
             />
           </Field>
 
@@ -545,21 +558,29 @@ function EditorForm({
             <>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="From" htmlFor="tx-from">
-                  <AccountSelect
-                    id="tx-from"
-                    value={accountId}
-                    onChange={setAccountId}
-                    disabled={!canWrite}
-                  />
+                  {lockedTransfer && accountId === existing?.transfer?.peerAccountId ? (
+                    <Input id="tx-from" value="Someone’s private account" disabled />
+                  ) : (
+                    <AccountSelect
+                      id="tx-from"
+                      value={accountId}
+                      onChange={setAccountId}
+                      disabled={!editable}
+                    />
+                  )}
                 </Field>
                 <Field label="To" htmlFor="tx-to">
-                  <AccountSelect
-                    id="tx-to"
-                    value={toAccountId}
-                    onChange={setToAccountId}
-                    exclude={accountId}
-                    disabled={!canWrite}
-                  />
+                  {lockedTransfer && toAccountId === existing?.transfer?.peerAccountId ? (
+                    <Input id="tx-to" value="Someone’s private account" disabled />
+                  ) : (
+                    <AccountSelect
+                      id="tx-to"
+                      value={toAccountId}
+                      onChange={setToAccountId}
+                      exclude={accountId}
+                      disabled={!editable}
+                    />
+                  )}
                 </Field>
               </div>
               {toAccount && account && toAccount.currency !== account.currency && (
@@ -587,7 +608,7 @@ function EditorForm({
                       type="button"
                       className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                       onClick={() => setSplitMode(true)}
-                      disabled={!canWrite}
+                      disabled={!editable}
                     >
                       <Split className="size-3.5" /> Split
                     </button>
@@ -734,7 +755,7 @@ function EditorForm({
                         if (suggestion?.group.kind === kind) setCategoryId(p.suggestedCategoryId);
                       }
                     }}
-                    disabled={!canWrite}
+                    disabled={!editable}
                   />
                 </Field>
                 <Field label="Account" htmlFor="tx-account">
@@ -742,7 +763,7 @@ function EditorForm({
                     id="tx-account"
                     value={accountId}
                     onChange={setAccountId}
-                    disabled={!canWrite}
+                    disabled={!editable}
                   />
                 </Field>
               </div>
@@ -767,7 +788,7 @@ function EditorForm({
               placeholder="Optional"
               rows={2}
               className="min-h-0"
-              disabled={!canWrite}
+              disabled={!editable}
             />
           </Field>
 
@@ -781,7 +802,7 @@ function EditorForm({
                 <Checkbox
                   checked={pending}
                   onCheckedChange={(v) => setPending(v === true)}
-                  disabled={!canWrite}
+                  disabled={!editable}
                 />
                 <span>
                   Pending
@@ -795,7 +816,7 @@ function EditorForm({
               transactionId={existing?.id ?? null}
               queued={queuedFiles}
               onQueue={setQueuedFiles}
-              disabled={!canWrite}
+              disabled={!editable}
             />
           )}
 
@@ -810,7 +831,7 @@ function EditorForm({
             </p>
           )}
         </DialogBody>
-        {canWrite && (
+        {editable && (
           <DialogFooter>
             {isEdit && (
               <Button variant="ghost" className="text-destructive sm:mr-auto" onClick={remove}>

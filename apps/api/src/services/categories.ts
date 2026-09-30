@@ -18,8 +18,10 @@ import {
   transactions,
 } from '../db/schema';
 import { badRequest, conflict, notFound } from '../lib/errors';
+import { type Scope, visibleAccount } from './visibility';
 
-export async function listCategoryGroups(db: Db, workspaceId: string): Promise<CategoryGroup[]> {
+export async function listCategoryGroups(db: Db, scope: Scope): Promise<CategoryGroup[]> {
+  const workspaceId = scope.id;
   const groups = await db
     .select()
     .from(categoryGroups)
@@ -31,7 +33,11 @@ export async function listCategoryGroups(db: Db, workspaceId: string): Promise<C
     .leftJoin(transactionSplits, eq(transactionSplits.categoryId, categories.id))
     .leftJoin(
       transactions,
-      and(eq(transactions.id, transactionSplits.transactionId), isNull(transactions.deletedAt)),
+      and(
+        eq(transactions.id, transactionSplits.transactionId),
+        isNull(transactions.deletedAt),
+        visibleAccount(scope, transactions.accountId),
+      ),
     )
     .where(eq(categories.workspaceId, workspaceId))
     .groupBy(categories.id)

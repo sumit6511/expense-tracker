@@ -11,8 +11,9 @@ import type { z } from 'zod';
 import type { WorkspaceCtx } from '../context';
 import type { Db, Executor } from '../db/client';
 import { accounts, transactions } from '../db/schema';
-import { badRequest, conflict, notFound } from '../lib/errors';
+import { badRequest, conflict, forbidden, notFound } from '../lib/errors';
 import { loadRateBook } from './rates';
+import { isHidden, type Scope, scopeId, visibleAccount } from './visibility';
 
 type AccountRow = typeof accounts.$inferSelect;
 
@@ -39,7 +40,7 @@ async function withBalances(
     .select({ account: accounts, ...balanceColumns })
     .from(accounts)
     .leftJoin(transactions, eq(transactions.accountId, accounts.id))
-    .where(where)
+    .where(and(where, visibleAccount(ws, accounts.id)))
     .groupBy(accounts.id)
     .orderBy(sql`${accounts.archivedAt} is not null`, asc(accounts.sortOrder), asc(accounts.name));
 
@@ -93,6 +94,8 @@ function toAccountDto(
     color: a.color,
     onBudget: a.onBudget,
     inNetWorth: a.inNetWorth,
+    visibility: a.visibility,
+    ownerUserId: a.ownerUserId,
     archived: a.archivedAt !== null,
     sortOrder: a.sortOrder,
     balanceMinor: stats.balance,
@@ -119,19 +122,22 @@ export async function getAccount(db: Executor, ws: WorkspaceCtx, id: string): Pr
   return account;
 }
 
-/** Loads an account row and checks it belongs to the workspace. */
+/**
+ * Loads an account row and checks it belongs to the workspace and that the person asking can
+ * see it (someone else's private account is "not found", like one in another workspace).
+ */
 export async function requireAccount(
   db: Executor,
-  workspaceId: string,
+  scope: Scope,
   id: string,
   options: { allowArchived?: boolean } = {},
 ): Promise<AccountRow> {
   const [row] = await db
     .select()
     .from(accounts)
-    .where(and(eq(accounts.workspaceId, workspaceId), eq(accounts.id, id)))
+    .where(and(eq(accounts.workspaceId, scopeId(scope)), eq(accounts.id, id)))
     .limit(1);
-  if (!row) throw notFound('Account');
+  if (!row || isHidden(scope, row.id)) throw notFound('Account');
   if (row.archivedAt && !options.allowArchived) {
     throw badRequest(`"${row.name}" is archived. Unarchive it to add transactions.`);
   }
@@ -163,6 +169,8 @@ export async function createAccount(
     color: input.color ?? preset?.color ?? '#64748b',
     onBudget: input.onBudget,
     inNetWorth: input.inNetWorth,
+    visibility: input.visibility,
+    ownerUserId: ws.userId,
     sortOrder: Number(next),
   });
   return getAccount(db, ws, id);
@@ -174,7 +182,10 @@ export async function updateAccount(
   id: string,
   input: z.output<typeof UpdateAccountSchema>,
 ): Promise<Account> {
-  await requireAccount(db, ws.id, id, { allowArchived: true });
+  const row = await requireAccount(db, ws, id, { allowArchived: true });
+  if (input.visibility && input.visibility !== row.visibility && row.ownerUserId !== ws.userId) {
+    throw forbidden('Only the person who added this account can change who sees it');
+  }
   const { archived, ...rest } = input;
   const patch: Partial<typeof accounts.$inferInsert> = { ...rest };
   if (archived !== undefined) patch.archivedAt = archived ? new Date() : null;
@@ -192,7 +203,7 @@ export async function updateAccount(
  * the transactions first. Transactions already in the trash are purged with it.
  */
 export async function deleteAccount(db: Db, ws: WorkspaceCtx, id: string): Promise<void> {
-  await requireAccount(db, ws.id, id, { allowArchived: true });
+  await requireAccount(db, ws, id, { allowArchived: true });
   await db.transaction(async (tx) => {
     const [live] = await tx
       .select({ n: sql<number>`count(*)::int` })

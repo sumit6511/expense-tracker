@@ -16,6 +16,7 @@ import { listAccounts, requireAccount } from './accounts';
 import { budgetOverview, setRollover } from './budgets';
 import { periodSettings } from './reports';
 import { workspaceToday } from './transactions';
+import { isHidden, type Scope, visibleAccount } from './visibility';
 
 type Row = typeof goals.$inferSelect;
 
@@ -69,13 +70,14 @@ async function toDtos(db: Db, ws: WorkspaceCtx, rows: Row[]): Promise<Goal[]> {
   });
 }
 
-async function requireRow(db: Executor, workspaceId: string, id: string) {
+async function requireRow(db: Executor, scope: Scope, id: string) {
   const [row] = await db
     .select()
     .from(goals)
-    .where(and(eq(goals.workspaceId, workspaceId), eq(goals.id, id)))
+    .where(and(eq(goals.workspaceId, scope.id), eq(goals.id, id)))
     .limit(1);
-  if (!row) throw notFound('Goal');
+  // A goal tracking someone else's private account is private too.
+  if (!row || isHidden(scope, row.accountId)) throw notFound('Goal');
   return row;
 }
 
@@ -83,19 +85,19 @@ export async function listGoals(db: Db, ws: WorkspaceCtx) {
   const rows = await db
     .select()
     .from(goals)
-    .where(eq(goals.workspaceId, ws.id))
+    .where(and(eq(goals.workspaceId, ws.id), visibleAccount(ws, goals.accountId)))
     .orderBy(sql`${goals.archivedAt} is not null`, asc(goals.targetDate), asc(goals.createdAt));
   return toDtos(db, ws, rows);
 }
 
 export async function getGoal(db: Db, ws: WorkspaceCtx, id: string) {
-  const [dto] = await toDtos(db, ws, [await requireRow(db, ws.id, id)]);
+  const [dto] = await toDtos(db, ws, [await requireRow(db, ws, id)]);
   return dto!;
 }
 
 async function checkRefs(db: Executor, ws: WorkspaceCtx, body: GoalBody) {
   if (body.kind === 'account')
-    await requireAccount(db, ws.id, body.accountId!, { allowArchived: true });
+    await requireAccount(db, ws, body.accountId!, { allowArchived: true });
   if (body.kind === 'category') {
     const [cat] = await db
       .select({ id: categories.id })
@@ -145,7 +147,7 @@ async function ensureRollover(db: Db, ws: WorkspaceCtx, categoryId: string) {
 }
 
 export async function updateGoal(db: Db, ws: WorkspaceCtx, id: string, patch: Partial<GoalBody>) {
-  const row = await requireRow(db, ws.id, id);
+  const row = await requireRow(db, ws, id);
   const parsed = GoalBodySchema.safeParse({
     name: row.name,
     kind: row.kind,
@@ -174,17 +176,14 @@ export async function updateGoal(db: Db, ws: WorkspaceCtx, id: string, patch: Pa
   return getGoal(db, ws, id);
 }
 
-export async function deleteGoal(db: Db, workspaceId: string, id: string) {
-  const deleted = await db
-    .delete(goals)
-    .where(and(eq(goals.workspaceId, workspaceId), eq(goals.id, id)))
-    .returning({ id: goals.id });
-  if (deleted.length === 0) throw notFound('Goal');
+export async function deleteGoal(db: Db, scope: Scope, id: string) {
+  await requireRow(db, scope, id);
+  await db.delete(goals).where(and(eq(goals.workspaceId, scope.id), eq(goals.id, id)));
 }
 
 /** Adds to (or takes from) a manual goal's saved amount. */
 export async function contribute(db: Db, ws: WorkspaceCtx, id: string, amountMinor: number) {
-  const row = await requireRow(db, ws.id, id);
+  const row = await requireRow(db, ws, id);
   if (row.kind !== 'manual')
     throw badRequest('This goal follows an account or category; add money there instead');
   await db

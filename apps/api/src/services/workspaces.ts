@@ -163,6 +163,7 @@ export async function createWorkspace(
         openingDate: today,
         icon: a.icon ?? preset?.icon ?? 'wallet',
         color: a.color ?? preset?.color ?? '#64748b',
+        ownerUserId: userId,
         sortOrder: i,
       });
     }

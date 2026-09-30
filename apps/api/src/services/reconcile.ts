@@ -14,6 +14,7 @@ import { ApiError, badRequest } from '../lib/errors';
 import { requireAccount } from './accounts';
 import { withAudit } from './audit';
 import { getTransactions, insertTransaction, workspaceToday } from './transactions';
+import type { Scope } from './visibility';
 
 function toDto(r: typeof reconciliations.$inferSelect): Reconciliation {
   return {
@@ -59,7 +60,7 @@ export async function reconcileState(
   accountId: string,
   statementDate?: IsoDate,
 ): Promise<ReconcileState> {
-  const account = await requireAccount(db, ws.id, accountId, { allowArchived: true });
+  const account = await requireAccount(db, ws, accountId, { allowArchived: true });
   const until = statementDate ?? workspaceToday(ws);
   const open = await db
     .select({ id: transactions.id })
@@ -79,7 +80,7 @@ export async function reconcileState(
     reconciledBalanceMinor: await reconciledBalance(db, accountId, account.openingBalanceMinor),
     candidates: await getTransactions(
       db,
-      ws.id,
+      ws,
       open.map((r) => r.id),
     ),
     last: await lastReconciliation(db, accountId),
@@ -100,7 +101,7 @@ export async function finishReconciliation(
 ): Promise<Reconciliation> {
   const id = uuidv7();
   await db.transaction(async (tx) => {
-    const account = await requireAccount(tx, ws.id, accountId, { allowArchived: true });
+    const account = await requireAccount(tx, ws, accountId, { allowArchived: true });
     // Serialize reconciliations of the same account.
     await tx.execute(sql`select 1 from accounts where id = ${accountId} for update`);
     const ids = [...new Set(input.transactionIds)];
@@ -191,7 +192,9 @@ export async function finishReconciliation(
   return toDto(row!);
 }
 
-export async function listReconciliations(db: Db, workspaceId: string, accountId: string) {
+export async function listReconciliations(db: Db, scope: Scope, accountId: string) {
+  const workspaceId = scope.id;
+  await requireAccount(db, scope, accountId, { allowArchived: true });
   const rows = await db
     .select()
     .from(reconciliations)
