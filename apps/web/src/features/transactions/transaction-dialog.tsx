@@ -558,9 +558,16 @@ function EditorForm({
                       categoryTouched.current = true;
                       setCategoryId(id);
                     }}
-                    kind={kind}
+                    // Money in can also be a refund, which goes back to a spending category.
+                    kind={mode === 'expense' ? 'expense' : undefined}
                     placeholder="All categories…"
                   />
+                  {mode === 'income' && (
+                    <p className="text-xs text-muted-foreground">
+                      Got a refund? Choose the spending category it belongs to, and it reduces that
+                      category’s spending.
+                    </p>
+                  )}
                 </div>
               )}
 

@@ -156,7 +156,17 @@ function mountWebApp(app: OpenAPIHono<AppEnv>, root: string) {
     await next();
     if (c.res.status === 200) c.header('Cache-Control', 'public, max-age=31536000, immutable');
   });
-  app.use('*', serveStatic({ root, index: '' }));
+  // Only real files (paths with an extension) are served from disk; every other path is a
+  // client-side route and gets index.html below.
+  const staticFiles = serveStatic({ root });
+  app.use('*', async (c, next) => {
+    if (c.req.path.startsWith('/api/') || !/\.[a-z0-9]+$/i.test(c.req.path)) return next();
+    if (/^\/(sw\.js|registerSW\.js|manifest\.webmanifest)$/.test(c.req.path)) {
+      // The service worker and manifest must be re-checked so updates reach installed apps.
+      c.header('Cache-Control', 'no-cache');
+    }
+    return staticFiles(c, next);
+  });
   app.get('*', async (c) => {
     if (c.req.path.startsWith('/api/')) return c.notFound();
     indexHtml ??= readFile(indexPath, 'utf8');

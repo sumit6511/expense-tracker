@@ -1,0 +1,60 @@
+# Self-hosting: `AUTH_SECRET=$(openssl rand -base64 32) docker compose up -d`, then open
+# http://localhost:3000. For development, `docker compose up -d db` starts just the database.
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: et
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-et}
+      POSTGRES_DB: expense_tracker
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # Only reachable from this machine (for local development and backups).
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U et -d expense_tracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    image: expense-tracker:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://et:${POSTGRES_PASSWORD:-et}@db:5432/expense_tracker
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET, e.g. openssl rand -base64 32}
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-true}
+      FX_NRB_ENABLED: ${FX_NRB_ENABLED:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${PORT:-3000}:3000"
+
+  # Nightly database dump, keeping two weeks of history in the `backups` volume.
+  backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-et}
+    volumes:
+      - backups:/backups
+    entrypoint: >
+      sh -c 'while true; do
+        pg_dump -h db -U et -d expense_tracker -Fc -f /backups/expense-tracker-$$(date +%F).dump &&
+        find /backups -name "*.dump" -mtime +14 -delete;
+        sleep 86400;
+      done'
+
+volumes:
+  pgdata:
+  backups:

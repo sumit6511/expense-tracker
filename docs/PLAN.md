@@ -1,6 +1,6 @@
 # Expense Tracker: Research & Product/Technical Plan
 
-> Status: **Approved on 30 Sep 2026** with the decisions in [§0.1](#01-decisions-approved-30-sep-2026). Implementation of Phase 0 and Phase 1 is in progress.
+> Status: **Approved on 30 Sep 2026** with the decisions in [§0.1](#01-decisions-approved-30-sep-2026). **Phase 0 and Phase 1 are implemented** (see [§12.1](#121-implementation-notes-phase-0--1)); Phase 2 is next.
 > Research date: September 2026.
 
 ---
@@ -601,9 +601,26 @@ attachments         POST (presigned upload), GET (signed URL), DELETE
 
 Each milestone ends with a working app that can be demoed, and a merged PR.
 
+### 12.1 Implementation notes (Phase 0 + 1)
+
+Built as planned, with these differences:
+
+- **Transaction list:** infinite scroll in pages of 100 instead of a virtualized table. Only loaded
+  rows are rendered, which covers personal-scale histories; virtualization can be added later if needed.
+- **Integration tests** run against a real throwaway PostgreSQL database created by the test setup
+  (a service container in CI) rather than Testcontainers, so no Docker is needed locally.
+- **Workspace creation** happens in onboarding (after sign-up) rather than automatically, so the
+  user picks the currency, calendar and accounts first.
+- **Docker Compose** has no MinIO yet: attachments are Phase 2. It includes a nightly `pg_dump` backup service.
+- **Charts** use a validated colour-blind-safe palette (blue/orange series) with every chart
+  also available as a table.
+- **Refunds** are recorded as money in against a spending category (Income mode lets you pick one).
+- **Hardening found by the end-to-end tests:** sign-in/sign-up rate limiting (configurable only for
+  automated tests), and static-file serving limited to real files.
+
 ### Phase 0: Foundations
 - Monorepo, TypeScript config, Biome, Vitest, Playwright, CI
-- Docker Compose (Postgres, MinIO), env config, logging
+- Docker Compose (Postgres; MinIO when attachments arrive in P2), env config, logging
 - Drizzle schema and first migration; seed script
 - Better Auth (email/password, sessions); workspace created on sign-up
 - Web shell: routing, layout (sidebar and bottom nav), theme, design tokens, shadcn/ui base components

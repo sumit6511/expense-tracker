@@ -13,7 +13,9 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=../../.env src/db/migrate-cli.ts",
-    "db:seed": "tsx --env-file-if-exists=../../.env src/db/seed-cli.ts"
+    "db:seed": "tsx --env-file-if-exists=../../.env src/db/seed-cli.ts",
+    "migrate": "node dist/migrate.js",
+    "seed": "node dist/seed.js"
   },
   "dependencies": {
     "@et/shared": "workspace:*",
