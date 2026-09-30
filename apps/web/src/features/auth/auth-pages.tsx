@@ -9,7 +9,12 @@ import { ApiError, authApi, errorMessage } from '@/lib/api';
 import { isCancelled, passkeysSupported, signInWithPasskey } from '@/lib/passkeys';
 import { meKey } from '@/lib/queries';
 
-function AuthShell({
+/** A same-site path to continue to after signing in (never another site). */
+function safeNext(next: string | undefined) {
+  return next?.startsWith('/') && !next.startsWith('//') ? next : null;
+}
+
+export function AuthShell({
   title,
   subtitle,
   children,
@@ -36,10 +41,10 @@ function AuthShell({
 }
 
 export function LoginPage() {
-  const { next } = useSearch({ from: '/login' });
+  const { next, email: invited } = useSearch({ from: '/login' });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(invited ?? '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -49,7 +54,7 @@ export function LoginPage() {
 
   async function signedIn() {
     await queryClient.invalidateQueries({ queryKey: meKey });
-    navigate({ to: next?.startsWith('/') && !next.startsWith('//') ? next : '/' });
+    navigate({ to: safeNext(next) ?? '/' });
   }
 
   async function submit(e: FormEvent) {
@@ -111,7 +116,11 @@ export function LoginPage() {
       footer={
         <>
           New here?{' '}
-          <Link to="/signup" className="font-medium text-primary hover:underline">
+          <Link
+            to="/signup"
+            search={{ next, email: invited }}
+            className="font-medium text-primary hover:underline"
+          >
             Create an account
           </Link>
         </>
@@ -262,10 +271,11 @@ function CodeForm({ onDone }: { onDone: () => Promise<void> }) {
 }
 
 export function SignupPage() {
+  const { next, email: invited } = useSearch({ from: '/signup' });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(invited ?? '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -281,7 +291,8 @@ export function SignupPage() {
     try {
       await authApi.signUp({ name: name.trim(), email: email.trim(), password });
       await queryClient.invalidateQueries({ queryKey: meKey });
-      navigate({ to: '/onboarding' });
+      // Coming from an invitation: go back to it to join (instead of setting up a workspace).
+      navigate({ to: safeNext(next) ?? '/onboarding' });
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -296,7 +307,11 @@ export function SignupPage() {
       footer={
         <>
           Already have an account?{' '}
-          <Link to="/login" search={{}} className="font-medium text-primary hover:underline">
+          <Link
+            to="/login"
+            search={{ next, email: invited }}
+            className="font-medium text-primary hover:underline"
+          >
             Sign in
           </Link>
         </>

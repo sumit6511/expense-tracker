@@ -189,6 +189,31 @@ export const accountTypeEnum = pgEnum('account_type', [
   'other',
 ]);
 
+/** An invitation to join a workspace. Only a hash of the link's token is stored. */
+export const invitations = pgTable(
+  'invitations',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    /** Lower-cased; only someone signed in with this address can accept. */
+    email: text().notNull(),
+    role: roleEnum().notNull(),
+    tokenHash: text().notNull(),
+    invitedBy: text().references(() => user.id, { onDelete: 'set null' }),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    acceptedAt: timestamp({ withTimezone: true }),
+    acceptedBy: text().references(() => user.id, { onDelete: 'set null' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex().on(t.tokenHash),
+    // One open invitation per address per workspace; inviting again replaces it.
+    uniqueIndex().on(t.workspaceId, t.email).where(sql`${t.acceptedAt} is null`),
+  ],
+);
+
 export const accounts = pgTable(
   'accounts',
   {

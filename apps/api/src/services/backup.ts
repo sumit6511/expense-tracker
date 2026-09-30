@@ -30,6 +30,7 @@ import {
   transactionSplits,
   transactions,
   transactionTags,
+  user,
   workspaceMembers,
   workspaces,
 } from '../db/schema';
@@ -88,6 +89,17 @@ export async function exportTransactionsCsv(
   const tag = new Map(tagRows.map((t) => [t.id, t.name]));
   const splitsByTx = Map.groupBy(splitRows, (s) => s.transactionId);
   const tagsByTx = Map.groupBy(txTagRows, (t) => t.transactionId);
+  const creatorIds = [...new Set(rows.map((r) => r.createdBy).filter((u): u is string => !!u))];
+  const creator = new Map(
+    creatorIds.length
+      ? (
+          await db
+            .select({ id: user.id, name: user.name })
+            .from(user)
+            .where(inArray(user.id, creatorIds))
+        ).map((u) => [u.id, u.name])
+      : [],
+  );
 
   const header = [
     'Date',
@@ -103,6 +115,7 @@ export async function exportTransactionsCsv(
     'Tags',
     'Status',
     'Bank description',
+    'Added by',
   ];
   const lines = [header.join(',')];
   for (const t of rows) {
@@ -132,6 +145,7 @@ export async function exportTransactionsCsv(
         csvText(tagNames),
         t.status,
         csvText(t.rawDescription),
+        csvText(t.createdBy ? (creator.get(t.createdBy) ?? '') : ''),
       ].join(',');
 
     if (t.transferGroupId) {

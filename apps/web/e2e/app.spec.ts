@@ -126,6 +126,47 @@ test.describe('account security', () => {
   });
 });
 
+test.describe('sharing', () => {
+  test('invite a partner, who signs up from the link and joins', async ({
+    signedIn: page,
+    browser,
+    baseURL,
+  }) => {
+    const email = `partner-${Date.now()}@example.com`;
+    await page.goto('/settings?tab=members');
+    await page.getByLabel('Email address').fill(email);
+    await page.getByRole('button', { name: 'Invite' }).click();
+    const link = await page.getByLabel('Invitation link').inputValue();
+    await expect(page.getByText('Waiting to join')).toBeVisible();
+
+    const partner = await (await browser.newContext({ baseURL })).newPage();
+    await partner.goto(new URL(link).pathname);
+    await expect(partner.getByRole('heading', { name: 'Join “Home”' })).toBeVisible();
+    await partner.getByRole('link', { name: 'Create an account' }).click();
+    await expect(partner.getByLabel('Email')).toHaveValue(email);
+    await partner.getByLabel('Your name').fill('Partner');
+    await partner.getByLabel('Password').fill('correct-horse-battery');
+    await partner.getByRole('button', { name: 'Create account' }).click();
+    await partner.getByRole('button', { name: 'Join “Home”' }).click();
+    await expect(partner.getByText('Let’s record your first expense')).toBeVisible();
+
+    await partner.keyboard.press('n');
+    const dialog = partner.getByRole('dialog');
+    await dialog.getByLabel('Amount').fill('700');
+    await dialog.getByLabel('Payee').fill('Vegetable market');
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(partner.getByText('Expense added')).toBeVisible();
+
+    await page.goto('/transactions');
+    await expect(page.getByRole('img', { name: 'Added by Partner' })).toBeVisible();
+    await page.getByLabel('Added by', { exact: true }).selectOption({ label: 'Added by Partner' });
+    await expect(page.getByText('1 transaction', { exact: true })).toBeVisible();
+    await page.goto('/settings?tab=members');
+    await expect(page.getByLabel('Role for Partner')).toHaveValue('editor');
+    await expect(page.getByText('Waiting to join')).toBeHidden();
+  });
+});
+
 test.describe('everyday use', () => {
   test('quick add with the keyboard, edit, delete and undo', async ({ signedIn: page }) => {
     await page.keyboard.press('n');

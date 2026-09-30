@@ -29,6 +29,8 @@ export interface WorkspaceCtx {
   monthStartDay: number;
   weekStart: number;
   timezone: string;
+  /** The person making the request (or, for background jobs, the person it's done for). */
+  userId: string;
   role: Role;
   createdAt: Date;
 }

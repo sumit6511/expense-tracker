@@ -17,6 +17,7 @@ import {
   workspaces,
 } from './db/schema';
 import type { Env } from './env';
+import { handOverOwnedWorkspaces } from './services/members';
 
 // OWASP-recommended Argon2id parameters (19 MiB memory, 2 iterations).
 const ARGON2_OPTIONS = { memoryCost: 19_456, timeCost: 2, parallelism: 1 } as const;
@@ -53,6 +54,8 @@ export function createAuth(db: Db, env: Env) {
         enabled: true,
         // Workspaces nobody else belongs to would be orphaned: delete them with the user.
         beforeDelete: async (deleted) => {
+          // Shared workspaces get a new owner; ones nobody else uses are deleted.
+          await handOverOwnedWorkspaces(db, deleted.id);
           await db.execute(sql`
             delete from ${workspaces} w
             where w.id in (select workspace_id from ${workspaceMembers} where user_id = ${deleted.id})

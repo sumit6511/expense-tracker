@@ -2,7 +2,13 @@ import type { Transaction, TransactionChange } from '@et/shared';
 import { ChevronDown, History } from 'lucide-react';
 import { useState } from 'react';
 import { useFormat } from '@/lib/format';
-import { useAccountMap, useCategoryMap, useTags, useTransactionHistory } from '@/lib/queries';
+import {
+  useAccountMap,
+  useCategoryMap,
+  useMemberNames,
+  useTags,
+  useTransactionHistory,
+} from '@/lib/queries';
 
 const ACTIONS: Record<TransactionChange['action'], string> = {
   update: 'edited',
@@ -17,12 +23,16 @@ export function TransactionHistory({ tx }: { tx: Transaction }) {
   const history = useTransactionHistory(open ? tx.id : null);
   const f = useFormat();
   const describe = useDescribeChange(tx.currency);
+  const people = useMemberNames();
+  const by = people && tx.createdBy ? people.get(tx.createdBy) : undefined;
 
-  const origin = tx.importBatchId
-    ? 'Imported from a statement'
-    : tx.recurringId
-      ? 'Recorded from a recurring series'
-      : 'Created';
+  const origin = `${
+    tx.importBatchId
+      ? 'Imported from a statement'
+      : tx.recurringId
+        ? 'Recorded from a recurring series'
+        : 'Created'
+  }${by ? ` by ${by}` : ''}`;
 
   return (
     <div className="rounded-xl border">

@@ -2,10 +2,12 @@ import type { Transaction } from '@et/shared';
 import { ArrowLeftRight, Inbox, Lock, Paperclip, Repeat, Split } from 'lucide-react';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
+import { PersonAvatar } from '@/components/person';
 import { Badge } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/menu';
 import { useFormat } from '@/lib/format';
-import { useAccountMap, useCategoryMap, useTags } from '@/lib/queries';
+import { useAccountMap, useCategoryMap, useMemberNames, useTags } from '@/lib/queries';
+import { useSession } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
 /** One line in a transaction list: icon, payee/description, category · account, amount. */
@@ -30,6 +32,11 @@ export function TransactionRow({
   const accounts = useAccountMap();
   const categories = useCategoryMap();
   const { data: tags = [] } = useTags();
+  const people = useMemberNames();
+  const { me } = useSession();
+  // In a shared workspace, mark what other people added (your own entries stay unmarked).
+  const addedBy =
+    people && tx.createdBy && tx.createdBy !== me.user.id ? people.get(tx.createdBy) : undefined;
   const account = accounts.get(tx.accountId);
   const isSplit = tx.splits.length > 1;
   const category =
@@ -106,6 +113,14 @@ export function TransactionRow({
             {tx.status === 'pending' && <Badge tone="warning">Pending</Badge>}
             {tx.status === 'reconciled' && (
               <Lock className="size-3 shrink-0 text-muted-foreground/70" aria-label="Reconciled" />
+            )}
+            {addedBy && tx.createdBy && (
+              <PersonAvatar
+                id={tx.createdBy}
+                name={addedBy}
+                size="xs"
+                label={`Added by ${addedBy}`}
+              />
             )}
           </span>
           <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">

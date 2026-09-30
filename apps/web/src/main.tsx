@@ -31,7 +31,8 @@ const queryClient = new QueryClient({
 setUnauthorizedHandler(() => {
   queryClient.clear();
   const path = window.location.pathname;
-  if (!['/login', '/signup'].includes(path)) {
+  // Invitation links explain themselves (and offer sign-in) before asking anyone to sign in.
+  if (!['/login', '/signup'].includes(path) && !path.startsWith('/invite/')) {
     router.navigate({ to: '/login', search: { next: path === '/' ? undefined : path } });
   }
 });

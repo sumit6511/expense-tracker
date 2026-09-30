@@ -12,6 +12,7 @@ import type {
   Comparison,
   CreateAccountInput,
   CreateCategoryInput,
+  CreateInvitationInput,
   CreateTransactionInput,
   CreateTransferInput,
   CreateWorkspaceInput,
@@ -26,9 +27,11 @@ import type {
   ImportPreview,
   ImportProfile,
   ImportRow,
+  InvitationCreated,
   ListTransactionsQuery,
   MarkNotificationsRead,
   Me,
+  Members,
   NetWorthSeries,
   NotificationList,
   NotificationSettings,
@@ -774,5 +777,61 @@ export function useUpdateNotificationSettings() {
     mutationFn: (input: UpdateNotificationPrefs) =>
       api<NotificationSettings>('/me/notification-settings', { method: 'PATCH', body: input }),
     onSuccess: (settings) => qc.setQueryData(notificationSettingsKey, settings),
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Members
+// ---------------------------------------------------------------------------------------------
+
+export function useMembers() {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'members'],
+    queryFn: () => api<Members>(`${base}/members`),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** Names of the people in this workspace by user id, when more than one person uses it. */
+export function useMemberNames(): Map<string, string> | null {
+  const { data } = useMembers();
+  return useMemo(
+    () =>
+      data && data.members.length > 1 ? new Map(data.members.map((m) => [m.userId, m.name])) : null,
+    [data],
+  );
+}
+
+export const useInvite = () =>
+  useWsMutation((base, input: CreateInvitationInput) =>
+    api<InvitationCreated>(`${base}/invitations`, { method: 'POST', body: input }),
+  );
+export const useRenewInvitation = () =>
+  useWsMutation((base, id: string) =>
+    api<InvitationCreated>(`${base}/invitations/${id}/renew`, { method: 'POST' }),
+  );
+export const useRevokeInvitation = () =>
+  useWsMutation((base, id: string) => api<void>(`${base}/invitations/${id}`, { method: 'DELETE' }));
+export const useUpdateMember = () =>
+  useWsMutation((base, { userId, role }: { userId: string; role: 'admin' | 'editor' | 'viewer' }) =>
+    api<Members>(`${base}/members/${userId}`, { method: 'PATCH', body: { role } }),
+  );
+export const useRemoveMember = () =>
+  useWsMutation((base, userId: string) =>
+    api<void>(`${base}/members/${userId}`, { method: 'DELETE' }),
+  );
+
+/** Ownership changes the workspace's role, which lives on /me. */
+export function useTransferOwnership() {
+  const qc = useQueryClient();
+  const { base } = useWs();
+  const invalidate = useInvalidateWorkspace();
+  return useMutation({
+    mutationFn: (userId: string) =>
+      api<Members>(`${base}/transfer-ownership`, { method: 'POST', body: { userId } }),
+    onSuccess: async () => {
+      await Promise.all([qc.invalidateQueries({ queryKey: meKey }), invalidate()]);
+    },
   });
 }

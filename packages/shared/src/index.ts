@@ -8,6 +8,7 @@ export * from './ids';
 export * from './import';
 export * from './insights';
 export * from './ledger';
+export * from './members';
 export * from './money';
 export * from './notifications';
 export * from './periods';

@@ -8,6 +8,7 @@ import {
   Tags,
   UserRound,
   Users,
+  UsersRound,
   Wand2,
 } from 'lucide-react';
 import { PageHeader } from '@/components/page';
@@ -18,11 +19,13 @@ import { CategoriesSettings } from './categories-settings';
 import { DataSettings } from './data-settings';
 import { GeneralSettings } from './general-settings';
 import { PayeesSettings, TagsSettings } from './labels-settings';
+import { MembersSettings } from './members-settings';
 import { ProfileSettings } from './profile-settings';
 import { RatesSettings } from './rates-settings';
 
 type Tab =
   | 'general'
+  | 'members'
   | 'categories'
   | 'payees'
   | 'tags'
@@ -46,6 +49,9 @@ export function SettingsPage() {
         <TabsList className="mb-5 flex w-full justify-start">
           <TabsTrigger value="general">
             <Settings2 /> General
+          </TabsTrigger>
+          <TabsTrigger value="members">
+            <UsersRound /> Members
           </TabsTrigger>
           <TabsTrigger value="categories">
             <Tags /> Categories
@@ -74,6 +80,9 @@ export function SettingsPage() {
         </TabsList>
         <TabsContent value="general">
           <GeneralSettings />
+        </TabsContent>
+        <TabsContent value="members">
+          <MembersSettings />
         </TabsContent>
         <TabsContent value="categories">
           <CategoriesSettings />

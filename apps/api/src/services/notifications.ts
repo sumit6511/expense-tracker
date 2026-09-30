@@ -249,16 +249,26 @@ async function prefsFor(db: Executor, userIds: string[]) {
 }
 
 /**
- * Adds each candidate for every member who wants that kind and hasn't had it yet. Returns how
- * many new notifications were created.
+ * Adds each candidate for every member (or just `onlyFor`) who wants that kind and hasn't had it
+ * yet. Returns how many new notifications were created.
  */
-export async function deliver(db: Executor, workspaceId: string, candidates: Candidate[]) {
+export async function deliver(
+  db: Executor,
+  workspaceId: string,
+  candidates: Candidate[],
+  onlyFor?: string[],
+) {
   if (candidates.length === 0) return 0;
   const members = (
     await db
       .select({ userId: workspaceMembers.userId })
       .from(workspaceMembers)
-      .where(eq(workspaceMembers.workspaceId, workspaceId))
+      .where(
+        and(
+          eq(workspaceMembers.workspaceId, workspaceId),
+          onlyFor ? inArray(workspaceMembers.userId, onlyFor) : undefined,
+        ),
+      )
   ).map((m) => m.userId);
   if (members.length === 0) return 0;
   const prefs = await prefsFor(db, members);
@@ -307,7 +317,10 @@ export async function deliver(db: Executor, workspaceId: string, candidates: Can
   return inserted.length;
 }
 
-/** Checks one workspace for anything new to announce. */
+/**
+ * Checks one workspace for anything new to tell `ws.userId` about. Each person is checked on
+ * their own, since what they see (and so their budget totals) can differ.
+ */
 export async function refreshNotifications(db: Db, ws: WorkspaceCtx) {
   const today = workspaceToday(ws);
   const candidates = [
@@ -315,7 +328,7 @@ export async function refreshNotifications(db: Db, ws: WorkspaceCtx) {
     ...(await budgetCandidates(db, ws, today)),
     ...(await goalCandidates(db, ws)),
   ];
-  return deliver(db, ws.id, candidates);
+  return deliver(db, ws.id, candidates, [ws.userId]);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -520,9 +533,12 @@ export async function runNotifications(
   publicUrl: string,
   logger?: Logger,
 ) {
-  const rows = await db.select().from(workspaces);
+  const rows = await db
+    .select({ w: workspaces, userId: workspaceMembers.userId, role: workspaceMembers.role })
+    .from(workspaces)
+    .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id));
   let created = 0;
-  for (const w of rows) {
+  for (const { w, userId, role } of rows) {
     const ws: WorkspaceCtx = {
       id: w.id,
       name: w.name,
@@ -531,7 +547,8 @@ export async function runNotifications(
       monthStartDay: w.monthStartDay,
       weekStart: w.weekStart,
       timezone: w.timezone,
-      role: 'owner',
+      userId,
+      role,
       createdAt: w.createdAt,
     };
     try {

@@ -132,6 +132,7 @@ async function hydrate(
       importBatchId: r.importBatchId,
       attachmentCount: attachmentCount.get(r.id) ?? 0,
       recurringId: r.recurringId,
+      createdBy: r.createdBy,
       deleted: r.deletedAt !== null,
       version: r.version,
       createdAt: r.createdAt.toISOString(),
@@ -245,6 +246,7 @@ export function transactionFilters(
   if (q.needsReview) where.push(eq(t.needsReview, q.needsReview === 'true'));
   if (q.importBatchId) where.push(eq(t.importBatchId, q.importBatchId));
   if (q.recurringId) where.push(eq(t.recurringId, q.recurringId));
+  if (q.createdBy) where.push(eq(t.createdBy, q.createdBy));
   if (q.q) {
     const pattern = `%${escapeLike(q.q)}%`;
     where.push(sql`(

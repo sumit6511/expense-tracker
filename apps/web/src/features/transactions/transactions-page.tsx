@@ -40,6 +40,7 @@ import {
   type TransactionFilters,
   useBulkTransactions,
   useCategoryMap,
+  useMemberNames,
   useTags,
   useTransactions,
 } from '@/lib/queries';
@@ -58,6 +59,7 @@ export function TransactionsPage() {
   const { openNew, openEdit } = useTransactionDialog();
   const categories = useCategoryMap();
   const { data: tags = [] } = useTags();
+  const people = useMemberNames();
   const bulk = useBulkTransactions();
   const confirm = useConfirm();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -233,6 +235,21 @@ export function TransactionsPage() {
               {tags.map((t) => (
                 <option key={t.id} value={t.id}>
                   #{t.name}
+                </option>
+              ))}
+            </NativeSelect>
+          )}
+          {people && (
+            <NativeSelect
+              value={search.createdBy ?? ''}
+              onChange={(e) => setSearch({ createdBy: e.target.value || undefined })}
+              className="h-8 w-36 text-[13px]"
+              aria-label="Added by"
+            >
+              <option value="">Anyone</option>
+              {[...people].map(([id, name]) => (
+                <option key={id} value={id}>
+                  Added by {name}
                 </option>
               ))}
             </NativeSelect>

@@ -21,6 +21,7 @@ import { goalsRouter } from './routes/goals';
 import { importsRouter } from './routes/imports';
 import { ledgerRouter } from './routes/ledger';
 import { meRouter } from './routes/me';
+import { membersRouter } from './routes/members';
 import { notificationsRouter } from './routes/notifications';
 import { recurringRouter } from './routes/recurring';
 import { rulesRouter } from './routes/rules';
@@ -112,6 +113,7 @@ export function createApp(deps: Deps) {
     goalsRouter,
     ledgerRouter,
     notificationsRouter,
+    membersRouter,
   ]) {
     api.route('/', router);
   }

@@ -33,7 +33,7 @@ const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   notFoundComponent: NotFoundPage,
 });
 
-const authSearch = z.object({ next: z.string().optional() });
+const authSearch = z.object({ next: z.string().optional(), email: z.string().optional() });
 
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -45,7 +45,14 @@ const loginRoute = createRoute({
 const signupRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/signup',
+  validateSearch: authSearch,
   component: SignupPage,
+});
+
+const inviteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/invite/$token',
+  component: lazyRouteComponent(() => import('./features/auth/invite-page'), 'InvitePage'),
 });
 
 const onboardingRoute = createRoute({
@@ -78,6 +85,7 @@ export const transactionsSearch = z.object({
   needsReview: z.enum(['true', 'false']).optional(),
   importBatchId: z.string().optional(),
   recurringId: z.string().optional(),
+  createdBy: z.string().optional(),
   deleted: z.enum(['true', 'false']).optional(),
 });
 export type TransactionsSearch = z.infer<typeof transactionsSearch>;
@@ -170,6 +178,7 @@ const settingsRoute = createRoute({
     tab: z
       .enum([
         'general',
+        'members',
         'categories',
         'payees',
         'tags',
@@ -187,6 +196,7 @@ const settingsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   loginRoute,
   signupRoute,
+  inviteRoute,
   onboardingRoute,
   appRoute.addChildren([
     dashboardRoute,

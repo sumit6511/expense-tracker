@@ -368,10 +368,12 @@ export const TransactionSchema = z.object({
   tagIds: z.array(Id),
   original: z.object({ amountMinor: MinorAmount, currency: z.string() }).nullable(),
   importBatchId: Id.nullable(),
-  /** The recurring series this was recorded from. */
   /** Receipts and other files attached. */
   attachmentCount: z.number(),
+  /** The recurring series this was recorded from. */
   recurringId: Id.nullable(),
+  /** Who added it (null when recorded automatically or by someone since removed). */
+  createdBy: z.string().nullable(),
   deleted: z.boolean(),
   version: z.number(),
   createdAt: z.string(),
@@ -396,6 +398,8 @@ export const ListTransactionsQuerySchema = z.object({
   needsReview: z.enum(['true', 'false']).optional(),
   importBatchId: Id.optional(),
   recurringId: Id.optional(),
+  /** Who added them (a user id). */
+  createdBy: z.string().min(1).max(100).optional(),
   deleted: z.enum(['true', 'false']).optional(),
   cursor: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(500).default(100),
