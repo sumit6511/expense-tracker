@@ -15,6 +15,7 @@ import {
   Sun,
   Target,
   Upload,
+  Wand2,
 } from 'lucide-react';
 import { useState } from 'react';
 import { CategoryIcon } from '@/components/icons';
@@ -131,13 +132,18 @@ export function CommandPalette({
                 </Command.Item>
               ))}
               <Command.Item
-                value="needs review inbox"
-                onSelect={() =>
-                  run(() => navigate({ to: '/transactions', search: { needsReview: 'true' } }))
-                }
+                value="review inbox needs review uncategorized"
+                onSelect={() => run(() => navigate({ to: '/inbox' }))}
                 className={item}
               >
-                <Inbox /> Needs review
+                <Inbox /> Review inbox
+              </Command.Item>
+              <Command.Item
+                value="rules automatic categorization"
+                onSelect={() => run(() => navigate({ to: '/settings', search: { tab: 'rules' } }))}
+                className={item}
+              >
+                <Wand2 /> Rules
               </Command.Item>
             </Command.Group>
             <Command.Group heading="Accounts">

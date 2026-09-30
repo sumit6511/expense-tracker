@@ -50,7 +50,14 @@ describe('statement import', () => {
       suggestedCategoryId: f.categories['Food & Groceries'],
     });
     expect(fresh.payeeId).toBe(dup.payeeId);
-    expect(salary).toEqual({ duplicateOfId: null, payeeId: null, suggestedCategoryId: null });
+    expect(salary).toEqual({
+      duplicateOfId: null,
+      payeeId: null,
+      suggestedCategoryId: null,
+      ruleIds: [],
+      splitByRule: false,
+      rulePayee: null,
+    });
 
     const commit = await f.client.post(`${f.base}/imports`, {
       accountId: f.accounts.Bank,

@@ -149,6 +149,41 @@ test.describe('everyday use', () => {
     await expect(page.getByText('Undone', { exact: true })).toBeVisible();
   });
 
+  test('review imported transactions and turn a choice into a rule', async ({ signedIn: page }) => {
+    await page.goto('/import');
+    await page.getByLabel('Import into account').selectOption({ label: 'Nabil Bank (NPR)' });
+    const csv = [
+      'Date,Description,Amount',
+      '2026-10-02,POS/DARAZ ONLINE PVT LTD,-2899',
+      '2026-10-01,FONEPAY/QR/PATHAO RIDE,-320',
+    ].join('\n');
+    await page
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'bank.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+    await page.getByRole('button', { name: /Review 2 rows/ }).click();
+    await page.getByRole('button', { name: 'Import 2 transactions' }).click();
+    await page.getByRole('link', { name: 'Open review inbox' }).click();
+
+    await expect(page.getByRole('button', { name: /To review · 2/ })).toBeVisible();
+    // Newest first: the Daraz purchase.
+    await page.getByRole('button', { name: 'Choose category' }).first().click();
+    await page.keyboard.type('Shopping');
+    await page.keyboard.press('Enter');
+    await expect(page.getByText('Categorized as Shopping')).toBeVisible();
+    await page.getByRole('button', { name: 'Always do this' }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'New rule' });
+    await expect(dialog.getByLabel('Condition 1 text')).toHaveValue('daraz');
+    await dialog.getByRole('button', { name: 'Create rule' }).click();
+    await expect(page.getByText('Rule created')).toBeVisible();
+    await expect(page.getByRole('button', { name: /To review · 1/ })).toBeVisible();
+
+    await page.goto('/settings?tab=rules');
+    await expect(page.getByText('Category: Shopping')).toBeVisible();
+    await page.getByRole('switch', { name: /enabled/ }).click();
+    await expect(page.getByRole('switch', { name: /enabled/ })).not.toBeChecked();
+  });
+
   test('reports and settings pages load', async ({ signedIn: page }) => {
     await page.goto('/reports?tab=cashflow');
     await expect(page.getByText('Income and spending per month')).toBeVisible();

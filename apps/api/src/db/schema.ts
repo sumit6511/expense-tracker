@@ -365,6 +365,35 @@ export const transactionTags = pgTable(
 );
 
 // ---------------------------------------------------------------------------------------------
+// Rules
+// ---------------------------------------------------------------------------------------------
+
+export const ruleMatchEnum = pgEnum('rule_match', ['all', 'any']);
+
+/** Categorization rules; conditions and actions are validated by RuleBodySchema in @et/shared. */
+export const rules = pgTable(
+  'rules',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    enabled: boolean().notNull().default(true),
+    /** Rules run in ascending priority; later matches override earlier ones. */
+    priority: integer().notNull().default(0),
+    match: ruleMatchEnum().notNull().default('all'),
+    conditions: jsonb().notNull(),
+    actions: jsonb().notNull(),
+    stopProcessing: boolean().notNull().default(false),
+    hitCount: integer().notNull().default(0),
+    lastHitAt: timestamp({ withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index().on(t.workspaceId, t.priority)],
+);
+
+// ---------------------------------------------------------------------------------------------
 // Budgets
 // ---------------------------------------------------------------------------------------------
 

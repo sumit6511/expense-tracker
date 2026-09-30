@@ -17,6 +17,7 @@ import { budgetsRouter } from './routes/budgets';
 import { labelsRouter } from './routes/categories';
 import { importsRouter } from './routes/imports';
 import { meRouter } from './routes/me';
+import { rulesRouter } from './routes/rules';
 import { transactionsRouter } from './routes/transactions';
 import { workspaceRouter } from './routes/workspace';
 
@@ -91,6 +92,7 @@ export function createApp(deps: Deps) {
     transactionsRouter,
     budgetsRouter,
     importsRouter,
+    rulesRouter,
   ]) {
     api.route('/', router);
   }

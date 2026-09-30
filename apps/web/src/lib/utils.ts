@@ -1,4 +1,5 @@
 import { type ClassValue, clsx } from 'clsx';
+import { useEffect, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 
 export function cn(...inputs: ClassValue[]) {
@@ -33,4 +34,14 @@ export function downloadBlob(blob: Blob, fileName: string) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** `value`, once it has stopped changing for `ms`. */
+export function useDebouncedValue<T>(value: T, ms = 350): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return debounced;
 }

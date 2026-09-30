@@ -131,11 +131,20 @@ const importRoute = createRoute({
   component: lazyRouteComponent(() => import('./features/import/import-page'), 'ImportPage'),
 });
 
+const inboxRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/inbox',
+  validateSearch: z.object({ tab: z.enum(['review', 'uncategorized']).optional() }),
+  component: lazyRouteComponent(() => import('./features/inbox/inbox-page'), 'InboxPage'),
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/settings',
   validateSearch: z.object({
-    tab: z.enum(['general', 'categories', 'payees', 'tags', 'rates', 'data', 'profile']).optional(),
+    tab: z
+      .enum(['general', 'categories', 'payees', 'tags', 'rules', 'rates', 'data', 'profile'])
+      .optional(),
   }),
   component: lazyRouteComponent(() => import('./features/settings/settings-page'), 'SettingsPage'),
 });
@@ -152,6 +161,7 @@ const routeTree = rootRoute.addChildren([
     accountsRoute,
     accountRoute,
     importRoute,
+    inboxRoute,
     settingsRoute,
   ]),
 ]);

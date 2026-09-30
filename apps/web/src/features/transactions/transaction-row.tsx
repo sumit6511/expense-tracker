@@ -95,7 +95,7 @@ export function TransactionRow({
             )}
           </span>
           <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-            <span className={cn('truncate', uncategorized && 'italic')}>{subtitle}</span>
+            <span className={cn('truncate', uncategorized && 'pr-0.5 italic')}>{subtitle}</span>
             {showAccount && account && (
               <span className="hidden truncate sm:inline">· {account.name}</span>
             )}

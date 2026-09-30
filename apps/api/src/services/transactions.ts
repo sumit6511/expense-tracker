@@ -2,6 +2,7 @@ import {
   type BulkTransactionAction,
   type CreateTransactionSchema,
   type CreateTransferSchema,
+  evaluateRules,
   type ListTransactionsQuerySchema,
   type SplitInput,
   type Transaction,
@@ -20,6 +21,7 @@ import { requireAccount } from './accounts';
 import { assertCategoriesExist } from './categories';
 import { findOrCreatePayee } from './payees';
 import { loadRateBook } from './rates';
+import { loadActiveRules, recordHits } from './rules';
 import { assertTagsExist } from './tags';
 
 type TxRow = typeof transactions.$inferSelect;
@@ -145,6 +147,21 @@ export async function getTransaction(
   const row = await requireTransactionRow(db, workspaceId, id);
   const [tx] = await hydrate(db, [row]);
   return tx!;
+}
+
+/** Several transactions, in the order of `ids`. */
+export async function getTransactions(
+  db: Executor,
+  workspaceId: string,
+  ids: string[],
+): Promise<Transaction[]> {
+  if (ids.length === 0) return [];
+  const rows = await db
+    .select()
+    .from(transactions)
+    .where(and(eq(transactions.workspaceId, workspaceId), inArray(transactions.id, ids)));
+  const hydrated = new Map((await hydrate(db, rows)).map((t) => [t.id, t]));
+  return ids.flatMap((id) => hydrated.get(id) ?? []);
 }
 
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
@@ -306,7 +323,7 @@ export async function listTransactions(
 // Writing
 // ---------------------------------------------------------------------------------------------
 
-async function replaceSplits(
+export async function replaceSplits(
   db: Executor,
   workspaceId: string,
   transactionId: string,
@@ -332,6 +349,46 @@ async function replaceTags(db: Executor, transactionId: string, tagIds: readonly
   const unique = [...new Set(tagIds)];
   if (unique.length)
     await db.insert(transactionTags).values(unique.map((tagId) => ({ transactionId, tagId })));
+}
+
+/** Changes a rule makes to an existing regular transaction. */
+export interface TransactionEffects {
+  categoryId?: string | null;
+  split?: Array<{ categoryId: string | null; amountMinor: number }>;
+  payeeId?: string | null;
+  addTagIds?: string[];
+  notes?: string;
+  reviewed?: boolean;
+}
+
+export async function applyEffects(
+  db: Executor,
+  workspaceId: string,
+  userId: string | null,
+  target: { id: string; amountMinor: number },
+  effects: TransactionEffects,
+) {
+  if (effects.split) {
+    await replaceSplits(db, workspaceId, target.id, effects.split);
+  } else if (effects.categoryId !== undefined) {
+    await replaceSplits(db, workspaceId, target.id, [
+      { categoryId: effects.categoryId, amountMinor: target.amountMinor },
+    ]);
+  }
+  if (effects.addTagIds?.length) {
+    await db
+      .insert(transactionTags)
+      .values(effects.addTagIds.map((tagId) => ({ transactionId: target.id, tagId })))
+      .onConflictDoNothing();
+  }
+  const patch: Partial<typeof transactions.$inferInsert> = {};
+  if (effects.payeeId !== undefined) patch.payeeId = effects.payeeId;
+  if (effects.notes !== undefined) patch.notes = effects.notes;
+  if (effects.reviewed) patch.needsReview = false;
+  await db
+    .update(transactions)
+    .set({ ...patch, updatedBy: userId, version: sql`${transactions.version} + 1` })
+    .where(eq(transactions.id, target.id));
 }
 
 function normalizedOriginal(
@@ -411,9 +468,46 @@ export async function createTransaction(
     await assertCategoriesExist(tx, ws.id, categoryIds);
     if (input.tagIds) await assertTagsExist(tx, ws.id, input.tagIds);
     const payeeId = await findOrCreatePayee(tx, ws.id, input.payee);
-    return insertTransaction(tx, ws.id, userId, account.currency, input, payeeId);
+    return insertTransaction(
+      tx,
+      ws.id,
+      userId,
+      account.currency,
+      await fillFromRules(tx, ws.id, input),
+      payeeId,
+    );
   });
   return { transaction: await getTransaction(db, ws.id, id), created: true };
+}
+
+/**
+ * On manual entry rules only fill gaps: a category when none was chosen, extra tags, and notes
+ * when empty. What the person typed is never overwritten.
+ */
+async function fillFromRules(
+  db: Executor,
+  workspaceId: string,
+  input: z.output<typeof CreateTransactionSchema>,
+): Promise<z.output<typeof CreateTransactionSchema>> {
+  const active = await loadActiveRules(db, workspaceId);
+  if (active.length === 0) return input;
+  const result = evaluateRules(active, {
+    payee: input.payee ?? '',
+    description: '',
+    notes: input.notes ?? '',
+    amountMinor: input.amountMinor,
+    accountId: input.accountId,
+  });
+  if (result.matchedRuleIds.length === 0) return input;
+  const filled = { ...input };
+  const uncategorized = !input.splits && !input.categoryId;
+  if (uncategorized && result.split) filled.splits = result.split;
+  else if (uncategorized && result.categoryId) filled.categoryId = result.categoryId;
+  if (result.tagIds.length)
+    filled.tagIds = [...new Set([...(input.tagIds ?? []), ...result.tagIds])];
+  if (!input.notes && result.notes) filled.notes = result.notes;
+  await recordHits(db, new Map(result.matchedRuleIds.map((id) => [id, 1])));
+  return filled;
 }
 
 export async function updateTransaction(

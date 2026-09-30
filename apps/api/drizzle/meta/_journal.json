@@ -15,6 +15,13 @@
       "when": 1790751096769,
       "tag": "0001_split_invariant",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790762050290,
+      "tag": "0002_rules",
+      "breakpoints": true
     }
   ]
 }

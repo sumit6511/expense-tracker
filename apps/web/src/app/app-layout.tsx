@@ -5,6 +5,7 @@ import {
   ChartPie,
   ChevronsUpDown,
   House,
+  Inbox,
   Landmark,
   Loader2,
   LogOut,
@@ -33,12 +34,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/menu';
+import { RuleDialogProvider } from '@/features/rules/rule-dialog';
 import {
   TransactionDialogProvider,
   useTransactionDialog,
 } from '@/features/transactions/transaction-dialog';
 import { ApiError, authApi } from '@/lib/api';
-import { useMeQuery } from '@/lib/queries';
+import { useMeQuery, useReviewCounts } from '@/lib/queries';
 import {
   pickWorkspace,
   rememberWorkspace,
@@ -58,11 +60,30 @@ interface NavItem {
 const NAV: NavItem[] = [
   { to: '/', label: 'Home', icon: House },
   { to: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
+  { to: '/inbox', label: 'Review', icon: Inbox },
   { to: '/budgets', label: 'Budgets', icon: Target },
   { to: '/reports', label: 'Reports', icon: ChartPie },
   { to: '/accounts', label: 'Accounts', icon: Landmark },
   { to: '/import', label: 'Import', icon: Upload },
 ];
+
+// Phones show these in the bottom bar (around the add button); the rest go under "More".
+const BOTTOM_PATHS = ['/', '/transactions', '/budgets'];
+const BOTTOM_NAV = BOTTOM_PATHS.map((to) => NAV.find((n) => n.to === to)!);
+const MORE_NAV: NavItem[] = [
+  ...NAV.filter((n) => !BOTTOM_PATHS.includes(n.to)),
+  { to: '/settings', label: 'Settings', icon: Settings },
+];
+
+function ReviewBadge() {
+  const { data } = useReviewCounts();
+  if (!data?.needsReview) return null;
+  return (
+    <span className="ml-auto rounded-full bg-primary px-1.5 py-px text-[11px] font-semibold text-primary-foreground tabular">
+      {data.needsReview > 99 ? '99+' : data.needsReview}
+    </span>
+  );
+}
 
 /** Loads the signed-in user and workspace, then renders the app chrome. */
 export function AppLayout() {
@@ -95,9 +116,11 @@ export function AppLayout() {
 
   return (
     <SessionProvider me={data} workspace={workspace} onSwitch={switchWorkspace}>
-      <TransactionDialogProvider>
-        <Shell />
-      </TransactionDialogProvider>
+      <RuleDialogProvider>
+        <TransactionDialogProvider>
+          <Shell />
+        </TransactionDialogProvider>
+      </RuleDialogProvider>
     </SessionProvider>
   );
 }
@@ -183,6 +206,7 @@ function Shell() {
               )}
             >
               <item.icon /> {item.label}
+              {item.to === '/inbox' && <ReviewBadge />}
             </Link>
           ))}
         </nav>
@@ -224,7 +248,7 @@ function Shell() {
         aria-label="Main"
         className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t bg-card/95 backdrop-blur safe-bottom lg:hidden"
       >
-        {[NAV[0]!, NAV[1]!].map((item) => (
+        {BOTTOM_NAV.slice(0, 2).map((item) => (
           <BottomLink key={item.to} item={item} active={isActive(pathname, item.to)} />
         ))}
         <div className="grid grid-cols-1 place-items-center">
@@ -239,14 +263,13 @@ function Shell() {
             </button>
           )}
         </div>
-        <BottomLink item={NAV[2]!} active={isActive(pathname, NAV[2]!.to)} />
+        <BottomLink item={BOTTOM_NAV[2]!} active={isActive(pathname, BOTTOM_NAV[2]!.to)} />
         <button
           type="button"
           onClick={() => setMoreOpen(true)}
           className={cn(
             'flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground',
-            ['/reports', '/accounts', '/import', '/settings'].some((p) => isActive(pathname, p)) &&
-              'text-primary',
+            MORE_NAV.some((item) => isActive(pathname, item.to)) && 'text-primary',
           )}
         >
           <Menu className="size-5" /> More
@@ -259,18 +282,17 @@ function Shell() {
             <DialogTitle>More</DialogTitle>
           </DialogHeader>
           <DialogBody className="grid grid-cols-2 gap-2 pb-6">
-            {[...NAV.slice(3), { to: '/settings', label: 'Settings', icon: Settings }].map(
-              (item) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  onClick={() => setMoreOpen(false)}
-                  className="flex items-center gap-3 rounded-xl border p-4 text-sm font-medium hover:bg-muted [&_svg]:size-5 [&_svg]:text-primary"
-                >
-                  <item.icon /> {item.label}
-                </Link>
-              ),
-            )}
+            {MORE_NAV.map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                onClick={() => setMoreOpen(false)}
+                className="flex items-center gap-3 rounded-xl border p-4 text-sm font-medium hover:bg-muted [&_svg]:size-5 [&_svg]:text-primary"
+              >
+                <item.icon /> {item.label}
+                {item.to === '/inbox' && <ReviewBadge />}
+              </Link>
+            ))}
           </DialogBody>
         </DialogContent>
       </Dialog>

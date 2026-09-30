@@ -20,6 +20,7 @@ import {
   Save,
   Undo2,
   Upload,
+  Wand2,
 } from 'lucide-react';
 import { type DragEvent, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -671,7 +672,19 @@ export function ImportPage() {
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">{f.date(r.date)}</td>
                         <td className="max-w-56 px-3 py-2">
-                          <span className="block truncate">{r.payee || '—'}</span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="truncate">{p.rulePayee ?? (r.payee || '—')}</span>
+                            {p.ruleIds.length > 0 && (
+                              <Badge tone="primary" title="Changed by your rules">
+                                <Wand2 className="size-3" /> Rule
+                              </Badge>
+                            )}
+                          </span>
+                          {p.rulePayee && (
+                            <span className="block truncate text-xs text-muted-foreground">
+                              {r.payee || r.description}
+                            </span>
+                          )}
                           {p.duplicateOfId && <Badge tone="warning">Already recorded?</Badge>}
                         </td>
                         <td className="w-52 min-w-44 px-3 py-1.5">
@@ -682,6 +695,7 @@ export function ImportPage() {
                             }
                             kind={r.amountMinor < 0 ? 'expense' : 'income'}
                             className="h-8 text-[13px]"
+                            placeholder={p.splitByRule ? 'Split by rule' : 'Choose category'}
                           />
                         </td>
                         <td className="px-3 py-2 text-right">
@@ -712,11 +726,14 @@ export function ImportPage() {
             <CircleCheck className="size-10 text-positive" />
             <h2 className="text-lg font-semibold">Imported {result.created} transactions</h2>
             <p className="max-w-md text-sm text-muted-foreground">
-              {result.skipped > 0 ? `${result.skipped} skipped. ` : ''}They’re marked “needs review”
-              so you can check categories quickly.
+              {result.skipped > 0 ? `${result.skipped} skipped. ` : ''}They wait in the review inbox
+              so you can check categories quickly (unless a rule already confirmed them).
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               <Button asChild>
+                <Link to="/inbox">Open review inbox</Link>
+              </Button>
+              <Button variant="outline" asChild>
                 <Link to="/transactions" search={{ importBatchId: result.id }}>
                   Review them
                 </Link>

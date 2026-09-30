@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/dialog';
 import { Field, Input, Textarea } from '@/components/ui/input';
 import { Segmented } from '@/components/ui/menu';
+import { canMakeRule, ruleFromTransaction, useRuleDialog } from '@/features/rules/rule-dialog';
 import { ApiError, errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
 import {
@@ -270,6 +271,7 @@ function EditorForm({
 
   const createTx = useCreateTransaction();
   const updateTx = useUpdateTransaction();
+  const { openRule } = useRuleDialog();
   const createTransfer = useCreateTransfer();
   const updateTransfer = useUpdateTransfer();
   const deleteTx = useDeleteTransaction();
@@ -378,8 +380,27 @@ function EditorForm({
           ...(splits ? { splits } : { categoryId }),
         };
         if (existing) {
-          await updateTx.mutateAsync({ id: existing.id, version: existing.version, ...common });
-          toast.success('Saved');
+          // Saving an edit also confirms a transaction waiting in the review inbox.
+          const saved = await updateTx.mutateAsync({
+            id: existing.id,
+            version: existing.version,
+            ...common,
+            ...(existing.needsReview && { needsReview: false }),
+          });
+          const recategorized =
+            !splits &&
+            categoryId !== null &&
+            (existing.splits.length !== 1 || existing.splits[0]!.categoryId !== categoryId);
+          toast.success('Saved', {
+            ...(recategorized &&
+              canMakeRule(saved) && {
+                description: 'Categorize similar transactions like this automatically?',
+                action: {
+                  label: 'Always do this',
+                  onClick: () => openRule(ruleFromTransaction(saved, categoryId)),
+                },
+              }),
+          });
         } else {
           const created = await createTx.mutateAsync({ id: uuidv7(), ...common });
           toast.success(mode === 'expense' ? 'Expense added' : 'Income added', {

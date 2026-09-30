@@ -63,3 +63,13 @@ export function guessPayeeFromDescription(description: string): string {
     )
     .join(' ');
 }
+
+/**
+ * A short, distinctive word from a bank narration for a "description contains …" rule:
+ * "FONEPAY/QR/PATHAO RIDE KTM" → "pathao", "NTC TOPUP 98XXXXXXXX" → "ntc topup".
+ */
+export function descriptionKeyword(description: string): string {
+  const words = guessPayeeFromDescription(description).toLowerCase().split(' ').filter(Boolean);
+  if (words.length === 0) return description.trim().toLowerCase().slice(0, 40);
+  return (words[0]!.length >= 4 ? words[0]! : words.slice(0, 2).join(' ')).slice(0, 40);
+}

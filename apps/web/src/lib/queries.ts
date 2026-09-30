@@ -23,6 +23,9 @@ import type {
   ListTransactionsQuery,
   Me,
   Payee,
+  Rule,
+  RuleInput,
+  RulePreview,
   SpendingByCategory,
   Tag,
   Transaction,
@@ -453,3 +456,72 @@ export const useDeleteImportProfile = () =>
   useWsMutation((base, id: string) =>
     api<void>(`${base}/import-profiles/${id}`, { method: 'DELETE' }),
   );
+
+// ---------------------------------------------------------------------------------------------
+// Rules
+// ---------------------------------------------------------------------------------------------
+
+export function useRules() {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'rules'],
+    queryFn: () => api<Rule[]>(`${base}/rules`),
+  });
+}
+
+export const useCreateRule = () =>
+  useWsMutation((base, input: RuleInput) =>
+    api<Rule>(`${base}/rules`, { method: 'POST', body: input }),
+  );
+export const useUpdateRule = () =>
+  useWsMutation((base, { id, ...input }: Partial<RuleInput> & { id: string }) =>
+    api<Rule>(`${base}/rules/${id}`, { method: 'PATCH', body: input }),
+  );
+export const useDeleteRule = () =>
+  useWsMutation((base, id: string) => api<void>(`${base}/rules/${id}`, { method: 'DELETE' }));
+export const useReorderRules = () =>
+  useWsMutation((base, ids: string[]) =>
+    api<Rule[]>(`${base}/rules/reorder`, { method: 'POST', body: { ids } }),
+  );
+export const useApplyRule = () =>
+  useWsMutation((base, { id, onlyUncategorized }: { id: string; onlyUncategorized: boolean }) =>
+    api<{ updated: number }>(`${base}/rules/${id}/apply`, {
+      method: 'POST',
+      body: { onlyUncategorized },
+    }),
+  );
+
+/** Which existing transactions a (possibly unsaved) rule matches. */
+export function useRulePreview(rule: RuleInput | null, onlyUncategorized: boolean) {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'rule-preview', JSON.stringify(rule), onlyUncategorized],
+    queryFn: () =>
+      api<RulePreview>(`${base}/rules/preview`, {
+        method: 'POST',
+        body: { rule, onlyUncategorized },
+      }),
+    enabled: rule !== null,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** How many transactions wait in the review inbox. */
+export function useReviewCounts() {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'review-counts'],
+    queryFn: async () => {
+      const [review, uncategorized] = await Promise.all([
+        api<TransactionPage>(`${base}/transactions`, {
+          query: { needsReview: 'true', limit: 1 },
+        }),
+        api<TransactionPage>(`${base}/transactions`, {
+          query: { categoryIds: 'none', limit: 1 },
+        }),
+      ]);
+      return { needsReview: review.totals.count, uncategorized: uncategorized.totals.count };
+    },
+    staleTime: 30_000,
+  });
+}

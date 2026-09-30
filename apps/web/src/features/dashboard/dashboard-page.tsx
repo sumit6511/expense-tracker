@@ -429,14 +429,14 @@ function AttentionCard({ data }: { data: Dashboard }) {
     icon: typeof Inbox;
     label: string;
     hint: string;
-    search: { needsReview?: 'true'; categoryIds?: string };
+    search: { tab: 'review' | 'uncategorized' };
   }> = [];
   if (data.needsReviewCount > 0) {
     items.push({
       icon: Inbox,
       label: `${data.needsReviewCount} to review`,
       hint: 'Imported transactions waiting for a quick check',
-      search: { needsReview: 'true' },
+      search: { tab: 'review' },
     });
   }
   if (data.uncategorizedCount > 0) {
@@ -444,7 +444,7 @@ function AttentionCard({ data }: { data: Dashboard }) {
       icon: Tags,
       label: `${data.uncategorizedCount} uncategorized`,
       hint: 'Give them a category for accurate reports',
-      search: { categoryIds: 'none' },
+      search: { tab: 'uncategorized' },
     });
   }
 
@@ -459,7 +459,7 @@ function AttentionCard({ data }: { data: Dashboard }) {
           items.map((item) => (
             <Link
               key={item.label}
-              to="/transactions"
+              to="/inbox"
               search={item.search}
               className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/60"
             >

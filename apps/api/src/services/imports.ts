@@ -1,6 +1,7 @@
 import {
   addDays,
   type CommitImportSchema,
+  evaluateRules,
   findDuplicates,
   type ImportBatch,
   type ImportPreview,
@@ -18,6 +19,7 @@ import { notFound } from '../lib/errors';
 import { requireAccount } from './accounts';
 import { assertCategoriesExist } from './categories';
 import { findOrCreatePayee, learnedCategories } from './payees';
+import { countHits, loadActiveRules, recordHits } from './rules';
 import { insertTransaction, softDeleteTransactions } from './transactions';
 
 type ImportRowInput = z.output<typeof ImportRowSchema>;
@@ -96,25 +98,59 @@ export async function previewImport(
   await requireAccount(db, ws.id, accountId);
   const existing = await existingForDuplicates(db, accountId, rows);
   const duplicates = findDuplicates(rows, existing);
-  const lookup = await payeeLookup(
-    db,
-    ws.id,
-    rows.map((r) => r.payee),
-  );
-  const payeeIds = [...new Set([...lookup.values()].map((p) => p.id))];
-  const learned = await learnedCategories(db, ws.id, payeeIds);
+  const ruled = await applyRulesToRows(db, ws.id, accountId, rows);
   return {
-    rows: rows.map((row, i) => {
-      const payee = lookup.get(normalizePayeeName(row.payee));
+    rows: rows.map((_, i) => {
+      const r = ruled[i]!;
       return {
         duplicateOfId: duplicates[i] ?? null,
-        payeeId: payee?.id ?? null,
-        suggestedCategoryId: payee
-          ? (payee.defaultCategoryId ?? learned.get(payee.id) ?? null)
-          : null,
+        payeeId: r.payeeId,
+        suggestedCategoryId: r.split ? null : r.categoryId,
+        ruleIds: r.result.matchedRuleIds,
+        splitByRule: r.split !== undefined,
+        rulePayee: r.result.payee ?? null,
       };
     }),
   };
+}
+
+/**
+ * Runs the workspace's rules over statement rows, then fills in what rules left open from the
+ * payee: its default category, else the category learned from history.
+ */
+async function applyRulesToRows(
+  db: Executor,
+  workspaceId: string,
+  accountId: string,
+  rows: ImportRowInput[],
+) {
+  const active = await loadActiveRules(db, workspaceId);
+  const results = rows.map((row) =>
+    evaluateRules(active, {
+      payee: row.payee,
+      description: row.description,
+      notes: row.notes,
+      amountMinor: row.amountMinor,
+      accountId,
+    }),
+  );
+  const payeeNames = rows.map((row, i) => results[i]!.payee ?? row.payee);
+  const lookup = await payeeLookup(db, workspaceId, payeeNames);
+  const learned = await learnedCategories(db, workspaceId, [
+    ...new Set([...lookup.values()].map((p) => p.id)),
+  ]);
+  return rows.map((_, i) => {
+    const result = results[i]!;
+    const payee = lookup.get(normalizePayeeName(payeeNames[i]!));
+    const fromPayee = payee ? (payee.defaultCategoryId ?? learned.get(payee.id) ?? null) : null;
+    return {
+      result,
+      payeeName: payeeNames[i]!,
+      payeeId: payee?.id ?? null,
+      split: result.split,
+      categoryId: result.categoryId !== undefined ? result.categoryId : fromPayee,
+    };
+  });
 }
 
 export async function commitImport(
@@ -153,14 +189,8 @@ export async function commitImport(
         : [],
     );
 
-    const lookup = await payeeLookup(
-      tx,
-      ws.id,
-      input.rows.map((r) => r.payee),
-    );
-    const learned = await learnedCategories(tx, ws.id, [
-      ...new Set([...lookup.values()].map((p) => p.id)),
-    ]);
+    const ruled = await applyRulesToRows(tx, ws.id, account.id, input.rows);
+    const hits = new Map<string, number>();
 
     await tx.insert(importBatches).values({
       id: batchId,
@@ -175,25 +205,24 @@ export async function commitImport(
     let created = 0;
     let skipped = 0;
     const payeeIdCache = new Map<string, string | null>();
-    for (const row of input.rows) {
+    for (const [i, row] of input.rows.entries()) {
       if (row.skip || (row.externalId && takenRefs.has(row.externalId))) {
         skipped++;
         continue;
       }
       if (row.externalId) takenRefs.add(row.externalId);
-      const payeeKey = normalizePayeeName(row.payee);
+      const r = ruled[i]!;
+      const payeeKey = normalizePayeeName(r.payeeName);
       let payeeId = payeeIdCache.get(payeeKey);
       if (payeeId === undefined) {
-        payeeId = await findOrCreatePayee(tx, ws.id, row.payee);
+        payeeId = await findOrCreatePayee(tx, ws.id, r.payeeName);
         payeeIdCache.set(payeeKey, payeeId);
       }
-      const known = lookup.get(normalizePayeeName(row.payee));
+      // A category chosen in the review screen wins (null = deliberately none). Without one, a
+      // rule's split applies, else the rule's or payee's category.
+      const split = row.categoryId ? undefined : r.split;
       const categoryId =
-        row.categoryId !== undefined
-          ? row.categoryId
-          : known
-            ? (known.defaultCategoryId ?? learned.get(known.id) ?? null)
-            : null;
+        row.categoryId !== undefined ? row.categoryId : split ? null : r.categoryId;
       await insertTransaction(
         tx,
         ws.id,
@@ -204,16 +233,20 @@ export async function commitImport(
           date: row.date,
           amountMinor: row.amountMinor,
           categoryId,
-          notes: row.notes,
+          ...(split && { splits: split }),
+          notes: r.result.notes ?? row.notes,
+          tagIds: r.result.tagIds,
           rawDescription: row.description,
           externalId: row.externalId,
           importBatchId: batchId,
-          needsReview: true,
+          needsReview: !r.result.markReviewed,
         },
         payeeId,
       );
+      countHits(hits, r.result);
       created++;
     }
+    await recordHits(tx, hits);
     await tx
       .update(importBatches)
       .set({ createdCount: created, skippedCount: skipped })

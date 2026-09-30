@@ -7,5 +7,6 @@ export * from './import';
 export * from './money';
 export * from './periods';
 export * from './presets';
+export * from './rules';
 export * from './schemas';
 export * from './text';

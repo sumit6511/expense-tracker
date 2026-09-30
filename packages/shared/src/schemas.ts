@@ -604,6 +604,12 @@ export const ImportPreviewSchema = z.object({
       duplicateOfId: Id.nullable(),
       payeeId: Id.nullable(),
       suggestedCategoryId: Id.nullable(),
+      /** Rules that match this row, in the order they ran. */
+      ruleIds: z.array(Id),
+      /** A rule splits this row across categories (applied unless a category is chosen). */
+      splitByRule: z.boolean(),
+      /** The payee name a rule renames this row to. */
+      rulePayee: z.string().nullable(),
     }),
   ),
 });

@@ -3,6 +3,8 @@ import {
   isBsSupported,
   type ListTransactionsQuerySchema,
   normalizePayeeName,
+  type RuleBody,
+  RuleBodySchema,
   toBsIsoString,
   toDecimalString,
   uuidv7,
@@ -20,6 +22,7 @@ import {
   importProfiles,
   manualRates,
   payees,
+  rules,
   tags,
   transactionSplits,
   transactions,
@@ -28,6 +31,7 @@ import {
   workspaces,
 } from '../db/schema';
 import { badRequest } from '../lib/errors';
+import { listRules } from './rules';
 import { transactionFilters } from './transactions';
 import { toWorkspaceDto } from './workspaces';
 
@@ -249,6 +253,8 @@ export const BackupSchema = z.object({
     z.object({ base: z.string().length(3), quote: z.string().length(3), date, rate: z.string() }),
   ),
   importProfiles: z.array(z.object({ name: z.string(), mapping: z.unknown() })),
+  // Added after the first release, so older backups without them still restore.
+  rules: z.array(RuleBodySchema).default([]),
 });
 export type Backup = z.infer<typeof BackupSchema>;
 
@@ -266,6 +272,7 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
     budgetRows,
     rateRows,
     profileRows,
+    ruleRows,
   ] = await Promise.all([
     db.select().from(accounts).where(eq(accounts.workspaceId, w)).orderBy(asc(accounts.sortOrder)),
     db
@@ -298,6 +305,7 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
     db.select().from(budgets).where(eq(budgets.workspaceId, w)),
     db.select().from(manualRates).where(eq(manualRates.workspaceId, w)),
     db.select().from(importProfiles).where(eq(importProfiles.workspaceId, w)),
+    listRules(db, w),
   ]);
   const splitsByTx = Map.groupBy(splitRows, (s) => s.transactionId);
   const tagsByTx = Map.groupBy(txTagRows, (t) => t.transactionId);
@@ -387,7 +395,38 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
       rate: r.rate,
     })),
     importProfiles: profileRows.map((p) => ({ name: p.name, mapping: p.mapping })),
+    rules: ruleRows.map((r) => ({
+      name: r.name,
+      enabled: r.enabled,
+      match: r.match,
+      conditions: r.conditions,
+      actions: r.actions,
+      stopProcessing: r.stopProcessing,
+    })),
   };
+}
+
+/** Points a rule at the restored copies of its accounts, categories and tags. */
+function remapRule(rule: RuleBody, map: (old: string) => string | undefined): RuleBody | null {
+  const conditions = rule.conditions.flatMap((c): RuleBody['conditions'] => {
+    if (c.field !== 'account') return [c];
+    const value = map(c.value);
+    return value ? [{ ...c, value }] : [];
+  });
+  const cat = (old: string | null) => (old === null ? null : (map(old) ?? null));
+  const actions = rule.actions.map((a): RuleBody['actions'][number] => {
+    if (a.type === 'setCategory') return { ...a, categoryId: cat(a.categoryId) };
+    if (a.type === 'splitByPercent') {
+      return { ...a, lines: a.lines.map((l) => ({ ...l, categoryId: cat(l.categoryId) })) };
+    }
+    if (a.type === 'addTags') {
+      return { ...a, tagIds: a.tagIds.flatMap((t) => map(t) ?? []) };
+    }
+    return a;
+  });
+  const kept = actions.filter((a) => a.type !== 'addTags' || a.tagIds.length > 0);
+  if (conditions.length === 0 || kept.length === 0) return null;
+  return { ...rule, conditions, actions: kept };
 }
 
 /**
@@ -543,6 +582,12 @@ export async function restoreBackup(
         .values(
           part.map((p) => ({ id: uuidv7(), workspaceId, name: p.name, mapping: p.mapping ?? {} })),
         ),
+    );
+    const restoredRules = b.rules.flatMap((r) => remapRule(r, (old) => remap.get(old)) ?? []);
+    await chunk(restoredRules, (part) =>
+      tx
+        .insert(rules)
+        .values(part.map((r, i) => ({ id: uuidv7(), workspaceId, ...r, priority: i }))),
     );
     return created!;
   });
