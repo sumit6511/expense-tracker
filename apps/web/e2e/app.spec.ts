@@ -498,6 +498,38 @@ test.describe('everyday use', () => {
     await expect(page.getByText('Undone', { exact: true })).toBeVisible();
   });
 
+  test('move over from Splitwise: your share of each expense, categories kept', async ({
+    signedIn: page,
+  }) => {
+    await page.goto('/import');
+    await page.getByLabel('Import into account').selectOption({ label: 'Cash (NPR)' });
+    const csv = [
+      'Date,Description,Category,Cost,Currency,Asha Test,Bikash',
+      '2026-09-01,Dinner by the lake,Dining out,3000.00,NPR,1500.00,-1500.00',
+      '2026-09-02,Taxi,Transport,1200.00,NPR,-600.00,600.00',
+      '2026-09-03,Settle up,Payment,900.00,NPR,-900.00,900.00',
+      ',Total balance,,,NPR,0.00,0.00',
+    ].join('\n');
+    await page
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'splitwise.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+    await expect(page.getByText('Looks like a Splitwise export')).toBeVisible();
+    // The signed-in person (Asha Test) is picked out already.
+    await expect(page.getByLabel('Which one is you?')).toHaveValue('Asha Test');
+    await expect(page.getByText('2 transactions to check')).toBeVisible();
+    await expect(page.getByText(/1 left out \(Settling up/)).toBeVisible();
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(page.getByText('2 of 2 will be imported into Cash')).toBeVisible();
+    await page.getByRole('button', { name: 'Import 2 transactions' }).click();
+    await expect(page.getByRole('heading', { name: 'Imported 2 transactions' })).toBeVisible();
+
+    await page.goto('/transactions');
+    const dinner = page.getByRole('button', { name: /Dinner by the lake/ });
+    await expect(dinner).toContainText('-Rs. 1,500.00');
+    await expect(dinner).toContainText('Dining Out');
+    await expect(page.getByRole('button', { name: /Taxi/ })).toContainText('Transport');
+  });
+
   test('review imported transactions and turn a choice into a rule', async ({ signedIn: page }) => {
     await page.goto('/import');
     await page.getByLabel('Import into account').selectOption({ label: 'Nabil Bank (NPR)' });

@@ -1,17 +1,23 @@
 import {
+  APP_PRESET_NAMES,
+  type AppPreset,
   DATE_FORMAT_LABELS,
   DATE_FORMATS,
   type DateFormat,
+  detectAppExport,
   guessMapping,
   guessPayeeFromDescription,
   type ImportBatch,
   type ImportMapping,
   type ImportPreview,
+  matchCategory,
   type NormalizedRow,
+  normalizePayeeName,
   normalizeRows,
   type ParsedStatement,
   parseBankSms,
   parseStatementFile,
+  readAppExport,
   toIsoDate,
 } from '@et/shared';
 import { Link } from '@tanstack/react-router';
@@ -43,6 +49,7 @@ import {
   useAccountMap,
   useAccounts,
   useAiStatus,
+  useCategories,
   useCommitImport,
   useCreateImportProfile,
   useImportBatches,
@@ -51,10 +58,10 @@ import {
   useReadStatement,
   useRevertImport,
 } from '@/lib/queries';
-import { useCanWrite } from '@/lib/session';
+import { useCanWrite, useSession } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
-type Step = 'upload' | 'map' | 'review' | 'done';
+type Step = 'upload' | 'preset' | 'map' | 'review' | 'done';
 
 type Source = 'csv' | 'xlsx' | 'ofx' | 'qif' | 'camt' | 'sms' | 'pdf';
 
@@ -63,6 +70,8 @@ interface ParsedFile {
   source: Source;
   /** Table cells, for CSV and Excel (mapped to fields in the next step). */
   rows: string[][];
+  /** An export from another app (YNAB, Actual, Mint, Splitwise): read with its preset. */
+  preset?: AppPreset;
   /** Rows already read from a structured format (OFX, QIF, CAMT, SMS): no mapping needed. */
   structured?: Pick<ParsedStatement, 'rows' | 'errors' | 'currency' | 'balance'>;
 }
@@ -112,10 +121,12 @@ async function parseFile(file: File, digits: number): Promise<ParsedFile> {
   const Papa = (await import('papaparse')).default;
   const result = Papa.parse<string[]>(text.replace(/^﻿/, ''), { skipEmptyLines: 'greedy' });
   if (result.data.length === 0) throw new Error('The file looks empty.');
+  const rows = result.data.map((r) => r.map((c) => String(c ?? '')));
   return {
     name: file.name,
     source: 'csv',
-    rows: result.data.map((r) => r.map((c) => String(c ?? ''))),
+    rows,
+    preset: detectAppExport(rows[0] ?? []) ?? undefined,
   };
 }
 
@@ -181,6 +192,9 @@ export function ImportPage() {
   const [mode, setMode] = useState<'file' | 'sms'>('file');
   const [smsText, setSmsText] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const session = useSession();
+  const { data: categoryGroups = [] } = useCategories();
+  const [presetChoice, setPresetChoice] = useState({ account: '', you: '' });
   const readStatement = useReadStatement();
   const aiOn = useAiStatus().data?.enabled ?? false;
 
@@ -257,6 +271,18 @@ export function ImportPage() {
         await startReview(parsed.structured.rows);
         return;
       }
+      if (parsed.preset) {
+        const info = readAppExport(parsed.rows, parsed.preset, { digits });
+        const ours = normalizePayeeName(account?.name ?? '');
+        const me = normalizePayeeName(session.me.user.name);
+        setPresetChoice({
+          account:
+            info.accounts.find((a) => normalizePayeeName(a) === ours) ?? info.accounts[0] ?? '',
+          you: info.people.find((p) => normalizePayeeName(p) === me) ?? '',
+        });
+        setStep('preset');
+        return;
+      }
       const guess = guessMapping(parsed.rows);
       setMapping({ hasHeader: true, ...guess });
       setStep('map');
@@ -296,7 +322,25 @@ export function ImportPage() {
     await startReview(normalized.rows);
   }
 
-  async function startReview(source: NormalizedRow[]) {
+  /** Reads the other app's export with the choices made, then shows the review. */
+  async function continuePreset() {
+    if (!file?.preset) return;
+    const { rows } = readAppExport(file.rows, file.preset, {
+      digits,
+      account: presetChoice.account || null,
+      you: presetChoice.you || null,
+    });
+    if (rows.length === 0) {
+      toast.error('Nothing to import with these choices.');
+      return;
+    }
+    await startReview(
+      rows,
+      rows.map((r) => r.category),
+    );
+  }
+
+  async function startReview(source: NormalizedRow[], sourceCategories?: string[]) {
     if (!accountId) return;
     try {
       const rows = source.map((r) => ({
@@ -310,7 +354,18 @@ export function ImportPage() {
       const res = await preview.mutateAsync({ accountId, rows });
       setReview({ rows: source, preview: res });
       setInclude(res.rows.map((r) => r.duplicateOfId === null));
-      setCategories(res.rows.map((r) => r.suggestedCategoryId));
+      // Moving from another app: its categories, where ours have the same name, come first.
+      const ofKind = (amount: number) =>
+        categoryGroups
+          .filter((g) => g.kind === (amount < 0 ? 'expense' : 'income'))
+          .flatMap((g) => g.categories);
+      setCategories(
+        res.rows.map((r, i) => {
+          const name = sourceCategories?.[i];
+          const matched = name ? matchCategory(name, ofKind(source[i]!.amountMinor)) : null;
+          return matched?.id ?? r.suggestedCategoryId;
+        }),
+      );
       setStep('review');
     } catch (err) {
       toast.error(errorMessage(err));
@@ -324,7 +379,7 @@ export function ImportPage() {
         accountId,
         fileName: file.name,
         source: file.source,
-        ...(file.structured ? {} : { mapping: mapping as ImportMapping }),
+        ...(file.structured || file.preset ? {} : { mapping: mapping as ImportMapping }),
         rows: review.rows.map((r, i) => ({
           date: r.date,
           amountMinor: r.amountMinor,
@@ -357,7 +412,7 @@ export function ImportPage() {
     ['review', 'Review'],
     ['done', 'Done'],
   ];
-  const stepIndex = steps.findIndex(([s]) => s === step);
+  const stepIndex = steps.findIndex(([s]) => s === (step === 'preset' ? 'map' : step));
 
   return (
     <div className="pb-10">
@@ -485,6 +540,19 @@ export function ImportPage() {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {canWrite && step === 'preset' && file?.preset && (
+        <PresetStep
+          file={file}
+          preset={file.preset}
+          digits={digits}
+          choice={presetChoice}
+          onChoice={setPresetChoice}
+          onBack={reset}
+          onContinue={continuePreset}
+          busy={preview.isPending}
+        />
       )}
 
       {canWrite && step === 'map' && file && (
@@ -959,5 +1027,105 @@ function RecentImports() {
         ))}
       </Card>
     </section>
+  );
+}
+
+/** "This looks like a YNAB export": which account in it, or which Splitwise person is you. */
+function PresetStep({
+  file,
+  preset,
+  digits,
+  choice,
+  onChoice,
+  onBack,
+  onContinue,
+  busy,
+}: {
+  file: ParsedFile;
+  preset: AppPreset;
+  digits: number;
+  choice: { account: string; you: string };
+  onChoice: (choice: { account: string; you: string }) => void;
+  onBack: () => void;
+  onContinue: () => void;
+  busy: boolean;
+}) {
+  const info = useMemo(
+    () =>
+      readAppExport(file.rows, preset, {
+        digits,
+        account: choice.account || null,
+        you: choice.you || null,
+      }),
+    [file, preset, digits, choice],
+  );
+  const leftOut = info.errors.length;
+  const needsYou = preset === 'splitwise' && !choice.you;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Looks like a {APP_PRESET_NAMES[preset]} export</CardTitle>
+        <span className="text-xs text-muted-foreground">{file.name}</span>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 gap-4">
+        <p className="text-sm text-muted-foreground">
+          {preset === 'splitwise'
+            ? 'Your share of each expense becomes a transaction in this account. Settling-up payments are left out.'
+            : 'Columns are matched for you, and categories with the same name as yours are kept. Transfers between accounts and starting balances are left out.'}
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {info.accounts.length > 1 && (
+            <Field label="Account in the file" htmlFor="preset-account">
+              <NativeSelect
+                id="preset-account"
+                value={choice.account}
+                onChange={(e) => onChoice({ ...choice, account: e.target.value })}
+              >
+                {info.accounts.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+          )}
+          {preset === 'splitwise' && (
+            <Field label="Which one is you?" htmlFor="preset-you">
+              <NativeSelect
+                id="preset-you"
+                value={choice.you}
+                onChange={(e) => onChoice({ ...choice, you: e.target.value })}
+              >
+                <option value="">Choose…</option>
+                {info.people.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+          )}
+        </div>
+        {!needsYou && (
+          <p className="text-sm">
+            {info.rows.length} transaction{info.rows.length === 1 ? '' : 's'} to check
+            {leftOut > 0 && (
+              <span className="text-muted-foreground">
+                {' '}
+                · {leftOut} left out ({[...new Set(info.errors.map((e) => e.message))].join('; ')})
+              </span>
+            )}
+          </p>
+        )}
+        <div className="flex gap-2">
+          <Button onClick={onContinue} disabled={busy || needsYou || info.rows.length === 0}>
+            {busy && <Loader2 className="animate-spin" />} Continue
+          </Button>
+          <Button variant="ghost" onClick={onBack}>
+            Start over
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
