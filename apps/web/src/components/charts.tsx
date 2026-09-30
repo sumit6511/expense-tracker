@@ -39,13 +39,25 @@ export function niceTicks(max: number, count = 4): { ticks: number[]; top: numbe
   return { ticks, top };
 }
 
+/** Like niceTicks, for data that can go below zero. */
+export function niceRange(min: number, max: number, count = 4) {
+  const span = Math.max(max, 0) - Math.min(min, 0);
+  const { ticks } = niceTicks(span || 1, count);
+  const step = ticks[1] ?? 1;
+  const lo = Math.floor(Math.min(min, 0) / step) * step;
+  const hi = Math.ceil(Math.max(max, 0) / step) * step;
+  const out: number[] = [];
+  for (let v = lo; v <= hi + step / 2; v += step) out.push(Math.round(v * 1e6) / 1e6);
+  return { ticks: out, domain: [lo, hi] as [number, number] };
+}
+
 function useMajorUnits() {
   const f = useFormat();
   const unit = 10 ** f.digits();
   return {
     f,
     major: (minor: number | null) => (minor === null ? null : minor / unit),
-    tick: (value: number) => f.compact(Math.round(value * unit)).replace(/^Rs\. /, ''),
+    tick: (value: number) => f.compact(Math.round(value * unit)).replace(/^(-?)Rs\. /, '$1'),
   };
 }
 
@@ -433,6 +445,98 @@ export function MiniColumns({
         <span>{labels[0]}</span>
         <span>{labels.at(-1)}</span>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Net worth: assets up, debts down, net as a line
+// ---------------------------------------------------------------------------------------------
+
+export interface NetWorthPoint {
+  label: string;
+  shortLabel: string;
+  assets: number;
+  liabilities: number;
+  net: number;
+}
+
+export function NetWorthChart({ data, height = 280 }: { data: NetWorthPoint[]; height?: number }) {
+  const { f, major, tick } = useMajorUnits();
+  const values = data.flatMap((d) => [
+    major(d.assets) ?? 0,
+    major(d.liabilities) ?? 0,
+    major(d.net) ?? 0,
+  ]);
+  const range = niceRange(Math.min(0, ...values), Math.max(0, ...values));
+  return (
+    <div role="img" aria-label="Net worth at the end of each month">
+      <ResponsiveContainer width="100%" height={height}>
+        <ComposedChart
+          data={data}
+          barGap={2}
+          barCategoryGap="28%"
+          stackOffset="sign"
+          margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+        >
+          <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
+          <XAxis
+            dataKey="shortLabel"
+            tick={axisTick}
+            tickLine={false}
+            axisLine={{ stroke: 'var(--chart-axis)' }}
+          />
+          <YAxis
+            tick={axisTick}
+            tickLine={false}
+            axisLine={false}
+            width={56}
+            tickFormatter={tick}
+            ticks={range.ticks}
+            domain={range.domain}
+          />
+          <Tooltip
+            cursor={{ fill: 'var(--muted)', opacity: 0.6 }}
+            content={(props) => {
+              const p = props.payload?.[0]?.payload as NetWorthPoint | undefined;
+              if (!props.active || !p) return null;
+              return (
+                <TooltipCard
+                  title={p.label}
+                  rows={[
+                    { label: 'Assets', color: 'var(--series-1)', value: f.money(p.assets) },
+                    { label: 'Debts', color: 'var(--series-2)', value: f.money(p.liabilities) },
+                    { label: 'Net worth', color: 'var(--foreground)', value: f.money(p.net) },
+                  ]}
+                />
+              );
+            }}
+          />
+          <Bar
+            dataKey={(d: NetWorthPoint) => major(d.assets)}
+            stackId="balance"
+            fill="var(--series-1)"
+            radius={[4, 4, 0, 0]}
+            maxBarSize={24}
+            isAnimationActive={false}
+          />
+          <Bar
+            dataKey={(d: NetWorthPoint) => major(d.liabilities)}
+            stackId="balance"
+            fill="var(--series-2)"
+            radius={[0, 0, 4, 4]}
+            maxBarSize={24}
+            isAnimationActive={false}
+          />
+          <Line
+            dataKey={(d: NetWorthPoint) => major(d.net)}
+            stroke="var(--foreground)"
+            strokeWidth={2}
+            dot={{ r: 2.5, fill: 'var(--foreground)' }}
+            isAnimationActive={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
     </div>
   );
 }

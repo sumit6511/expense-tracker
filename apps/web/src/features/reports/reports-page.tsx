@@ -1,6 +1,17 @@
 import { formatMonthPeriod, getMonthPeriod, shiftMonthPeriod } from '@et/shared';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { ChartColumn, ChartPie, Target, TrendingUp, TriangleAlert } from 'lucide-react';
+import {
+  CalendarDays,
+  ChartColumn,
+  ChartPie,
+  GitCompareArrows,
+  Hash,
+  Landmark,
+  Target,
+  TrendingUp,
+  TriangleAlert,
+  Users,
+} from 'lucide-react';
 import { useMemo } from 'react';
 import { BudgetVsActualChart, CashFlowChart, ChartLegend, MiniColumns } from '@/components/charts';
 import { DateRangePicker } from '@/components/date-range';
@@ -21,8 +32,18 @@ import {
 } from '@/lib/queries';
 import { useWorkspace } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { CalendarReport, CompareReport, GroupReport, NetWorthReport } from './more-reports';
 
-type Tab = 'spending' | 'cashflow' | 'trends' | 'budget';
+type Tab =
+  | 'spending'
+  | 'cashflow'
+  | 'trends'
+  | 'budget'
+  | 'networth'
+  | 'payees'
+  | 'tags'
+  | 'compare'
+  | 'calendar';
 
 export function ReportsPage() {
   const search = useSearch({ from: '/app/reports' });
@@ -75,7 +96,16 @@ export function ReportsPage() {
         value={tab}
         onValueChange={(v) => navigate({ search: (s) => ({ ...s, tab: v as Tab }), replace: true })}
       >
-        <TabsList className="mb-4 max-w-full">
+        <TabsList
+          className="mb-4 flex max-w-full justify-start overflow-x-auto"
+          // Keep the chosen tab in view when the row scrolls (phones).
+          ref={(el) => {
+            el?.querySelector('[data-state="active"]')?.scrollIntoView({
+              block: 'nearest',
+              inline: 'nearest',
+            });
+          }}
+        >
           <TabsTrigger value="spending">
             <ChartPie /> Spending
           </TabsTrigger>
@@ -87,6 +117,21 @@ export function ReportsPage() {
           </TabsTrigger>
           <TabsTrigger value="budget">
             <Target /> Budget
+          </TabsTrigger>
+          <TabsTrigger value="networth">
+            <Landmark /> Net worth
+          </TabsTrigger>
+          <TabsTrigger value="payees">
+            <Users /> Payees
+          </TabsTrigger>
+          <TabsTrigger value="tags">
+            <Hash /> Tags
+          </TabsTrigger>
+          <TabsTrigger value="compare">
+            <GitCompareArrows /> Compare
+          </TabsTrigger>
+          <TabsTrigger value="calendar">
+            <CalendarDays /> Calendar
           </TabsTrigger>
         </TabsList>
         <TabsContent value="spending">
@@ -100,6 +145,21 @@ export function ReportsPage() {
         </TabsContent>
         <TabsContent value="budget">
           <BudgetReport to={range.to} />
+        </TabsContent>
+        <TabsContent value="networth">
+          <NetWorthReport range={range} />
+        </TabsContent>
+        <TabsContent value="payees">
+          <GroupReport range={range} by="payee" />
+        </TabsContent>
+        <TabsContent value="tags">
+          <GroupReport range={range} by="tag" />
+        </TabsContent>
+        <TabsContent value="compare">
+          <CompareReport range={range} />
+        </TabsContent>
+        <TabsContent value="calendar">
+          <CalendarReport range={range} />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,11 +1,21 @@
 import { type Category, type CategoryGroup, COLOR_SWATCHES } from '@et/shared';
-import { Archive, ArchiveRestore, Ellipsis, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import {
+  Archive,
+  ArchiveRestore,
+  Ellipsis,
+  Eye,
+  EyeOff,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { toast } from 'sonner';
 import { CategoryIcon, ICON_NAMES, iconFor } from '@/components/icons';
 import { CategoryPicker } from '@/components/pickers';
 import { Button } from '@/components/ui/button';
-import { Card, Skeleton } from '@/components/ui/card';
+import { Badge, Card, Skeleton } from '@/components/ui/card';
 import {
   Dialog,
   DialogBody,
@@ -167,6 +177,11 @@ export function CategoriesSettings() {
                           {c.archived && (
                             <span className="ml-1 text-muted-foreground">(archived)</span>
                           )}
+                          {c.excludeFromReports && (
+                            <Badge className="ml-1.5" title="Left out of reports">
+                              <EyeOff className="size-3" /> Not in reports
+                            </Badge>
+                          )}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {c.transactionCount} uses
@@ -200,6 +215,24 @@ export function CategoriesSettings() {
                               >
                                 {c.archived ? <ArchiveRestore /> : <Archive />}{' '}
                                 {c.archived ? 'Unarchive' : 'Archive'}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() =>
+                                  run(
+                                    updateCategory.mutateAsync({
+                                      id: c.id,
+                                      excludeFromReports: !c.excludeFromReports,
+                                    }),
+                                    c.excludeFromReports
+                                      ? `${c.name} counts in reports again`
+                                      : `${c.name} is left out of reports`,
+                                  )
+                                }
+                              >
+                                {c.excludeFromReports ? <Eye /> : <EyeOff />}{' '}
+                                {c.excludeFromReports
+                                  ? 'Include in reports'
+                                  : 'Leave out of reports'}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem

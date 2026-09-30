@@ -53,6 +53,7 @@ export async function listCategoryGroups(db: Db, workspaceId: string): Promise<C
         color: c.color,
         sortOrder: c.sortOrder,
         archived: c.archivedAt !== null,
+        excludeFromReports: c.excludeFromReports,
         transactionCount: Number(count),
       })),
   }));

@@ -32,7 +32,7 @@ const Name = (max = 80) => z.string().trim().min(1, { error: 'Required' }).max(m
 const OptionalText = (max: number) => z.string().trim().max(max);
 
 /** Comma-separated ids in a query string ("a,b,c") → string[]. */
-const IdList = z
+export const IdList = z
   .string()
   .transform((s) => s.split(',').filter(Boolean))
   .pipe(z.array(z.union([Id, z.literal('none')])).max(200));
@@ -212,6 +212,8 @@ export const UpdateCategorySchema = z.object({
   color: Color.optional(),
   sortOrder: z.number().int().min(0).max(10_000).optional(),
   archived: z.boolean().optional(),
+  /** Leave this category out of reports and dashboard totals (e.g. reimbursable work costs). */
+  excludeFromReports: z.boolean().optional(),
 });
 export type UpdateCategoryInput = z.input<typeof UpdateCategorySchema>;
 
@@ -223,6 +225,7 @@ export const CategorySchema = z.object({
   color: z.string(),
   sortOrder: z.number(),
   archived: z.boolean(),
+  excludeFromReports: z.boolean(),
   transactionCount: z.number(),
 });
 export type Category = z.infer<typeof CategorySchema>;

@@ -1,0 +1,1 @@
+ALTER TABLE "categories" ADD COLUMN "exclude_from_reports" boolean DEFAULT false NOT NULL;

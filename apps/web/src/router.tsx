@@ -103,7 +103,19 @@ const budgetsRoute = createRoute({
 });
 
 export const reportsSearch = z.object({
-  tab: z.enum(['spending', 'cashflow', 'trends', 'budget']).optional(),
+  tab: z
+    .enum([
+      'spending',
+      'cashflow',
+      'trends',
+      'budget',
+      'networth',
+      'payees',
+      'tags',
+      'compare',
+      'calendar',
+    ])
+    .optional(),
   preset: z.string().optional(),
   from: z.string().optional(),
   to: z.string().optional(),

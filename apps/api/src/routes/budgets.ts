@@ -3,15 +3,20 @@ import {
   BudgetVsActualSchema,
   CashFlowSchema,
   CategoryTrendsSchema,
+  CompareQuerySchema,
+  ComparisonSchema,
   CopyBudgetsSchema,
+  DailySpendingSchema,
   DashboardSchema,
   FillAverageBudgetsSchema,
   IsoDateSchema,
+  NetWorthSeriesSchema,
   ReportQuerySchema,
   SetBudgetCapSchema,
   SetBudgetsSchema,
   SetRolloverSchema,
   SpendingByCategorySchema,
+  SpendingByGroupSchema,
   todayIn,
 } from '@et/shared';
 import { createRoute } from '@hono/zod-openapi';
@@ -36,8 +41,12 @@ import {
   budgetVsActual,
   cashFlow,
   categoryTrends,
+  compare,
+  dailySpending,
   dashboard,
+  netWorthSeries,
   spendingByCategory,
+  spendingByGroup,
 } from '../services/reports';
 
 /** Budgets and reports. */
@@ -231,4 +240,63 @@ budgetsRouter.openapi(
     await setBudgetCap(c.get('deps').db, c.get('workspace'), periodStart, amountMinor);
     return c.body(null, 204);
   },
+);
+
+for (const groupBy of ['payee', 'tag'] as const) {
+  budgetsRouter.openapi(
+    createRoute({
+      method: 'get',
+      path: `/workspaces/{wid}/reports/spending-by-${groupBy}`,
+      tags: ['Reports'],
+      summary: `Spending and income per ${groupBy} over a date range`,
+      request: { params: WidParams, query: ReportQuerySchema },
+      responses: { 200: jsonContent(SpendingByGroupSchema), ...errorResponses },
+    }),
+    async (c) =>
+      c.json(
+        await spendingByGroup(c.get('deps').db, c.get('workspace'), c.req.valid('query'), groupBy),
+        200,
+      ),
+  );
+}
+
+budgetsRouter.openapi(
+  createRoute({
+    method: 'get',
+    path: '/workspaces/{wid}/reports/net-worth',
+    tags: ['Reports'],
+    summary: 'Assets, liabilities and net worth at the end of each budget month',
+    request: { params: WidParams, query: ReportQuerySchema.pick({ from: true, to: true }) },
+    responses: { 200: jsonContent(NetWorthSeriesSchema), ...errorResponses },
+  }),
+  async (c) => {
+    const { from, to } = c.req.valid('query');
+    return c.json(await netWorthSeries(c.get('deps').db, c.get('workspace'), from, to), 200);
+  },
+);
+
+budgetsRouter.openapi(
+  createRoute({
+    method: 'get',
+    path: '/workspaces/{wid}/reports/compare',
+    tags: ['Reports'],
+    summary: 'Compare spending in two periods, per category',
+    request: { params: WidParams, query: CompareQuerySchema },
+    responses: { 200: jsonContent(ComparisonSchema), ...errorResponses },
+  }),
+  async (c) =>
+    c.json(await compare(c.get('deps').db, c.get('workspace'), c.req.valid('query')), 200),
+);
+
+budgetsRouter.openapi(
+  createRoute({
+    method: 'get',
+    path: '/workspaces/{wid}/reports/daily',
+    tags: ['Reports'],
+    summary: 'Spending and income per day (for a calendar heatmap), up to about a year',
+    request: { params: WidParams, query: ReportQuerySchema },
+    responses: { 200: jsonContent(DailySpendingSchema), ...errorResponses },
+  }),
+  async (c) =>
+    c.json(await dailySpending(c.get('deps').db, c.get('workspace'), c.req.valid('query')), 200),
 );

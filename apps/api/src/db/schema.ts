@@ -213,6 +213,8 @@ export const categories = pgTable(
     budgetRollover: rolloverEnum().notNull().default('none'),
     /** First budget month whose leftover carries over. */
     rolloverSince: date({ mode: 'string' }),
+    /** Left out of reports and dashboard totals (budgets still track it). */
+    excludeFromReports: boolean().notNull().default(false),
     ...timestamps,
   },
   (t) => [index().on(t.workspaceId), index().on(t.groupId)],

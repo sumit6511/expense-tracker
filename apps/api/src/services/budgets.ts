@@ -44,7 +44,13 @@ async function expenseCategoryIds(db: Executor, workspaceId: string) {
 async function spendingByPeriod(db: Executor, ws: WorkspaceCtx, periods: MonthPeriod[]) {
   const from = periods.reduce((min, p) => (p.start < min ? p.start : min), periods[0]!.start);
   const to = periods.reduce((max, p) => (p.end > max ? p.end : max), periods[0]!.end);
-  const { flows } = await loadFlows(db, ws, { from, to, onBudgetOnly: true });
+  // Budgets track every category, including ones left out of reports.
+  const { flows } = await loadFlows(db, ws, {
+    from,
+    to,
+    onBudgetOnly: true,
+    includeExcluded: true,
+  });
   return periods.map((p) => {
     const totals = new Map<string | null, number>();
     for (const f of flows) {

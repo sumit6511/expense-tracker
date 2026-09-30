@@ -9,11 +9,13 @@ import type {
   CategoryGroup,
   CategoryTrends,
   CommitImportInput,
+  Comparison,
   CreateAccountInput,
   CreateCategoryInput,
   CreateTransactionInput,
   CreateTransferInput,
   CreateWorkspaceInput,
+  DailySpending,
   Dashboard,
   ExchangeRate,
   FinishReconcileInput,
@@ -26,6 +28,7 @@ import type {
   ImportRow,
   ListTransactionsQuery,
   Me,
+  NetWorthSeries,
   Payee,
   ReconcileState,
   Reconciliation,
@@ -39,6 +42,7 @@ import type {
   SetBudgetCapInput,
   SetRolloverInput,
   SpendingByCategory,
+  SpendingByGroup,
   Tag,
   Transaction,
   TransactionChange,
@@ -396,6 +400,24 @@ function useReport<T>(name: string, range: ReportRange) {
 export const useSpendingByCategory = (range: ReportRange) =>
   useReport<SpendingByCategory>('spending-by-category', range);
 export const useCashFlow = (range: ReportRange) => useReport<CashFlow>('cash-flow', range);
+export const useSpendingByPayee = (range: ReportRange) =>
+  useReport<SpendingByGroup>('spending-by-payee', range);
+export const useSpendingByTag = (range: ReportRange) =>
+  useReport<SpendingByGroup>('spending-by-tag', range);
+export const useNetWorthSeries = (range: ReportRange) =>
+  useReport<NetWorthSeries>('net-worth', { from: range.from, to: range.to });
+export const useDailySpending = (range: ReportRange) => useReport<DailySpending>('daily', range);
+export function useComparison(range: ReportRange, compareFrom: string, compareTo: string) {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'report', 'compare', range, compareFrom, compareTo],
+    queryFn: () =>
+      api<Comparison>(`${base}/reports/compare`, {
+        query: { ...range, compareFrom, compareTo },
+      }),
+    placeholderData: keepPreviousData,
+  });
+}
 export const useCategoryTrends = (range: ReportRange) =>
   useReport<CategoryTrends>('category-trends', range);
 

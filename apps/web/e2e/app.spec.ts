@@ -278,6 +278,12 @@ test.describe('everyday use', () => {
   test('reports and settings pages load', async ({ signedIn: page }) => {
     await page.goto('/reports?tab=cashflow');
     await expect(page.getByText('Income and spending per month')).toBeVisible();
+    await page.getByRole('tab', { name: 'Net worth' }).click();
+    await expect(page.getByText('Net worth at the end of each month')).toBeVisible();
+    await page.getByRole('tab', { name: 'Calendar' }).click();
+    await expect(page.getByText('Spending by day')).toBeVisible();
+    await page.getByRole('tab', { name: 'Compare' }).click();
+    await expect(page.getByText('Spending now')).toBeVisible();
     await page.goto('/settings');
     await expect(page.getByLabel('Main currency')).toHaveValue('NPR');
     await page.getByRole('tab', { name: 'Categories' }).click();

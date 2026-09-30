@@ -3,17 +3,23 @@ import {
   type BudgetVsActual,
   type CashFlow,
   type CategoryTrends,
+  type Comparison,
+  type DailySpending,
   type Dashboard,
   daysLeftInPeriod,
   formatMonthPeriod,
   getMonthPeriod,
   type IsoDate,
+  LIABILITY_ACCOUNT_TYPES,
   listMonthPeriods,
   type MonthPeriod,
+  minDate,
+  type NetWorthSeries,
   type PeriodDto,
   type PeriodSettings,
   rangeLength,
   type SpendingByCategory,
+  type SpendingByGroup,
   shiftMonthPeriod,
   todayIn,
 } from '@et/shared';
@@ -27,6 +33,7 @@ import {
   categoryGroups,
   transactionSplits,
   transactions,
+  transactionTags,
 } from '../db/schema';
 import { badRequest } from '../lib/errors';
 import { budgetOverview } from './budgets';
@@ -40,10 +47,12 @@ export function toPeriodDto(p: MonthPeriod): PeriodDto {
   return { ...p, label: formatMonthPeriod(p) };
 }
 
-/** Money movement on one day for one category, in the base currency. */
+/** Money movement on one day for one category (or payee, or tag), in the base currency. */
 export interface Flow {
   date: IsoDate;
   categoryId: string | null;
+  /** The payee or tag id when grouping by those; otherwise the category id. */
+  key: string | null;
   /** Spending (positive = money spent; refunds make it smaller, possibly negative). */
   expense: number;
   /** Income (positive = money received). */
@@ -57,6 +66,10 @@ export interface FlowOptions {
   accountIds?: string[] | undefined;
   /** Only accounts marked "include in budget". */
   onBudgetOnly?: boolean;
+  /** Also count categories marked "exclude from reports" (budgets do). */
+  includeExcluded?: boolean;
+  /** What `Flow.key` holds. A transaction with two tags counts under both. */
+  groupBy?: 'category' | 'payee' | 'tag';
 }
 
 /**
@@ -80,12 +93,21 @@ export async function loadFlows(
   const ids = options.accountIds?.filter((id) => id !== 'none');
   if (ids?.length) where.push(inArray(transactions.accountId, ids));
   if (options.onBudgetOnly) where.push(eq(accounts.onBudget, true));
+  if (!options.includeExcluded)
+    where.push(sql`coalesce(${categories.excludeFromReports}, false) = false`);
 
-  const rows = await db
+  const key =
+    options.groupBy === 'payee'
+      ? transactions.payeeId
+      : options.groupBy === 'tag'
+        ? transactionTags.tagId
+        : transactionSplits.categoryId;
+  let query = db
     .select({
       date: transactions.date,
       currency: accounts.currency,
       categoryId: transactionSplits.categoryId,
+      key,
       kind: categoryGroups.kind,
       amount: sql<number>`sum(${transactionSplits.amountMinor})::bigint`,
       negative: sql<number>`coalesce(sum(${transactionSplits.amountMinor}) filter (where ${transactionSplits.amountMinor} < 0), 0)::bigint`,
@@ -96,12 +118,17 @@ export async function loadFlows(
     .innerJoin(accounts, eq(accounts.id, transactions.accountId))
     .leftJoin(categories, eq(categories.id, transactionSplits.categoryId))
     .leftJoin(categoryGroups, eq(categoryGroups.id, categories.groupId))
+    .$dynamic();
+  if (options.groupBy === 'tag')
+    query = query.innerJoin(transactionTags, eq(transactionTags.transactionId, transactions.id));
+  const rows = await query
     .where(and(...where))
     .groupBy(
       transactions.date,
       accounts.currency,
       transactionSplits.categoryId,
       categoryGroups.kind,
+      ...(options.groupBy && options.groupBy !== 'category' ? [key] : []),
     );
 
   const rates = await loadRateBook(
@@ -127,7 +154,14 @@ export async function loadFlows(
       expense = -out;
       income = amount - out;
     }
-    flows.push({ date: r.date, categoryId: r.categoryId, expense, income, count: Number(r.count) });
+    flows.push({
+      date: r.date,
+      categoryId: r.categoryId,
+      key: r.key,
+      expense,
+      income,
+      count: Number(r.count),
+    });
   }
   return { flows, missingRates: [...rates.missing] };
 }
@@ -296,10 +330,12 @@ export async function dashboard(
   const previous = shiftMonthPeriod(period, -1, settings);
 
   const { flows, missingRates } = await loadFlows(db, ws, { from: previous.start, to: period.end });
+  // Budget progress counts every category, like the budget page does.
   const { flows: budgetFlows } = await loadFlows(db, ws, {
     from: period.start,
     to: period.end,
     onBudgetOnly: true,
+    includeExcluded: true,
   });
 
   const inPeriod = flows.filter((f) => f.date >= period.start && f.date <= period.end);
@@ -430,4 +466,184 @@ export async function netWorth(db: Executor, ws: WorkspaceCtx, date: IsoDate): P
       total + (rates.convert(Number(r.balance), r.currency, ws.baseCurrency, date) ?? 0),
     0,
   );
+}
+
+// ---------------------------------------------------------------------------------------------
+// More reports
+// ---------------------------------------------------------------------------------------------
+
+/** Spending and income per payee or per tag. */
+export async function spendingByGroup(
+  db: Db,
+  ws: WorkspaceCtx,
+  options: FlowOptions,
+  groupBy: 'payee' | 'tag',
+): Promise<SpendingByGroup> {
+  const { flows, missingRates } = await loadFlows(db, ws, { ...options, groupBy });
+  const key = (f: Flow) => f.key ?? NULL_KEY;
+  const counts = sumBy(flows, key, (f) => f.count);
+  const toList = (totals: Map<string, number>) =>
+    [...totals]
+      .filter(([, amount]) => amount !== 0)
+      .map(([k, amount]) => ({
+        id: k === NULL_KEY ? null : k,
+        amountMinor: amount,
+        count: counts.get(k) ?? 0,
+      }))
+      .sort((a, b) => b.amountMinor - a.amountMinor);
+  const expense = toList(sumBy(flows, key, (f) => f.expense));
+  const income = toList(sumBy(flows, key, (f) => f.income));
+  return {
+    currency: ws.baseCurrency,
+    expense,
+    income,
+    totalExpenseMinor: expense.reduce((s, e) => s + e.amountMinor, 0),
+    totalIncomeMinor: income.reduce((s, e) => s + e.amountMinor, 0),
+    missingRates,
+  };
+}
+
+/** Assets, liabilities and net worth at the end of each budget month in the range. */
+export async function netWorthSeries(
+  db: Db,
+  ws: WorkspaceCtx,
+  from: IsoDate,
+  to: IsoDate,
+): Promise<NetWorthSeries> {
+  const today = todayIn(ws.timezone);
+  const periods = listMonthPeriods(from, minDate(to, today), periodSettings(ws));
+  if (periods.length === 0) throw badRequest('Choose a range that isn’t in the future');
+  if (periods.length > 120) throw badRequest('Choose a range of at most 10 years');
+  const dates = periods.map((p) => minDate(p.end, today));
+  const last = dates.at(-1)!;
+
+  const accountRows = await db
+    .select({
+      id: accounts.id,
+      type: accounts.type,
+      currency: accounts.currency,
+      opening: accounts.openingBalanceMinor,
+      openingDate: accounts.openingDate,
+    })
+    .from(accounts)
+    .where(and(eq(accounts.workspaceId, ws.id), eq(accounts.inNetWorth, true)));
+  // Everything before the first point collapses into one opening sum per account.
+  const sums = await db.execute<{ account_id: string; date: string; amount: number }>(sql`
+    select t.account_id, greatest(t.date, ${dates[0]}::date)::text as date,
+      sum(t.amount_minor)::bigint as amount
+    from transactions t
+    join accounts a on a.id = t.account_id
+    where t.workspace_id = ${ws.id} and t.deleted_at is null and a.in_net_worth
+      and t.date <= ${last}
+    group by 1, 2
+  `);
+  const byAccount = Map.groupBy(sums.rows, (r) => r.account_id);
+  const rates = await loadRateBook(
+    db,
+    ws.id,
+    accountRows.map((a) => a.currency),
+    ws.baseCurrency,
+    dates[0]!,
+    last,
+  );
+  const points = periods.map((p, i) => {
+    const date = dates[i]!;
+    let assets = 0;
+    let liabilities = 0;
+    for (const a of accountRows) {
+      if (a.openingDate > date) continue;
+      const moved = (byAccount.get(a.id) ?? [])
+        .filter((r) => r.date <= date)
+        .reduce((s, r) => s + Number(r.amount), 0);
+      const balance = rates.convert(a.opening + moved, a.currency, ws.baseCurrency, date) ?? 0;
+      if (LIABILITY_ACCOUNT_TYPES.includes(a.type)) liabilities += balance;
+      else assets += balance;
+    }
+    return {
+      ...toPeriodDto(p),
+      date,
+      assetsMinor: assets,
+      liabilitiesMinor: liabilities,
+      netMinor: assets + liabilities,
+    };
+  });
+  return { currency: ws.baseCurrency, points, missingRates: [...rates.missing] };
+}
+
+/** Two periods side by side, per category. */
+export async function compare(
+  db: Db,
+  ws: WorkspaceCtx,
+  q: {
+    from: IsoDate;
+    to: IsoDate;
+    compareFrom: IsoDate;
+    compareTo: IsoDate;
+    accountIds?: string[];
+  },
+): Promise<Comparison> {
+  const [a, b] = await Promise.all([
+    loadFlows(db, ws, { from: q.from, to: q.to, accountIds: q.accountIds }),
+    loadFlows(db, ws, { from: q.compareFrom, to: q.compareTo, accountIds: q.accountIds }),
+  ]);
+  const key = (f: Flow) => f.categoryId ?? NULL_KEY;
+  const current = sumBy(a.flows, key, (f) => f.expense);
+  const previous = sumBy(b.flows, key, (f) => f.expense);
+  const keys = new Set([...current.keys(), ...previous.keys()]);
+  const categoriesOut = [...keys]
+    .map((k) => ({
+      categoryId: k === NULL_KEY ? null : k,
+      currentMinor: current.get(k) ?? 0,
+      previousMinor: previous.get(k) ?? 0,
+    }))
+    .filter((c) => c.currentMinor !== 0 || c.previousMinor !== 0)
+    .sort(
+      (x, y) =>
+        Math.abs(y.currentMinor - y.previousMinor) - Math.abs(x.currentMinor - x.previousMinor),
+    );
+  const total = (flows: Flow[], pick: (f: Flow) => number) =>
+    flows.reduce((s, f) => s + pick(f), 0);
+  return {
+    currency: ws.baseCurrency,
+    current: {
+      from: q.from,
+      to: q.to,
+      expenseMinor: total(a.flows, (f) => f.expense),
+      incomeMinor: total(a.flows, (f) => f.income),
+    },
+    previous: {
+      from: q.compareFrom,
+      to: q.compareTo,
+      expenseMinor: total(b.flows, (f) => f.expense),
+      incomeMinor: total(b.flows, (f) => f.income),
+    },
+    categories: categoriesOut,
+    missingRates: [...new Set([...a.missingRates, ...b.missingRates])],
+  };
+}
+
+/** Totals per day, for the spending calendar. */
+export async function dailySpending(
+  db: Db,
+  ws: WorkspaceCtx,
+  options: FlowOptions,
+): Promise<DailySpending> {
+  if (rangeLength({ start: options.from, end: options.to }) > 400)
+    throw badRequest('Choose a range of at most about a year');
+  const { flows, missingRates } = await loadFlows(db, ws, options);
+  const days = new Map<string, { expenseMinor: number; incomeMinor: number; count: number }>();
+  for (const f of flows) {
+    const d = days.get(f.date) ?? { expenseMinor: 0, incomeMinor: 0, count: 0 };
+    d.expenseMinor += f.expense;
+    d.incomeMinor += f.income;
+    d.count += f.count;
+    days.set(f.date, d);
+  }
+  return {
+    currency: ws.baseCurrency,
+    days: [...days]
+      .map(([date, d]) => ({ date, ...d }))
+      .sort((x, y) => x.date.localeCompare(y.date)),
+    missingRates,
+  };
 }
