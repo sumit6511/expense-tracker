@@ -1,6 +1,6 @@
 # Expense Tracker: Research & Product/Technical Plan
 
-> Status: **Draft for review.** No code will be written until this plan is approved.
+> Status: **Approved on 30 Sep 2026** with the decisions in [§0.1](#01-decisions-approved-30-sep-2026). Implementation of Phase 0 and Phase 1 is in progress.
 > Research date: September 2026.
 
 ---
@@ -11,7 +11,30 @@
 - **The main lesson from the research:** people stop using expense trackers because of **friction** (too much manual entry and categorizing), **complexity** (a methodology to learn before logging anything), **cost and upsells**, **privacy anxiety** (handing over bank credentials), and **shame-driven UI** (the app only ever tells you that you failed). Every decision below is aimed at one of these.
 - **Recommended stack:** TypeScript end-to-end. React + Vite PWA frontend, Hono API on Node.js, PostgreSQL with Drizzle ORM, Better Auth, pg-boss for background jobs. A pnpm monorepo that runs with one `docker compose up`.
 - **Delivery:** in phases. **Phase 1 (MVP)** is a complete, usable tracker on its own. Later phases add automation, collaboration and AI.
-- **Decisions I need from you:** see [§14 Open questions](#14-open-questions-for-you). The main ones are target region, single-user vs household, and budgeting style.
+- **Decisions:** answered. See §0.1 below.
+
+### 0.1 Decisions (approved 30 Sep 2026)
+
+| Question | Decision |
+|---|---|
+| Region / currency | **Nepal. Base currency NPR**, with USD, INR and any other ISO currency available per account; the base currency can be changed in settings |
+| Audience | Personal first; household sharing in Phase 3 (the data model is workspace-based from day one) |
+| Platform | Responsive web app, installable as a PWA; native wrapper later |
+| Hosting | Self-hostable with Docker; deployable to any cloud |
+| Budget style | Simple monthly category budgets; zero-based mode opt-in later |
+| AI | Opt-in, Phase 3 |
+| MVP scope | Phase 0 + Phase 1 as listed in §12 |
+| Branding | Neutral placeholder theme; app name configurable |
+| Stack | As recommended in §5.3 |
+
+**Nepal localization.** These change the design and are part of the MVP. Details in [§4.6](#46-nepal-localization).
+- **Bikram Sambat (BS) calendar:** dates are shown in BS or AD (user setting, BS by default), with a BS date picker. **Budget months follow BS months** when BS is selected, since salaries are commonly paid per BS month. Dates are still stored as AD, and BS is computed from them.
+- **Nepal fiscal year** (1 Shrawan to the end of Ashadh) as a report period.
+- **Lakh/crore number grouping** (Rs. 1,23,45,678.90) by default, with international grouping as an option.
+- **Exchange rates from Nepal Rastra Bank (NRB)**, which publishes daily NPR rates (ECB/Frankfurter does not cover NPR). INR is pegged at 1 INR = 1.60 NPR. Rates can be entered manually as a fallback, and overridden per transaction.
+- **Local presets:** e-wallet accounts (eSewa, Khalti, IME Pay); categories such as festivals (Dashain/Tihar), remittance income, mobile top-up and data, electricity (NEA), and LPG gas.
+- **Import:** Nepali banks and wallets mostly export **Excel**, so **XLSX import is in the MVP** alongside CSV.
+- **No open-banking API exists in Nepal.** Automatic capture will come from statement import, **pasting bank SMS alerts** into the app (P2; works on the web), and Android SMS reading (P4, native only).
 
 ---
 
@@ -144,6 +167,8 @@ Legend: **P1** = MVP (usable end to end), **P2** = automation and depth, **P3** 
 | **Undo an import** (revert a whole batch) | P1 | |
 | CSV export (filtered view or everything) | P1 | |
 | Full JSON backup and restore (entire workspace) | P1 | Guards against lock-in |
+| **XLSX (Excel) import** through the same wizard | P1 | Most Nepali banks and wallets export Excel. Files are parsed in the browser and only the mapped rows are sent |
+| **Paste a bank SMS alert** → parsed transaction | P2 | Templates for common Nepali bank and wallet alert formats; works on the web |
 | OFX / QFX / QIF / CAMT.053 import | P2 | Standard bank statement formats |
 | Import from other apps (YNAB, Actual, Mint CSV, Splitwise) | P3 | Presets on top of the CSV importer |
 | PDF bank-statement import (AI-assisted extraction) | P3 | Useful where banks only give PDFs |
@@ -194,6 +219,7 @@ Bank sync is the feature people most want and the most expensive and regulated o
 | US | **SimpleFIN Bridge** (~$15/yr, read-only, popular with self-hosted tools), **Plaid** (free sandbox; limited free production; paid after that), Teller |
 | EU / UK | **Enable Banking** (free "restricted production" for your own accounts). *GoCardless Bank Account Data (formerly Nordigen) stopped accepting new sign-ups in July 2025.* |
 | India | The Account Aggregator framework needs a regulated FIU licence (not practical for a personal app). The practical routes are **SMS parsing (Android native only)**, **statement import (CSV/PDF)**, and **forwarding bank alert emails** |
+| **Nepal (our target)** | No open-banking or aggregator API for individuals. The routes are **statement import (XLSX/CSV, P1)**, **pasting SMS alerts (P2)**, forwarding alert emails (P4), and **Android SMS reading (P4, native)** |
 | Everywhere | Statement import (P1/P2) plus a unique email-in address for receipts and alerts (P4) |
 
 We **never** store bank passwords. Provider access tokens are encrypted at rest (see §9).
@@ -230,16 +256,44 @@ We **never** store bank passwords. Provider access tokens are encrypted at rest 
 ### 4.3 Multi-currency
 - Each **account** has one currency. Each **workspace** has a **base currency** used for reports.
 - A transaction made in a foreign currency stores both the original amount and currency and the amount in the account's currency (with the rate used). Example: a €20 charge on a USD card is stored as −$21.60, with €20.00 as the original.
-- Reports convert to the base currency using the **historical rate on the transaction date**. Rates come from a daily job (ECB reference rates via a free API such as Frankfurter), are cached in an `exchange_rates` table, and can be overridden manually.
+- Reports convert to the base currency using the **historical rate on the transaction date**. Rates come from a daily job (**Nepal Rastra Bank** for NPR; see §4.6), are cached in an `exchange_rates` table, and can be overridden manually.
 
 ### 4.4 Dates & time
 - A transaction's `date` is a **calendar date** (`DATE`, no time zone). That is how people think about "when I bought it", and it avoids off-by-one-day bugs around midnight.
 - System timestamps (`created_at` and so on) are `timestamptz` in UTC.
-- Budget periods follow the workspace's **month start day** and **week start day**.
+- Budget periods follow the workspace's **calendar** (BS or AD; §4.6), **month start day** (AD only) and **week start day** (Sunday by default in Nepal).
 
 ### 4.5 Categories
 - Two levels: **group → category** (e.g. *Food → Groceries, Dining out*), each of kind *expense* or *income*.
 - A starter set of about 15 categories that can be edited during onboarding. Categories are archived rather than deleted when they have history (deleting offers to reassign transactions).
+
+### 4.6 Nepal localization
+
+**Calendar (Bikram Sambat).**
+- The stored value is always the AD `DATE`. BS is a presentation and period layer computed by a calendar module in `packages/shared`. That module has a table of BS month lengths (1970–2090 BS) and gives O(1) conversion in both directions.
+- The workspace setting `calendar: 'bs' | 'ad'` (default `bs`) controls:
+  - date display (e.g. "14 Asoj 2083", with the AD date shown secondly in detail views);
+  - the date picker (a BS month grid);
+  - **budget periods**: with BS, a budget month is a BS month (29–32 days); with AD, a Gregorian month with the custom start day.
+- The month-length data was cross-checked between two independent libraries (`bikram-sambat` by Medic, Apache-2.0, and `nepali-date-converter`, MIT). They agree through 2084 BS; later years are projections that the official panchang can revise. Because we store AD dates, a revision only moves period boundaries and never corrupts data.
+- **Fiscal year:** 1 Shrawan to the end of Ashadh (mid-July to mid-July). Available as a report preset, e.g. "FY 2083/84".
+
+**Numbers and currency display.**
+- Grouping `lakh` (default: 1,23,45,678.90) or `international` (12,345,678.90), a per-user preference implemented with `Intl.NumberFormat` (`en-IN` digit grouping for lakh).
+- Symbols: NPR shows as **"Rs."**, INR as "₹", USD as "$", and other currencies use their ISO code or Intl symbol. Devanagari numerals are an option for the Nepali UI later (P3).
+
+**Currencies and rates.**
+- NPR is the default base. The currency picker lists NPR, INR, USD first, then the main remittance and travel currencies (QAR, AED, SAR, MYR, KRW, JPY, KWD, EUR, GBP, AUD, CAD, CNY), then every other ISO 4217 currency.
+- A rate provider interface with these implementations:
+  1. **NRB** (`nrb.org.np/api/forex/v1/rates`): daily buying and selling rates against NPR. It handles the `unit` field (e.g. INR and JPY are quoted per 100 or per 10 units). We use the mid rate.
+  2. A **fixed peg** for INR (1.60), used if NRB is unreachable.
+  3. **Manual** rates entered by the user.
+- A daily job fetches rates. Missing dates fall back to the most recent earlier rate.
+
+**Local presets.**
+- Accounts: Cash, Bank account, eSewa, Khalti, IME Pay, Credit card.
+- Expense categories: Food & Groceries, Dining Out, Transport (fuel, bus, taxi, ride-hailing), Rent, Utilities (electricity, water, internet, LPG gas), Mobile & Data, Education, Health, Shopping, Entertainment, **Festivals & Gifts** (Dashain, Tihar, weddings), Family Support, Travel, Loan/EMI, Insurance, Donations.
+- Income categories: Salary, Business, **Remittance**, Interest, Gifts Received, Other Income.
 
 ---
 
@@ -287,7 +341,7 @@ We **never** store bank passwords. Provider access tokens are encrypted at rest 
 
 | Layer | Choice | Why | Alternatives considered |
 |---|---|---|---|
-| Language | **TypeScript** (strict) everywhere | One language; types and validation shared between client and server | — |
+| Language | **TypeScript 6** (strict) everywhere | One language; types and validation shared between client and server | — |
 | Monorepo | **pnpm workspaces** (+ Turborepo if builds get slow) | Simple, fast, shared packages | Nx (heavier) |
 | Frontend | **React 19 + Vite** | Mature ecosystem; fast dev server; a SPA suits an app behind a login | SvelteKit, Next.js |
 | Routing / data | **TanStack Router + TanStack Query** | Type-safe routes and search params (filters live in the URL); caching, optimistic updates, offline persistence | React Router |
@@ -298,7 +352,7 @@ We **never** store bank passwords. Provider access tokens are encrypted at rest 
 | PWA | **vite-plugin-pwa (Workbox)** | App shell caching, installable, update prompts | — |
 | API framework | **Hono** on Node.js 24 LTS | Small and fast; first-class Zod and OpenAPI integration; typed RPC client | Fastify, NestJS (heavier) |
 | Validation / API docs | **Zod 4 + @hono/zod-openapi** | One schema gives validation, types and an OpenAPI spec | tRPC (not as good for third-party clients) |
-| Database | **PostgreSQL 17+** | Relational integrity for money; JSONB for rules; full-text and trigram search; dependable | SQLite (single-user only), MySQL |
+| Database | **PostgreSQL 16+** | Relational integrity for money; JSONB for rules; full-text and trigram search; dependable | SQLite (single-user only), MySQL |
 | ORM / migrations | **Drizzle ORM + drizzle-kit** | SQL-first, type-safe, lightweight, explicit migrations | Prisma (heavier runtime, less SQL control) |
 | Auth | **Better Auth** | Email/password (Argon2id), OAuth (Google), **passkeys**, **TOTP 2FA**, sessions, organizations/teams (which fit workspaces) | Auth.js, Clerk (hosted and paid) |
 | Background jobs | **pg-boss** (Postgres-backed queue) | No Redis to run; transactional job creation; cron scheduling | BullMQ + Redis |
@@ -308,7 +362,7 @@ We **never** store bank passwords. Provider access tokens are encrypted at rest 
 | Dates | **date-fns** (+ `@date-fns/tz`) | Tree-shakeable, immutable | Day.js, Luxon |
 | i18n | **Lingui** or react-i18next | Message extraction; ICU plurals | — |
 | Logging / observability | **pino** structured logs; OpenTelemetry-ready; optional Sentry | | |
-| Testing | **Vitest** (unit and integration), **Testcontainers** (real Postgres), **Playwright** (E2E), MSW (API mocks in UI tests) | Fast; realistic; covers the key user flows | Jest, Cypress |
+| Testing | **Vitest** (unit and integration against a real, throwaway Postgres database), **Playwright** (E2E), MSW (API mocks in UI tests) | Fast; realistic; covers the key user flows; no Docker needed to run the tests | Jest, Cypress, Testcontainers |
 | Lint / format | **Biome** (or ESLint + Prettier) | One fast tool | |
 | CI | **GitHub Actions**: typecheck, lint, unit, integration, E2E, build Docker images | | |
 | Deploy | **Docker Compose** (web, api, worker, postgres, minio), self-hostable; any container host for the cloud (Fly.io, Railway, Render) + managed Postgres (Neon, Supabase) | Runs anywhere, no lock-in | Vercel (fine for the web app, not the worker) |
@@ -340,10 +394,10 @@ The code is organised by feature (`features/transactions`, `features/budgets`, �
 
 ```
 users                (Better Auth tables: user, session, account, verification, passkey, two_factor)
-  + locale, timezone, default_workspace_id
+  + locale, timezone, number_grouping enum(lakh, international), default_workspace_id
 
-workspaces           name, base_currency char(3), month_start_day 1..28, week_start 0..6,
-                     budget_mode enum(tracking, zero_based)
+workspaces           name, base_currency char(3), calendar enum(bs, ad), month_start_day 1..28 (AD only),
+                     week_start 0..6, budget_mode enum(tracking, zero_based)
 workspace_members    workspace_id, user_id, role enum(owner, admin, editor, viewer)   PK(workspace_id,user_id)
 invitations          workspace_id, email, role, token_hash, expires_at, accepted_at
 
@@ -393,7 +447,8 @@ import_batches       workspace_id, account_id, source enum(csv, ofx, qif, camt, 
                      file_name, mapping jsonb, stats jsonb, created_by, reverted_at
 import_profiles      workspace_id, name, mapping jsonb (saved per-bank CSV column mapping)
 
-exchange_rates       base char(3), quote char(3), date, rate numeric(20,10), source   PK(base,quote,date)
+exchange_rates       base char(3), quote char(3), date, rate numeric(20,10), source enum(nrb, peg, manual)
+                     PK(base,quote,date,source)
 notifications        user_id, workspace_id, type, payload jsonb, read_at
 audit_log            workspace_id, actor_user_id, entity, entity_id, action, diff jsonb, at
 
@@ -521,7 +576,7 @@ attachments         POST (presigned upload), GET (signed URL), DELETE
 | Level | Tooling | What is covered |
 |---|---|---|
 | Unit | Vitest | Money math and allocation, currency conversion, budget period calculations (custom month start), RRULE expansion, the rule evaluator, CSV/OFX parsers, duplicate detection, debt simplification. **≥ 90% coverage on `packages/shared`** |
-| Integration | Vitest + Testcontainers (real Postgres) | Every API endpoint: happy path, validation, authorization (cross-workspace denial), the split-sum invariant, transfer linkage, import commit/revert |
+| Integration | Vitest + a real Postgres (a fresh database per test run; a service container in CI) | Every API endpoint: happy path, validation, authorization (cross-workspace denial), the split-sum invariant, transfer linkage, import commit/revert |
 | E2E | Playwright (Chromium, plus mobile viewport) | Sign up → onboarding → quick add → edit → budget → report; CSV import; offline quick-add sync |
 | Accessibility | axe-core in Playwright | Key screens have no serious violations |
 | Visual | Playwright screenshots (optional) | Dashboard and budget screens in light/dark |
