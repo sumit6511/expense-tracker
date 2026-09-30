@@ -1,10 +1,21 @@
+import { passkey as passkeyPlugin } from '@better-auth/passkey';
 import { uuidv7 } from '@et/shared';
 import { hash, verify } from '@node-rs/argon2';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { twoFactor as twoFactorPlugin } from 'better-auth/plugins/two-factor';
 import { sql } from 'drizzle-orm';
 import type { Db } from './db/client';
-import { account, session, user, verification, workspaceMembers, workspaces } from './db/schema';
+import {
+  account,
+  passkey,
+  session,
+  twoFactor,
+  user,
+  verification,
+  workspaceMembers,
+  workspaces,
+} from './db/schema';
 import type { Env } from './env';
 
 // OWASP-recommended Argon2id parameters (19 MiB memory, 2 iterations).
@@ -12,15 +23,16 @@ const ARGON2_OPTIONS = { memoryCost: 19_456, timeCost: 2, parallelism: 1 } as co
 
 export function createAuth(db: Db, env: Env) {
   const secure = env.PUBLIC_URL.startsWith('https://');
+  const origins = [env.PUBLIC_URL, ...env.TRUSTED_ORIGINS];
   return betterAuth({
     appName: 'Expense Tracker',
     baseURL: env.PUBLIC_URL,
     basePath: '/api/auth',
     secret: env.AUTH_SECRET,
-    trustedOrigins: [env.PUBLIC_URL, ...env.TRUSTED_ORIGINS],
+    trustedOrigins: origins,
     database: drizzleAdapter(db, {
       provider: 'pg',
-      schema: { user, session, account, verification },
+      schema: { user, session, account, verification, twoFactor, passkey },
     }),
     emailAndPassword: {
       enabled: true,
@@ -56,6 +68,8 @@ export function createAuth(db: Db, env: Env) {
       customRules: {
         '/sign-in/email': { window: 60, max: 10 },
         '/sign-up/email': { window: 60, max: 5 },
+        '/two-factor/*': { window: 60, max: 10 },
+        '/passkey/verify-authentication': { window: 60, max: 10 },
       },
     },
     advanced: {
@@ -64,6 +78,19 @@ export function createAuth(db: Db, env: Env) {
       database: { generateId: () => uuidv7() },
     },
     telemetry: { enabled: false },
+    plugins: [
+      // Codes from an authenticator app, plus one-time backup codes, after the password.
+      twoFactorPlugin({
+        issuer: 'Expense Tracker',
+        backupCodeOptions: { amount: 10, length: 10 },
+      }),
+      // Passkeys (Face ID, fingerprint, security keys) sign in on their own.
+      passkeyPlugin({
+        rpID: new URL(env.PUBLIC_URL).hostname,
+        rpName: 'Expense Tracker',
+        origin: origins,
+      }),
+    ],
   });
 }
 

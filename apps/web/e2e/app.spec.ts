@@ -1,4 +1,4 @@
-import { createUser, expect, test } from './fixtures';
+import { createUser, expect, test, totp } from './fixtures';
 
 test.describe('getting started', () => {
   test('sign up, set up a workspace and record the first expense @mobile', async ({ page }) => {
@@ -38,15 +38,91 @@ test.describe('getting started', () => {
     await expect(page).toHaveURL(/\/login/);
     await page.getByLabel('Email').fill(user.email);
     await page.getByLabel('Password').fill('wrong-password');
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await expect(page.getByRole('alert')).toBeVisible();
     await page.getByLabel('Password').fill(user.password);
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await expect(page.getByText('Let’s record your first expense')).toBeVisible();
 
     await page.getByRole('button', { name: 'Asha Test' }).click();
     await page.getByRole('menuitem', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/login/);
+  });
+});
+
+test.describe('account security', () => {
+  test('turn on two-step sign-in, then sign in with a code and a backup code', async ({
+    signedIn: page,
+    user,
+    browser,
+    baseURL,
+  }) => {
+    await page.goto('/settings?tab=profile');
+    await page.getByRole('button', { name: 'Turn on' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Your password').fill(user.password);
+    await dialog.getByRole('button', { name: 'Continue' }).click();
+    await expect(dialog.getByRole('img', { name: /QR code/ })).toBeVisible();
+    const key = await dialog.getByText(/^[A-Z2-7]{4}( [A-Z2-7]{1,4})+$/).textContent();
+    await dialog.getByLabel('6-digit code').fill(totp(key!));
+    await dialog.getByRole('button', { name: 'Turn on' }).click();
+    const list = dialog.getByRole('list', { name: 'Backup codes' });
+    await expect(list).toBeVisible();
+    const codes = await list.getByRole('listitem').allTextContents();
+    expect(codes).toHaveLength(10);
+    await dialog.getByRole('button', { name: 'I’ve saved them' }).click();
+    await expect(page.getByText('On', { exact: true })).toBeVisible();
+
+    // Another device: the password alone isn't enough.
+    const other = await (await browser.newContext({ baseURL })).newPage();
+    await other.goto('/login');
+    await other.getByLabel('Email').fill(user.email);
+    await other.getByLabel('Password').fill(user.password);
+    await other.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await expect(other.getByRole('heading', { name: 'Two-step sign-in' })).toBeVisible();
+    await other.getByLabel('Code from your authenticator app').fill('000000');
+    await other.getByRole('button', { name: 'Verify' }).click();
+    await expect(other.getByRole('alert')).toHaveText(/didn’t work/);
+    await other.getByRole('button', { name: /Use a backup code/ }).click();
+    await other.getByLabel('Backup code').fill(codes[0]!);
+    await other.getByRole('button', { name: 'Verify' }).click();
+    await expect(other.getByText('Let’s record your first expense')).toBeVisible();
+
+    // And with the app's code.
+    const third = await (await browser.newContext({ baseURL })).newPage();
+    await third.goto('/login');
+    await third.getByLabel('Email').fill(user.email);
+    await third.getByLabel('Password').fill(user.password);
+    await third.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await third.getByLabel('Code from your authenticator app').fill(totp(key!));
+    await third.getByRole('button', { name: 'Verify' }).click();
+    await expect(third.getByText('Let’s record your first expense')).toBeVisible();
+  });
+
+  test('add a passkey and sign in with it', async ({ signedIn: page }) => {
+    // Chromium's virtual authenticator stands in for Face ID / fingerprint.
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('WebAuthn.enable');
+    await cdp.send('WebAuthn.addVirtualAuthenticator', {
+      options: {
+        protocol: 'ctap2',
+        transport: 'internal',
+        hasResidentKey: true,
+        hasUserVerification: true,
+        isUserVerified: true,
+        automaticPresenceSimulation: true,
+      },
+    });
+    await page.goto('/settings?tab=profile');
+    await page.getByRole('button', { name: 'Add a passkey' }).click();
+    await expect(page.getByText('Passkey added')).toBeVisible();
+    await expect(page.getByText(/^Chrome on /)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Asha Test' }).click();
+    await page.getByRole('menuitem', { name: 'Sign out' }).click();
+    await expect(page).toHaveURL(/\/login/);
+    await page.getByRole('button', { name: 'Sign in with a passkey' }).click();
+    await expect(page.getByText('Let’s record your first expense')).toBeVisible();
   });
 });
 
@@ -345,7 +421,7 @@ test.describe('everyday use', () => {
     await dialog.getByLabel('Amount').fill('340');
     await dialog.getByLabel('Payee').fill('Tea stall');
     await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByText('Saved on this device')).toBeVisible();
+    await expect(page.getByText('Saved on this device', { exact: true })).toBeVisible();
     await expect(page.getByText(/1 transaction saved on this device/)).toBeVisible();
 
     await page.context().setOffline(false);

@@ -113,6 +113,8 @@ export const MeSchema = z.object({
     name: z.string(),
     email: z.string(),
     numberGrouping: NumberGroupingSchema,
+    /** Signing in also needs a code from an authenticator app. */
+    twoFactorEnabled: z.boolean(),
   }),
   workspaces: z.array(WorkspaceSchema),
   defaultWorkspaceId: z.string().nullable(),

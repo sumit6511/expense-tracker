@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { type APIRequestContext, test as base, expect, type Page } from '@playwright/test';
 
 let counter = 0;
@@ -57,3 +58,22 @@ export const test = base.extend<{ user: TestUser; signedIn: Page }>({
 });
 
 export { expect };
+
+/** The code an authenticator app shows right now for a base32 key. */
+export function totp(base32Key: string, at = Date.now()) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  for (const ch of base32Key.replace(/[\s=]/g, '').toUpperCase()) {
+    bits += alphabet.indexOf(ch).toString(2).padStart(5, '0');
+  }
+  const key = Buffer.from(
+    Array.from({ length: Math.floor(bits.length / 8) }, (_, i) =>
+      Number.parseInt(bits.slice(i * 8, i * 8 + 8), 2),
+    ),
+  );
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
+  const mac = createHmac('sha1', key).update(counter).digest();
+  const offset = mac[mac.length - 1]! & 0xf;
+  return String((mac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0');
+}

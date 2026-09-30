@@ -1,3 +1,8 @@
+import type {
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+} from '@simplewebauthn/browser';
+
 /** Thin fetch wrapper for the JSON API. Errors carry the API's `{ error: { code, message } }`. */
 export class ApiError extends Error {
   constructor(
@@ -33,7 +38,12 @@ export function setUnauthorizedHandler(handler: () => void) {
   onUnauthorized = handler;
 }
 
-async function request<T>(url: string, init: RequestInit): Promise<T> {
+async function request<T>(
+  url: string,
+  init: RequestInit,
+  /** A 401 here means "wrong code", not "signed out": don't send the person to the login page. */
+  { quiet401 = false } = {},
+): Promise<T> {
   let res: Response;
   try {
     res = await fetch(url, { credentials: 'same-origin', ...init });
@@ -44,7 +54,7 @@ async function request<T>(url: string, init: RequestInit): Promise<T> {
   const text = await res.text();
   const body = text ? safeJson(text) : null;
   if (!res.ok) {
-    if (res.status === 401) onUnauthorized?.();
+    if (res.status === 401 && !quiet401) onUnauthorized?.();
     const err =
       (body as {
         error?: { code?: string; message?: string; details?: unknown };
@@ -96,7 +106,7 @@ export const authApi = {
       body: JSON.stringify(input),
     }),
   signIn: (input: { email: string; password: string; rememberMe?: boolean }) =>
-    request<{ user: { id: string } }>('/api/auth/sign-in/email', {
+    request<{ user?: { id: string }; twoFactorRedirect?: boolean }>('/api/auth/sign-in/email', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(input),
@@ -123,7 +133,62 @@ export const authApi = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ password }),
     }),
+  twoFactor: {
+    /** Starts setup: returns the authenticator URI and backup codes (not on until verified). */
+    enable: (password: string) =>
+      authPost<{ totpURI: string; backupCodes: string[] }>('/two-factor/enable', { password }),
+    verifyTotp: (code: string, trustDevice = false) =>
+      authPost<unknown>('/two-factor/verify-totp', { code, trustDevice }),
+    verifyBackupCode: (code: string, trustDevice = false) =>
+      authPost<unknown>('/two-factor/verify-backup-code', { code, trustDevice }),
+    disable: (password: string) => authPost<unknown>('/two-factor/disable', { password }),
+    newBackupCodes: (password: string) =>
+      authPost<{ backupCodes: string[] }>('/two-factor/generate-backup-codes', { password }),
+  },
+  passkey: {
+    registrationOptions: () =>
+      request<PublicKeyCredentialCreationOptionsJSON>(
+        '/api/auth/passkey/generate-register-options',
+        { method: 'GET' },
+        { quiet401: true },
+      ),
+    verifyRegistration: (response: unknown, name: string) =>
+      authPost<Passkey>('/passkey/verify-registration', { response, name }),
+    authenticationOptions: () =>
+      request<PublicKeyCredentialRequestOptionsJSON>(
+        '/api/auth/passkey/generate-authenticate-options',
+        { method: 'GET' },
+        { quiet401: true },
+      ),
+    verifyAuthentication: (response: unknown) =>
+      authPost<unknown>('/passkey/verify-authentication', { response }),
+    list: () => request<Passkey[]>('/api/auth/passkey/list-user-passkeys', { method: 'GET' }),
+    rename: (id: string, name: string) =>
+      authPost<unknown>('/passkey/update-passkey', { id, name }),
+    remove: (id: string) => authPost<unknown>('/passkey/delete-passkey', { id }),
+  },
 };
+
+export interface Passkey {
+  id: string;
+  name?: string | null;
+  deviceType: 'singleDevice' | 'multiDevice';
+  backedUp: boolean;
+  aaguid?: string | null;
+  createdAt: string;
+}
+
+function authPost<T>(path: string, body: unknown) {
+  return request<T>(
+    `/api/auth${path}`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    { quiet401: true },
+  );
+}
 
 export function errorMessage(err: unknown): string {
   if (err instanceof ApiError) return err.message;

@@ -12,6 +12,7 @@ import { authApi, errorMessage } from '@/lib/api';
 import { clearOfflineData } from '@/lib/offline';
 import { useUpdateMe } from '@/lib/queries';
 import { useSession } from '@/lib/session';
+import { SecuritySettings } from './security-settings';
 
 export function ProfileSettings() {
   const { me } = useSession();
@@ -156,6 +157,7 @@ export function ProfileSettings() {
           </form>
         </CardContent>
       </Card>
+      <SecuritySettings />
       <Card className="border-destructive/40 lg:col-span-2">
         <CardHeader>
           <CardTitle className="text-destructive">Delete account</CardTitle>

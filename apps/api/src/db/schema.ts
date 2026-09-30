@@ -49,6 +49,7 @@ export const user = pgTable('user', {
   image: text(),
   numberGrouping: numberGroupingEnum().notNull().default('lakh'),
   defaultWorkspaceId: uuid(),
+  twoFactorEnabled: boolean().notNull().default(false),
   ...timestamps,
 });
 
@@ -99,6 +100,45 @@ export const verification = pgTable(
     ...timestamps,
   },
   (t) => [index().on(t.identifier)],
+);
+
+/** Authenticator-app (TOTP) secret and hashed backup codes, both encrypted by Better Auth. */
+export const twoFactor = pgTable(
+  'two_factor',
+  {
+    id: text().primaryKey(),
+    secret: text().notNull(),
+    backupCodes: text().notNull(),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** False until the first code from the app has been checked. */
+    verified: boolean().notNull().default(true),
+    failedVerificationCount: integer().notNull().default(0),
+    lockedUntil: timestamp({ withTimezone: true }),
+  },
+  (t) => [index().on(t.userId), index().on(t.secret)],
+);
+
+/** WebAuthn credentials (passkeys) for signing in without a password. */
+export const passkey = pgTable(
+  'passkey',
+  {
+    id: text().primaryKey(),
+    name: text(),
+    publicKey: text().notNull(),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    credentialID: text().notNull(),
+    counter: integer().notNull(),
+    deviceType: text().notNull(),
+    backedUp: boolean().notNull(),
+    transports: text(),
+    aaguid: text(),
+    createdAt: timestamp({ withTimezone: true }).defaultNow(),
+  },
+  (t) => [index().on(t.userId), uniqueIndex().on(t.credentialID)],
 );
 
 // ---------------------------------------------------------------------------------------------

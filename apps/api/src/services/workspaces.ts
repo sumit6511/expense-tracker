@@ -73,7 +73,13 @@ export async function getMe(db: Db, userId: string): Promise<Me> {
       ? u.defaultWorkspaceId
       : (list[0]?.id ?? null);
   return {
-    user: { id: u.id, name: u.name, email: u.email, numberGrouping: u.numberGrouping },
+    user: {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      numberGrouping: u.numberGrouping,
+      twoFactorEnabled: u.twoFactorEnabled,
+    },
     workspaces: list,
     defaultWorkspaceId: defaultId,
   };

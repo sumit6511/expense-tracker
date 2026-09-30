@@ -64,6 +64,13 @@
       "when": 1790768079644,
       "tag": "0008_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790768891741,
+      "tag": "0009_two_factor_passkeys",
+      "breakpoints": true
     }
   ]
 }
