@@ -205,6 +205,10 @@ export const AccountSchema = z.object({
   balanceBaseMinor: MinorAmount.nullable(),
   /** Balance counting only cleared and reconciled transactions (what the bank shows). */
   clearedBalanceMinor: MinorAmount,
+  /** Market value of investments held in the account (null when it holds none). */
+  holdingsValueMinor: MinorAmount.nullable(),
+  /** The same in the workspace base currency (null without holdings or a rate). */
+  holdingsValueBaseMinor: MinorAmount.nullable(),
   pendingCount: z.number(),
   /** The statement date of the last reconciliation. */
   reconciledThrough: z.string().nullable(),

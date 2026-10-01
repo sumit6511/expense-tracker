@@ -5,6 +5,7 @@ export * from './budgeting';
 export * from './currency';
 export * from './dates';
 export * from './formats';
+export * from './holdings';
 export * from './ids';
 export * from './import';
 export * from './import-presets';

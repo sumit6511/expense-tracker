@@ -12,6 +12,7 @@ import type { WorkspaceCtx } from '../context';
 import type { Db, Executor } from '../db/client';
 import { accounts, transactions } from '../db/schema';
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors';
+import { holdingsValueByAccount } from './holding-values';
 import { loadRateBook } from './rates';
 import { isHidden, type Scope, scopeId, visibleAccount } from './visibility';
 
@@ -53,12 +54,22 @@ async function withBalances(
     today,
     today,
   );
+  const invested = await holdingsValueByAccount(
+    db,
+    rows.map((r) => r.account.id),
+  );
   return rows.map(
     ({ account, txSum, txCount, lastDate, clearedSum, pendingCount, reconciledThrough }) => {
       const balance = account.openingBalanceMinor + Number(txSum);
+      const holdingsValue = invested.get(account.id) ?? null;
       return toAccountDto(account, {
         balance,
         balanceBase: rates.convert(balance, account.currency, ws.baseCurrency, today),
+        holdingsValue,
+        holdingsValueBase:
+          holdingsValue === null
+            ? null
+            : rates.convert(holdingsValue, account.currency, ws.baseCurrency, today),
         cleared: account.openingBalanceMinor + Number(clearedSum),
         pendingCount: Number(pendingCount),
         reconciledThrough,
@@ -74,6 +85,8 @@ function toAccountDto(
   stats: {
     balance: number;
     balanceBase: number | null;
+    holdingsValue: number | null;
+    holdingsValueBase: number | null;
     cleared: number;
     pendingCount: number;
     reconciledThrough: string | null;
@@ -101,6 +114,8 @@ function toAccountDto(
     balanceMinor: stats.balance,
     balanceBaseMinor: stats.balanceBase,
     clearedBalanceMinor: stats.cleared,
+    holdingsValueMinor: stats.holdingsValue,
+    holdingsValueBaseMinor: stats.holdingsValueBase,
     pendingCount: stats.pendingCount,
     reconciledThrough: stats.reconciledThrough,
     transactionCount: stats.count,

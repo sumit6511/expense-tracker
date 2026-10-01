@@ -21,6 +21,7 @@ import {
   categories,
   categoryGroups,
   goals,
+  holdings,
   importProfiles,
   manualRates,
   payees,
@@ -337,6 +338,23 @@ export const BackupSchema = z.object({
       }),
     )
     .default([]),
+  /** Added with investments; older backups have none. */
+  holdings: z
+    .array(
+      z.object({
+        accountId: id,
+        symbol: z.string().min(1).max(20),
+        name: z.string().max(120),
+        quantity: z.string().regex(/^\d{1,15}(\.\d{1,8})?$/),
+        costMinor: z.number().int().min(0),
+        price: z
+          .string()
+          .regex(/^\d{1,15}(\.\d{1,8})?$/)
+          .nullable(),
+        priceDate: date.nullable(),
+      }),
+    )
+    .default([]),
   splitGroups: z
     .array(
       z.object({
@@ -404,6 +422,7 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
     recurringRows,
     capRows,
     goalRows,
+    holdingRows,
   ] = await Promise.all([
     db
       .select()
@@ -456,6 +475,10 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
       .select()
       .from(goals)
       .where(and(eq(goals.workspaceId, w), visibleAccount(ws, goals.accountId))),
+    db
+      .select()
+      .from(holdings)
+      .where(and(eq(holdings.workspaceId, w), visibleAccount(ws, holdings.accountId))),
   ]);
   const splitsByTx = Map.groupBy(splitRows, (s) => s.transactionId);
   const tagsByTx = Map.groupBy(txTagRows, (t) => t.transactionId);
@@ -583,6 +606,15 @@ export async function exportBackup(db: Db, ws: WorkspaceCtx): Promise<Backup> {
       icon: g.icon,
       color: g.color,
       archived: g.archivedAt !== null,
+    })),
+    holdings: holdingRows.map((h) => ({
+      accountId: h.accountId,
+      symbol: h.symbol,
+      name: h.name,
+      quantity: h.quantity.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, ''),
+      costMinor: h.costMinor,
+      price: h.price === null ? null : h.price.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, ''),
+      priceDate: h.priceDate,
     })),
     recurring: recurringRows.map(({ workspaceId: _, createdAt, updatedAt, ...r }) => r),
     splitGroups: splitGroupData.map((g) => ({
@@ -886,6 +918,18 @@ export async function restoreBackup(
           archivedAt: archivedAt(archived),
         })),
       ),
+    );
+    await chunk(
+      b.holdings.filter((h) => remap.has(h.accountId)),
+      (part) =>
+        tx.insert(holdings).values(
+          part.map((h) => ({
+            ...h,
+            id: uuidv7(),
+            workspaceId,
+            accountId: remap.get(h.accountId)!,
+          })),
+        ),
     );
     for (const g of b.splitGroups) {
       const groupId = uuidv7();

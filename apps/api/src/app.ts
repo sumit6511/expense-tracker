@@ -21,6 +21,7 @@ import { budgetsRouter } from './routes/budgets';
 import { labelsRouter } from './routes/categories';
 import { emailInRouter, mountInboundEmail } from './routes/email-in';
 import { goalsRouter } from './routes/goals';
+import { holdingsRouter } from './routes/holdings';
 import { importsRouter } from './routes/imports';
 import { insightsRouter } from './routes/insights';
 import { ledgerRouter } from './routes/ledger';
@@ -134,6 +135,7 @@ export function createApp(deps: Deps) {
     webhooksRouter,
     emailInRouter,
     bankRouter,
+    holdingsRouter,
   ]) {
     api.route('/', router);
   }

@@ -11,6 +11,7 @@ import type { Mailer } from '../mailer';
 import type { Pusher } from '../push';
 import { syncAllBanks } from '../services/bank';
 import { pruneInboundEmails } from '../services/email-in';
+import { snapshotAllHoldings } from '../services/holding-values';
 import { runHeadsUp } from '../services/insights';
 import { pollMailbox } from '../services/mailbox';
 import { pruneNotifications, runNotifications } from '../services/notifications';
@@ -29,6 +30,7 @@ export const QUEUES = {
   push: 'push',
   mailbox: 'email-in-mailbox',
   bankSync: 'bank-sync',
+  holdings: 'holdings-snapshot',
 } as const;
 
 /** Fetches the last `days` days of NRB rates and stores them. */
@@ -97,6 +99,13 @@ export async function startJobs(
       await sendPendingPushes(db, pusher, logger);
     });
   }
+
+  // What investments are worth, once a day, for net worth over time.
+  await boss.createQueue(QUEUES.holdings);
+  await boss.schedule(QUEUES.holdings, '50 23 * * *', null, { tz: 'Asia/Kathmandu' });
+  await boss.work(QUEUES.holdings, async () => {
+    await snapshotAllHoldings(db);
+  });
 
   // Accounts the bills could empty, prices that changed: once a day, in the morning.
   await boss.createQueue(QUEUES.headsUp);

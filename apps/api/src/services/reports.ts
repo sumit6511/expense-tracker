@@ -37,6 +37,7 @@ import {
 } from '../db/schema';
 import { badRequest } from '../lib/errors';
 import { budgetOverview } from './budgets';
+import { holdingValuesOn } from './holding-values';
 import { loadRateBook } from './rates';
 import { visibleAccount, visibleAccountSql } from './visibility';
 
@@ -444,6 +445,7 @@ export async function dashboard(
 export async function netWorth(db: Executor, ws: WorkspaceCtx, date: IsoDate): Promise<number> {
   const rows = await db
     .select({
+      id: accounts.id,
       currency: accounts.currency,
       balance: sql<number>`(${accounts.openingBalanceMinor} + coalesce(sum(${transactions.amountMinor}), 0))::bigint`,
     })
@@ -472,9 +474,20 @@ export async function netWorth(db: Executor, ws: WorkspaceCtx, date: IsoDate): P
     date,
     date,
   );
+  const invested = await holdingValuesOn(
+    db,
+    rows.map((r) => r.id),
+    [date],
+  );
   return rows.reduce(
     (total, r) =>
-      total + (rates.convert(Number(r.balance), r.currency, ws.baseCurrency, date) ?? 0),
+      total +
+      (rates.convert(
+        Number(r.balance) + (invested.get(r.id)?.get(date) ?? 0),
+        r.currency,
+        ws.baseCurrency,
+        date,
+      ) ?? 0),
     0,
   );
 }
@@ -563,11 +576,19 @@ export async function netWorthSeries(
     dates[0]!,
     last,
   );
+  // Investments: what they were worth then (from the daily snapshots), not at today's prices.
+  const invested = await holdingValuesOn(
+    db,
+    accountRows.map((a) => a.id),
+    dates,
+  );
   const points = periods.map((p, i) => {
     const date = dates[i]!;
     let assets = 0;
     let liabilities = 0;
     for (const a of accountRows) {
+      const held = invested.get(a.id)?.get(date) ?? 0;
+      if (held) assets += rates.convert(held, a.currency, ws.baseCurrency, date) ?? 0;
       if (a.openingDate > date) continue;
       const moved = (byAccount.get(a.id) ?? [])
         .filter((r) => r.date <= date)

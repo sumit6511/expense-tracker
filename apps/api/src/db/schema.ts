@@ -1170,3 +1170,47 @@ export const bankAccountLinks = pgTable(
   },
   (t) => [uniqueIndex().on(t.connectionId, t.providerAccountId), index().on(t.accountId)],
 );
+
+// ---------------------------------------------------------------------------------------------
+// Investment holdings
+// ---------------------------------------------------------------------------------------------
+
+/** Shares, fund units, gold… held in an account, with the latest price someone entered. */
+export const holdings = pgTable(
+  'holdings',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    accountId: uuid()
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    symbol: text().notNull(),
+    name: text().notNull().default(''),
+    quantity: numeric({ precision: 24, scale: 8 }).notNull(),
+    /** Total cost, in the account currency's minor units. */
+    costMinor: money().notNull().default(0),
+    /** Latest price per unit, in major units. */
+    price: numeric({ precision: 24, scale: 8 }),
+    priceDate: date({ mode: 'string' }),
+    ...timestamps,
+  },
+  (t) => [index().on(t.accountId), index().on(t.workspaceId)],
+);
+
+/**
+ * What an account's holdings were worth on a day (written when they change, and daily), so net
+ * worth over time uses the values of the time rather than today's prices.
+ */
+export const holdingValues = pgTable(
+  'holding_values',
+  {
+    accountId: uuid()
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    date: date({ mode: 'string' }).notNull(),
+    valueMinor: money().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.accountId, t.date] })],
+);

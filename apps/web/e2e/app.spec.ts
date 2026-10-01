@@ -980,6 +980,35 @@ test.describe('everyday use', () => {
     await expect(page).toHaveURL(/\/$/);
   });
 
+  test('track shares in an investment account', async ({ signedIn: page }) => {
+    await page.goto('/accounts');
+    await page.getByRole('button', { name: 'Add account' }).click();
+    const form = page.getByRole('dialog');
+    await form.getByLabel('Name').fill('Meroshare');
+    await form.getByLabel('Type').selectOption('investment');
+    await form.getByRole('button', { name: /^(Add|Create|Save)/ }).click();
+    await page.getByRole('link', { name: /Meroshare/ }).click();
+
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Add a holding' });
+    await dialog.getByLabel('Symbol').fill('nabil');
+    await dialog.getByLabel('Quantity').fill('50');
+    await dialog.getByLabel('Total cost').fill('24500');
+    await dialog.getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(page.getByText('No price')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Update prices' }).click();
+    await page.getByLabel('Paste prices').fill('NABIL\t512.30\nNICA 745');
+    await expect(page.getByLabel('Price of NABIL')).toHaveValue('512.30');
+    await page.getByRole('button', { name: 'Save prices' }).click();
+    const row = page.getByRole('row', { name: /^NABIL/ });
+    await expect(row.getByRole('cell', { name: 'Rs. 25,615' })).toBeVisible();
+    await expect(row.getByText('+Rs. 1,115')).toBeVisible();
+
+    await page.goto('/accounts');
+    await expect(page.getByText('Rs. 25,615 invested')).toBeVisible();
+  });
+
   test('reports and settings pages load', async ({ signedIn: page }) => {
     await page.goto('/reports?tab=cashflow');
     await expect(page.getByText('Income and spending per month')).toBeVisible();

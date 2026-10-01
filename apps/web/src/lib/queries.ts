@@ -22,6 +22,7 @@ import type {
   CreateCategoryInput,
   CreatedApiToken,
   CreatedWebhook,
+  CreateHolding,
   CreateInvitationInput,
   CreateSplitGroupInput,
   CreateTransactionInput,
@@ -37,6 +38,7 @@ import type {
   Forecast,
   Goal,
   GoalInput,
+  Holdings,
   ImportBatch,
   ImportMapping,
   ImportPreview,
@@ -83,8 +85,10 @@ import type {
   UpdateAccountInput,
   UpdateBankLink,
   UpdateCategoryInput,
+  UpdateHolding,
   UpdateMeInput,
   UpdateNotificationPrefs,
+  UpdatePrices,
   UpdateTransactionInput,
   UpdateWebhook,
   UpdateWorkspaceInput,
@@ -1222,4 +1226,30 @@ export const useSyncBank = () =>
 export const useRemoveBankConnection = () =>
   useWsMutation((base, id: string) =>
     api<BankSync>(`${base}/bank/connections/${id}`, { method: 'DELETE' }),
+  );
+
+// Investments ----------------------------------------------------------------------------------
+
+export function useHoldings(accountId: string) {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'holdings', accountId],
+    queryFn: () => api<Holdings>(`${base}/accounts/${accountId}/holdings`),
+  });
+}
+export const useCreateHolding = () =>
+  useWsMutation((base, { accountId, ...body }: CreateHolding & { accountId: string }) =>
+    api<Holdings>(`${base}/accounts/${accountId}/holdings`, { method: 'POST', body }),
+  );
+export const useUpdateHolding = () =>
+  useWsMutation((base, { id, ...body }: UpdateHolding & { id: string }) =>
+    api<Holdings>(`${base}/holdings/${id}`, { method: 'PATCH', body }),
+  );
+export const useDeleteHolding = () =>
+  useWsMutation((base, id: string) =>
+    api<Holdings>(`${base}/holdings/${id}`, { method: 'DELETE' }),
+  );
+export const useUpdatePrices = () =>
+  useWsMutation((base, { accountId, ...body }: UpdatePrices & { accountId: string }) =>
+    api<Holdings>(`${base}/accounts/${accountId}/holdings/prices`, { method: 'POST', body }),
   );

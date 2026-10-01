@@ -1,4 +1,10 @@
-import { ACCOUNT_TYPE_LABELS, type Account, type AccountType } from '@et/shared';
+import {
+  ACCOUNT_TYPE_LABELS,
+  type Account,
+  type AccountType,
+  accountValueBaseMinor,
+  accountValueMinor,
+} from '@et/shared';
 import { Link } from '@tanstack/react-router';
 import { ChevronRight, Landmark, Lock, Plus } from 'lucide-react';
 import { useState } from 'react';
@@ -30,11 +36,11 @@ export function AccountsPage() {
   const archived = accounts?.filter((a) => a.archived) ?? [];
   const inNetWorth = active.filter((a) => a.inNetWorth);
   const assets = inNetWorth
-    .filter((a) => (a.balanceBaseMinor ?? 0) > 0)
-    .reduce((s, a) => s + (a.balanceBaseMinor ?? 0), 0);
+    .filter((a) => (accountValueBaseMinor(a) ?? 0) > 0)
+    .reduce((s, a) => s + (accountValueBaseMinor(a) ?? 0), 0);
   const debts = inNetWorth
-    .filter((a) => (a.balanceBaseMinor ?? 0) < 0)
-    .reduce((s, a) => s + (a.balanceBaseMinor ?? 0), 0);
+    .filter((a) => (accountValueBaseMinor(a) ?? 0) < 0)
+    .reduce((s, a) => s + (accountValueBaseMinor(a) ?? 0), 0);
 
   return (
     <div>
@@ -82,7 +88,7 @@ export function AccountsPage() {
           {GROUPS.map((g) => {
             const list = active.filter((a) => g.types.includes(a.type));
             if (list.length === 0) return null;
-            const total = list.reduce((s, a) => s + (a.balanceBaseMinor ?? 0), 0);
+            const total = list.reduce((s, a) => s + (accountValueBaseMinor(a) ?? 0), 0);
             return (
               <section key={g.label}>
                 <div className="mb-2 flex items-baseline justify-between px-1">
@@ -187,14 +193,19 @@ function AccountRow({ account: a }: { account: Account }) {
       </span>
       <span className="text-right">
         <Money
-          minor={a.balanceMinor}
+          minor={accountValueMinor(a)}
           currency={a.currency}
           className="text-sm font-semibold"
           trimZero
         />
-        {a.currency !== f.base && a.balanceBaseMinor !== null && (
+        {a.holdingsValueMinor !== null && (
           <span className="block text-xs text-muted-foreground">
-            ≈ {f.money(a.balanceBaseMinor, undefined, { trimZeroFraction: true })}
+            {f.money(a.holdingsValueMinor, a.currency, { trimZeroFraction: true })} invested
+          </span>
+        )}
+        {a.currency !== f.base && accountValueBaseMinor(a) !== null && (
+          <span className="block text-xs text-muted-foreground">
+            ≈ {f.money(accountValueBaseMinor(a)!, undefined, { trimZeroFraction: true })}
           </span>
         )}
       </span>

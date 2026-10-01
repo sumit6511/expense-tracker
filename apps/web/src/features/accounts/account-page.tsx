@@ -1,4 +1,4 @@
-import { ACCOUNT_TYPE_LABELS } from '@et/shared';
+import { ACCOUNT_TYPE_LABELS, accountValueBaseMinor, accountValueMinor } from '@et/shared';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import {
   Archive,
@@ -36,6 +36,7 @@ import { useFormat } from '@/lib/format';
 import { useAccounts, useDeleteAccount, useTransactions, useUpdateAccount } from '@/lib/queries';
 import { useCanWrite } from '@/lib/session';
 import { AccountFormDialog } from './account-form';
+import { HoldingsCard } from './holdings-card';
 import { ReconcileDialog } from './reconcile-dialog';
 
 export function AccountPage() {
@@ -142,12 +143,22 @@ export function AccountPage() {
           </p>
         </div>
         <div className="text-right">
-          <p className="text-xs text-muted-foreground">Balance</p>
-          <p className="text-2xl font-semibold">
-            <Money minor={account.balanceMinor} currency={account.currency} />
+          <p className="text-xs text-muted-foreground">
+            {account.holdingsValueMinor === null ? 'Balance' : 'Value'}
           </p>
-          {account.currency !== f.base && account.balanceBaseMinor !== null && (
-            <p className="text-xs text-muted-foreground">≈ {f.money(account.balanceBaseMinor)}</p>
+          <p className="text-2xl font-semibold">
+            <Money minor={accountValueMinor(account)} currency={account.currency} />
+          </p>
+          {account.holdingsValueMinor !== null && (
+            <p className="text-xs text-muted-foreground">
+              Cash {f.money(account.balanceMinor, account.currency)} · invested{' '}
+              {f.money(account.holdingsValueMinor, account.currency)}
+            </p>
+          )}
+          {account.currency !== f.base && accountValueBaseMinor(account) !== null && (
+            <p className="text-xs text-muted-foreground">
+              ≈ {f.money(accountValueBaseMinor(account)!)}
+            </p>
           )}
           {account.pendingCount > 0 && (
             <p className="text-xs text-muted-foreground">
@@ -208,6 +219,10 @@ export function AccountPage() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+      )}
+
+      {(account.type === 'investment' || account.holdingsValueMinor !== null) && (
+        <HoldingsCard account={account} />
       )}
 
       <Card className="overflow-hidden">
