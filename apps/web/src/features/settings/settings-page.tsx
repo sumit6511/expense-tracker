@@ -4,6 +4,7 @@ import {
   Database,
   Hash,
   Landmark,
+  Plug,
   Settings2,
   Tags,
   UserRound,
@@ -18,6 +19,7 @@ import { RulesSettings } from '@/features/rules/rules-settings';
 import { CategoriesSettings } from './categories-settings';
 import { DataSettings } from './data-settings';
 import { GeneralSettings } from './general-settings';
+import { IntegrationsSettings } from './integrations-settings';
 import { PayeesSettings, TagsSettings } from './labels-settings';
 import { MembersSettings } from './members-settings';
 import { ProfileSettings } from './profile-settings';
@@ -32,6 +34,7 @@ type Tab =
   | 'rules'
   | 'rates'
   | 'notifications'
+  | 'integrations'
   | 'data'
   | 'profile';
 
@@ -71,6 +74,9 @@ export function SettingsPage() {
           <TabsTrigger value="notifications">
             <Bell /> Notifications
           </TabsTrigger>
+          <TabsTrigger value="integrations">
+            <Plug /> Integrations
+          </TabsTrigger>
           <TabsTrigger value="data">
             <Database /> Data
           </TabsTrigger>
@@ -101,6 +107,9 @@ export function SettingsPage() {
         </TabsContent>
         <TabsContent value="notifications">
           <NotificationSettings />
+        </TabsContent>
+        <TabsContent value="integrations">
+          <IntegrationsSettings />
         </TabsContent>
         <TabsContent value="data">
           <DataSettings />

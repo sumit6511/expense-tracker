@@ -17,7 +17,14 @@ meRouter.openapi(
   }),
   async (c) => {
     const user = requireUser(c.get('user'));
-    return c.json(await getMe(c.get('deps').db, user.id), 200);
+    const me = await getMe(c.get('deps').db, user.id);
+    // An access token only reaches its own workspace.
+    const token = c.get('token');
+    if (token) {
+      me.workspaces = me.workspaces.filter((w) => w.id === token.workspaceId);
+      me.defaultWorkspaceId = token.workspaceId;
+    }
+    return c.json(me, 200);
   },
 );
 
@@ -46,7 +53,9 @@ meRouter.openapi(
   }),
   async (c) => {
     const user = requireUser(c.get('user'));
-    return c.json(await listWorkspaces(c.get('deps').db, user.id), 200);
+    const list = await listWorkspaces(c.get('deps').db, user.id);
+    const token = c.get('token');
+    return c.json(token ? list.filter((w) => w.id === token.workspaceId) : list, 200);
   },
 );
 

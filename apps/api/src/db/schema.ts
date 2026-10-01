@@ -5,6 +5,7 @@ import {
   char,
   customType,
   date,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -938,4 +939,39 @@ export const manualRates = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.workspaceId, t.base, t.quote, t.date] })],
+);
+
+// ---------------------------------------------------------------------------------------------
+// Integrations: personal access tokens
+// ---------------------------------------------------------------------------------------------
+
+export const tokenScopeEnum = pgEnum('token_scope', ['read', 'write']);
+
+/**
+ * Personal access tokens for the API. Only a SHA-256 hash of the token is kept. A token belongs
+ * to a membership, so it disappears when its person leaves or is removed from the workspace.
+ */
+export const apiTokens = pgTable(
+  'api_tokens',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid().notNull(),
+    userId: text().notNull(),
+    name: text().notNull(),
+    tokenHash: text().notNull(),
+    /** The first characters of the token, shown to tell tokens apart. */
+    hint: text().notNull(),
+    scope: tokenScopeEnum().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp({ withTimezone: true }),
+    expiresAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex().on(t.tokenHash),
+    index().on(t.workspaceId),
+    foreignKey({
+      columns: [t.workspaceId, t.userId],
+      foreignColumns: [workspaceMembers.workspaceId, workspaceMembers.userId],
+    }).onDelete('cascade'),
+  ],
 );

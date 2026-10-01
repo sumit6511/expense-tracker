@@ -1,6 +1,7 @@
 import type {
   Account,
   AiStatus,
+  ApiToken,
   AskAnswer,
   Attachment,
   BudgetMonth,
@@ -14,7 +15,9 @@ import type {
   CommitImportInput,
   Comparison,
   CreateAccountInput,
+  CreateApiToken,
   CreateCategoryInput,
+  CreatedApiToken,
   CreateInvitationInput,
   CreateSplitGroupInput,
   CreateTransactionInput,
@@ -1082,3 +1085,21 @@ export const useDeleteSettlement = () =>
   useSplitMutation((base, { groupId, id }: { groupId: string; id: string }) =>
     api<SplitGroup>(`${base}/split-groups/${groupId}/settlements/${id}`, { method: 'DELETE' }),
   );
+
+// ---------------------------------------------------------------------------------------------
+// Integrations: access tokens
+// ---------------------------------------------------------------------------------------------
+
+export function useApiTokens() {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'tokens'],
+    queryFn: () => api<ApiToken[]>(`${base}/tokens`),
+  });
+}
+export const useCreateApiToken = () =>
+  useWsMutation((base, input: CreateApiToken) =>
+    api<CreatedApiToken>(`${base}/tokens`, { method: 'POST', body: input }),
+  );
+export const useRevokeApiToken = () =>
+  useWsMutation((base, id: string) => api<undefined>(`${base}/tokens/${id}`, { method: 'DELETE' }));

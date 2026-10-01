@@ -9,6 +9,7 @@ export * from './ids';
 export * from './import';
 export * from './import-presets';
 export * from './insights';
+export * from './integrations';
 export * from './ledger';
 export * from './members';
 export * from './money';

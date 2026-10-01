@@ -8,7 +8,7 @@ import { forbidden, notFound, unauthorized } from '../lib/errors';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const WRITE_ROLES: readonly Role[] = ['owner', 'admin', 'editor'];
 /** Writes that only change the person's own view, so viewers may make them. */
-const PERSONAL_WRITES = [/\/insights\/dismiss$/, /\/ai\/ask$/];
+const PERSONAL_WRITES = [/\/insights\/dismiss$/, /\/ai\/ask$/, /\/tokens(\/[^/]+)?$/];
 
 /**
  * Resolves /workspaces/:wid/* to a workspace the signed-in user belongs to. Non-members get 404,

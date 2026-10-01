@@ -6,6 +6,7 @@ import type { Env } from './env';
 import type { Logger } from './logger';
 import type { Mailer } from './mailer';
 import type { Pusher } from './push';
+import type { TokenCtx } from './services/tokens';
 
 export interface Deps {
   db: Db;
@@ -51,6 +52,8 @@ export type AppEnv = {
   Variables: {
     deps: Deps;
     user: SessionUser | null;
+    /** Set when the request was made with a personal access token instead of a session. */
+    token: TokenCtx | null;
     workspace: WorkspaceCtx;
   };
 };

@@ -787,6 +787,49 @@ test.describe('everyday use', () => {
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   });
 
+  test('make an access token and use it from a script', async ({
+    signedIn: page,
+    playwright,
+    baseURL,
+  }) => {
+    await page.goto('/settings?tab=integrations');
+    await page.getByRole('button', { name: 'New token' }).click();
+    await page.getByLabel('Name').fill('Spreadsheet');
+    await page.getByLabel('Access').selectOption('write');
+    await page.getByRole('button', { name: 'Make token' }).click();
+    const token = await page.getByLabel('New access token').inputValue();
+    expect(token).toMatch(/^et_/);
+
+    // A script: no cookies, just the token.
+    const script = await playwright.request.newContext({
+      baseURL,
+      extraHTTPHeaders: { authorization: `Bearer ${token}` },
+    });
+    const me = await (await script.get('/api/v1/me')).json();
+    const base = `/api/v1/workspaces/${me.defaultWorkspaceId}`;
+    const accounts = await (await script.get(`${base}/accounts`)).json();
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kathmandu' });
+    const created = await script.post(`${base}/transactions`, {
+      data: {
+        accountId: accounts[0].id,
+        date: today,
+        amountMinor: -12_300,
+        payee: 'From a script',
+      },
+    });
+    expect(created.status()).toBe(201);
+    await page.goto('/transactions');
+    await expect(page.getByText('From a script')).toBeVisible();
+
+    await page.goto('/settings?tab=integrations');
+    await expect(page.getByText('Read and write · used today')).toBeVisible();
+    await page.getByRole('button', { name: 'Revoke' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Revoke' }).click();
+    await expect(page.getByText('No tokens yet.')).toBeVisible();
+    expect((await script.get('/api/v1/me')).status()).toBe(401);
+    await script.dispose();
+  });
+
   test('reports and settings pages load', async ({ signedIn: page }) => {
     await page.goto('/reports?tab=cashflow');
     await expect(page.getByText('Income and spending per month')).toBeVisible();

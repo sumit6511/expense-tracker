@@ -11,7 +11,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import type { AppEnv, Deps } from './context';
 import { ApiError, mapDatabaseError } from './lib/errors';
 import { createRouter } from './lib/openapi';
-import { originCheck, writeRateLimit } from './middleware/security';
+import { originCheck, tokenAccess, tokenRateLimit, writeRateLimit } from './middleware/security';
 import { loadSession } from './middleware/session';
 import { loadWorkspace } from './middleware/workspace';
 import { accountsRouter } from './routes/accounts';
@@ -28,6 +28,7 @@ import { notificationsRouter } from './routes/notifications';
 import { recurringRouter } from './routes/recurring';
 import { rulesRouter } from './routes/rules';
 import { splitRouter } from './routes/split';
+import { tokensRouter } from './routes/tokens';
 import { transactionsRouter } from './routes/transactions';
 import { workspaceRouter } from './routes/workspace';
 
@@ -53,6 +54,7 @@ export function createApp(deps: Deps) {
   app.use('*', async (c, next) => {
     c.set('deps', deps);
     c.set('user', null);
+    c.set('token', null);
     const started = performance.now();
     await next();
     if (c.req.path.startsWith('/api/')) {
@@ -89,8 +91,10 @@ export function createApp(deps: Deps) {
   app.on(['GET', 'POST'], '/api/auth/*', (c) => deps.auth.handler(c.req.raw));
 
   const api = createRouter();
-  api.use('*', originCheck([env.PUBLIC_URL, ...env.TRUSTED_ORIGINS]));
   api.use('*', loadSession);
+  api.use('*', originCheck([env.PUBLIC_URL, ...env.TRUSTED_ORIGINS]));
+  api.use('*', tokenAccess('/api/v1'));
+  api.use('*', tokenRateLimit(env.NODE_ENV === 'test' ? 0 : 300));
   api.use('*', writeRateLimit(env.NODE_ENV === 'test' ? 0 : 600));
   // Receipts are the only large uploads; everything else is small JSON.
   api.use(
@@ -120,18 +124,40 @@ export function createApp(deps: Deps) {
     splitRouter,
     insightsRouter,
     aiRouter,
+    tokensRouter,
   ]) {
     api.route('/', router);
   }
+  api.openAPIRegistry.registerComponent('securitySchemes', 'accessToken', {
+    type: 'http',
+    scheme: 'bearer',
+    description:
+      'A personal access token from Settings → Integrations, sent as `Authorization: Bearer et_…`. ' +
+      'It reaches one workspace and does no more than its person may; read tokens only read.',
+  });
+  api.openAPIRegistry.registerComponent('securitySchemes', 'session', {
+    type: 'apiKey',
+    in: 'cookie',
+    name: 'better-auth.session_token',
+    description: 'The app’s own sign-in (writes also need a same-origin Origin header).',
+  });
   api.doc31('/openapi.json', {
     openapi: '3.1.0',
     info: {
       title: 'Expense Tracker API',
       version: '1.0.0',
-      description:
-        'Amounts are integers in minor units (paisa for NPR). Dates are calendar dates (YYYY-MM-DD, AD). ' +
-        'Authenticate by signing in through /api/auth (cookie session).',
+      description: [
+        'Amounts are integers in minor units (paisa for NPR). Dates are calendar dates (YYYY-MM-DD, AD).',
+        '',
+        'For your own scripts, make a personal access token under Settings → Integrations and send it as ' +
+          '`Authorization: Bearer et_…`. A token reaches one workspace (its id is in `GET /me`), ' +
+          'can be read-only, and can’t manage members, tokens or workspace settings. Each token may ' +
+          'make 300 requests a minute.',
+        '',
+        'Errors look like `{ "error": { "code": "…", "message": "…" } }`.',
+      ].join('\n'),
     },
+    security: [{ accessToken: [] }, { session: [] }],
   });
   app.route('/api/v1', api);
   app.get('/api/docs', Scalar({ url: '/api/v1/openapi.json', pageTitle: 'Expense Tracker API' }));
