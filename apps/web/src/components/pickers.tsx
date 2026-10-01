@@ -37,6 +37,8 @@ import {
 } from './ui/menu';
 import { Select, SelectItem } from './ui/select';
 
+// Pickers open as modal popovers: inside a dialog, the dialog's scroll lock would otherwise
+// swallow wheel and touch scrolling in the (portaled) list.
 const commandList = cn('max-h-72 overflow-y-auto overscroll-contain p-1', commandGroups);
 const commandItem = cn(menuItem, 'gap-2.5');
 
@@ -113,7 +115,7 @@ export function CategoryPicker({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
         <Button
           id={id}
@@ -182,7 +184,7 @@ export function CategoryFilter({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -312,7 +314,7 @@ export function CurrencySelect({
   );
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
         <Button
           id={id}
@@ -485,7 +487,7 @@ export function TagPicker({
     onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
         <Button
           variant="outline"

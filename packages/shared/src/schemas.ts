@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AvatarChoiceSchema } from './avatars';
 import { isCurrencyCode } from './currency';
 import { isIsoDate, isValidTimeZone } from './dates';
 import { DATE_FORMATS } from './import';
@@ -132,6 +133,8 @@ export const MeSchema = z.object({
     twoFactorEnabled: z.boolean(),
     /** They have finished (or skipped) the getting-started tour. */
     tourCompleted: z.boolean(),
+    /** "preset:<key>", the address of their photo, or null to show initials. */
+    avatar: z.string().nullable(),
   }),
   workspaces: z.array(WorkspaceSchema),
   defaultWorkspaceId: z.string().nullable(),
@@ -145,6 +148,8 @@ export const UpdateMeSchema = z.object({
   defaultWorkspaceId: Id.optional(),
   /** true when the tour is finished or skipped; false shows it again on the next visit. */
   tourCompleted: z.boolean().optional(),
+  /** A ready-made avatar, or null for none (also removes an uploaded photo). */
+  avatar: AvatarChoiceSchema.nullable().optional(),
 });
 export type UpdateMeInput = z.infer<typeof UpdateMeSchema>;
 

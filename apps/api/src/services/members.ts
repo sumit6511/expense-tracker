@@ -33,6 +33,7 @@ import {
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors';
 import type { Logger } from '../logger';
 import type { Mailer } from '../mailer';
+import { avatarValue } from './avatars';
 import { toWorkspaceDto } from './workspaces';
 
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
@@ -76,6 +77,7 @@ export async function listMembers(db: Db, ws: WorkspaceCtx): Promise<Members> {
       joinedAt: workspaceMembers.createdAt,
       name: user.name,
       email: user.email,
+      image: user.image,
     })
     .from(workspaceMembers)
     .innerJoin(user, eq(user.id, workspaceMembers.userId))
@@ -89,6 +91,7 @@ export async function listMembers(db: Db, ws: WorkspaceCtx): Promise<Members> {
       role: r.role,
       joinedAt: r.joinedAt.toISOString(),
       you: r.userId === ws.userId,
+      avatar: avatarValue(r.userId, r.image),
     }))
     .sort((a, b) => ROLE_RANK[b.role] - ROLE_RANK[a.role]);
 

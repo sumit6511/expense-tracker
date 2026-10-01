@@ -58,6 +58,16 @@ export const user = pgTable('user', {
   ...timestamps,
 });
 
+/** A person's uploaded profile picture (a small square image); presets live in `user.image`. */
+export const userAvatars = pgTable('user_avatars', {
+  userId: text()
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  contentType: text().notNull(),
+  data: bytea().notNull(),
+  updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});
+
 export const session = pgTable(
   'session',
   {

@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { toast } from 'sonner';
-import { PersonAvatar } from '@/components/person';
+import { UserAvatar } from '@/components/person';
 import { Button } from '@/components/ui/button';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/dialog';
@@ -119,7 +119,7 @@ function MemberRow({ m, me }: { m: Member; me: Role }) {
   const manageable = !m.you && canManageMember(me, m.role);
   return (
     <li className="flex flex-wrap items-center gap-3 px-4 py-3">
-      <PersonAvatar id={m.userId} name={m.name} />
+      <UserAvatar id={m.userId} name={m.name} avatar={m.avatar} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">
           {m.name}

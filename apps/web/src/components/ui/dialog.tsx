@@ -60,12 +60,15 @@ export function DialogContent({
 
 export function DialogHeader({ className, ...props }: ComponentProps<'div'>) {
   return (
-    <div className={cn('grid grid-cols-1 gap-1 px-5 pt-5 pb-3 pr-12', className)} {...props} />
+    <div className={cn('grid grid-cols-1 gap-1 px-5 pt-5 pb-2 pr-12', className)} {...props} />
   );
 }
 
 export function DialogBody({ className, ...props }: ComponentProps<'div'>) {
-  return <div className={cn('min-h-0 flex-1 overflow-y-auto px-5 pb-4', className)} {...props} />;
+  // The top padding keeps the first field's focus ring inside the scroll area.
+  return (
+    <div className={cn('min-h-0 flex-1 overflow-y-auto px-5 pt-1 pb-4', className)} {...props} />
+  );
 }
 
 export function DialogFooter({ className, ...props }: ComponentProps<'div'>) {

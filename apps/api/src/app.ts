@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { MAX_ATTACHMENT_BYTES } from '@et/shared';
+import { MAX_ATTACHMENT_BYTES, MAX_AVATAR_BYTES } from '@et/shared';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { Scalar } from '@scalar/hono-api-reference';
@@ -111,6 +111,14 @@ export function createApp(deps: Deps) {
       maxSize: MAX_ATTACHMENT_BYTES + 64 * 1024,
       onError: (c) =>
         c.json({ error: { code: 'too_large', message: 'Files can be at most 5 MB' } }, 413),
+    }),
+  );
+  api.use(
+    '/me/avatar',
+    bodyLimit({
+      maxSize: MAX_AVATAR_BYTES + 64 * 1024,
+      onError: (c) =>
+        c.json({ error: { code: 'too_large', message: 'Photos can be at most 512 KB' } }, 413),
     }),
   );
   api.use('/workspaces/:wid', loadWorkspace);

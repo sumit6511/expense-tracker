@@ -54,6 +54,8 @@ export const MemberSchema = z.object({
   joinedAt: z.string(),
   /** The person asking. */
   you: z.boolean(),
+  /** Their profile picture: "preset:<key>", a photo's address, or null. */
+  avatar: z.string().nullable(),
 });
 export type Member = z.infer<typeof MemberSchema>;
 

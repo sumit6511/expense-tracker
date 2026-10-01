@@ -154,7 +154,26 @@ export function useUpdateMe() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: UpdateMeInput) => api<Me>('/me', { method: 'PATCH', body: input }),
-    onSuccess: (me) => qc.setQueryData(meKey, me),
+    onSuccess: (me, input) => {
+      qc.setQueryData(meKey, me);
+      // Other people's lists show your name and picture.
+      if (input.name !== undefined || input.avatar !== undefined) {
+        void qc.invalidateQueries({ predicate: (q) => q.queryKey.at(-1) === 'members' });
+      }
+    },
+  });
+}
+
+/** Uploads a profile photo (already shrunk to a small square). */
+export function useUploadAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (photo: Blob) =>
+      apiUpload<Me>('/me/avatar', photo, photo.type === 'image/webp' ? 'me.webp' : 'me.jpg'),
+    onSuccess: (me) => {
+      qc.setQueryData(meKey, me);
+      void qc.invalidateQueries({ predicate: (q) => q.queryKey.at(-1) === 'members' });
+    },
   });
 }
 
@@ -963,6 +982,18 @@ export function useMembers() {
 }
 
 /** Names of the people in this workspace by user id, when more than one person uses it. */
+/** Names and pictures of the people in a shared workspace (null when it's just you). */
+export function useMemberProfiles(): Map<string, { name: string; avatar: string | null }> | null {
+  const { data } = useMembers();
+  return useMemo(
+    () =>
+      data && data.members.length > 1
+        ? new Map(data.members.map((m) => [m.userId, { name: m.name, avatar: m.avatar }]))
+        : null,
+    [data],
+  );
+}
+
 export function useMemberNames(): Map<string, string> | null {
   const { data } = useMembers();
   return useMemo(

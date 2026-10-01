@@ -2,11 +2,11 @@ import type { Transaction } from '@et/shared';
 import { ArrowLeftRight, Inbox, Lock, Paperclip, Repeat, Split } from 'lucide-react';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
-import { PersonAvatar } from '@/components/person';
+import { UserAvatar } from '@/components/person';
 import { Badge } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/menu';
 import { useFormat } from '@/lib/format';
-import { useAccountMap, useCategoryMap, useMemberNames, useTags } from '@/lib/queries';
+import { useAccountMap, useCategoryMap, useMemberProfiles, useTags } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
@@ -32,11 +32,12 @@ export function TransactionRow({
   const accounts = useAccountMap();
   const categories = useCategoryMap();
   const { data: tags = [] } = useTags();
-  const people = useMemberNames();
+  const people = useMemberProfiles();
   const { me } = useSession();
   // In a shared workspace, mark what other people added (your own entries stay unmarked).
-  const addedBy =
+  const author =
     people && tx.createdBy && tx.createdBy !== me.user.id ? people.get(tx.createdBy) : undefined;
+  const addedBy = author?.name;
   const account = accounts.get(tx.accountId);
   const isSplit = tx.splits.length > 1;
   const category =
@@ -74,9 +75,6 @@ export function TransactionRow({
           checked={selected}
           onCheckedChange={(v) => onSelect?.(v === true)}
           aria-label={`Select ${title}`}
-          className={cn(
-            !selected && 'sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100',
-          )}
         />
       )}
       <button
@@ -115,9 +113,10 @@ export function TransactionRow({
               <Lock className="size-3 shrink-0 text-muted-foreground/70" aria-label="Reconciled" />
             )}
             {addedBy && tx.createdBy && (
-              <PersonAvatar
+              <UserAvatar
                 id={tx.createdBy}
                 name={addedBy}
+                avatar={author?.avatar}
                 size="xs"
                 label={`Added by ${addedBy}`}
               />

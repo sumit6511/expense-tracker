@@ -1,7 +1,9 @@
 import { CreateWorkspaceSchema, MeSchema, UpdateMeSchema, WorkspaceSchema } from '@et/shared';
 import { createRoute } from '@hono/zod-openapi';
 import { z } from 'zod';
+import { badRequest } from '../lib/errors';
 import { createRouter, errorResponses, jsonBody, jsonContent, requireUser } from '../lib/openapi';
+import { getAvatarPhoto, setAvatarPhoto } from '../services/avatars';
 import { restoreBackup } from '../services/backup';
 import { createWorkspace, getMe, listWorkspaces, updateMe } from '../services/workspaces';
 
@@ -40,6 +42,67 @@ meRouter.openapi(
   async (c) => {
     const user = requireUser(c.get('user'));
     return c.json(await updateMe(c.get('deps').db, user.id, c.req.valid('json')), 200);
+  },
+);
+
+meRouter.openapi(
+  createRoute({
+    method: 'post',
+    path: '/me/avatar',
+    tags: ['Me'],
+    summary: 'Upload a profile photo (JPG, PNG or WebP, at most 512 KB)',
+    request: {
+      body: {
+        required: true,
+        content: {
+          'multipart/form-data': {
+            schema: {
+              type: 'object',
+              properties: { file: { type: 'string', format: 'binary' } },
+              required: ['file'],
+            },
+          },
+        },
+      },
+    },
+    responses: { 200: jsonContent(MeSchema), ...errorResponses },
+  }),
+  async (c) => {
+    const user = requireUser(c.get('user'));
+    const file = (await c.req.parseBody()).file;
+    if (!(file instanceof File)) throw badRequest('Send the photo in a "file" form field');
+    const db = c.get('deps').db;
+    await setAvatarPhoto(db, user.id, Buffer.from(await file.arrayBuffer()));
+    return c.json(await getMe(db, user.id), 200);
+  },
+);
+
+meRouter.openapi(
+  createRoute({
+    method: 'get',
+    path: '/avatars/{userId}',
+    tags: ['Me'],
+    summary: "Someone's profile photo (yours, or a person you share a workspace with)",
+    request: { params: z.object({ userId: z.string().min(1).max(100) }) },
+    responses: {
+      200: {
+        description: 'The photo',
+        content: { 'image/*': { schema: { type: 'string', format: 'binary' } } },
+      },
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const viewer = requireUser(c.get('user'));
+    const photo = await getAvatarPhoto(c.get('deps').db, viewer.id, c.req.valid('param').userId);
+    return c.body(new Uint8Array(photo.data), 200, {
+      'Content-Type': photo.contentType,
+      'Content-Length': String(photo.data.length),
+      // The address changes with each new photo, so it can be kept.
+      'Cache-Control': 'private, max-age=31536000, immutable',
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'X-Content-Type-Options': 'nosniff',
+    });
   },
 );
 

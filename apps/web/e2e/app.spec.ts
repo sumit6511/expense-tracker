@@ -373,6 +373,40 @@ test.describe('everyday use', () => {
     await expect(page.getByText('Rs. 20').first()).toBeVisible();
   });
 
+  test('choose a profile picture, or use a photo', async ({ signedIn: page }) => {
+    await page.goto('/settings?tab=profile');
+    await page.getByRole('button', { name: 'Change picture' }).click();
+    await page.getByRole('button', { name: 'Mountain' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByText('Picture updated')).toBeVisible();
+    expect((await (await page.request.get('/api/v1/me')).json()).user.avatar).toBe(
+      'preset:mountain',
+    );
+
+    await page.getByRole('button', { name: 'Change picture' }).click();
+    await page.getByRole('tab', { name: 'Photo' }).click();
+    await page
+      .getByRole('dialog')
+      .locator('input[type=file]')
+      .setInputFiles({
+        name: 'me.png',
+        mimeType: 'image/png',
+        buffer: Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+          'base64',
+        ),
+      });
+    await expect(page.getByRole('dialog').getByRole('img', { name: 'Preview' })).toBeVisible();
+    await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('dialog')).toBeHidden();
+    const avatar = (await (await page.request.get('/api/v1/me')).json()).user.avatar as string;
+    expect(avatar).toMatch(/^\/api\/v1\/avatars\//);
+    expect((await page.request.get(avatar)).ok()).toBeTruthy();
+
+    await page.getByRole('button', { name: 'Remove' }).click();
+    await expect(page.getByText('Picture removed')).toBeVisible();
+  });
+
   test('describe a transaction in words (no AI needed)', async ({ signedIn: page }) => {
     await page.keyboard.press('n');
     const dialog = page.getByRole('dialog');

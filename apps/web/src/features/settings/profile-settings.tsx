@@ -12,6 +12,7 @@ import { authApi, errorMessage } from '@/lib/api';
 import { clearOfflineData } from '@/lib/offline';
 import { useUpdateMe } from '@/lib/queries';
 import { useSession } from '@/lib/session';
+import { ProfilePicture } from './avatar-picker';
 import { SecuritySettings } from './security-settings';
 
 export function ProfileSettings() {
@@ -92,7 +93,8 @@ export function ProfileSettings() {
         <CardHeader>
           <CardTitle>Profile</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="grid grid-cols-1 gap-5">
+          <ProfilePicture />
           <form onSubmit={saveName} className="grid grid-cols-1 gap-4">
             <Field label="Name" htmlFor="profile-name">
               <Input

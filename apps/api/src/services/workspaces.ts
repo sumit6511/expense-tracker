@@ -24,6 +24,7 @@ import {
   workspaces,
 } from '../db/schema';
 import { badRequest, notFound } from '../lib/errors';
+import { avatarValue, setAvatarChoice } from './avatars';
 
 type WorkspaceRow = typeof workspaces.$inferSelect;
 
@@ -88,6 +89,7 @@ export async function getMe(db: Db, userId: string): Promise<Me> {
       locale: u.locale,
       twoFactorEnabled: u.twoFactorEnabled,
       tourCompleted: u.tourCompletedAt !== null,
+      avatar: avatarValue(u.id, u.image),
     },
     workspaces: list,
     defaultWorkspaceId: defaultId,
@@ -117,6 +119,7 @@ export async function updateMe(db: Db, userId: string, input: UpdateMeInput): Pr
     patch.tourCompletedAt = input.tourCompleted ? new Date() : null;
   }
   if (Object.keys(patch).length > 0) await db.update(user).set(patch).where(eq(user.id, userId));
+  if (input.avatar !== undefined) await setAvatarChoice(db, userId, input.avatar);
   return getMe(db, userId);
 }
 

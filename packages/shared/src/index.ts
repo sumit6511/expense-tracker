@@ -1,4 +1,5 @@
 export * from './ai';
+export * from './avatars';
 export * from './bs';
 export { BS_FIRST_YEAR, BS_VERIFIED_THROUGH_YEAR } from './bs-data';
 export * from './budgeting';

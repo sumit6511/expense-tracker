@@ -1,8 +1,7 @@
 import { MAX_ATTACHMENT_BYTES } from '@et/shared';
-import { Camera, FileText, Loader2, X } from 'lucide-react';
+import { FileText, ImagePlus, Loader2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/input';
 import { errorMessage } from '@/lib/api';
 import {
@@ -12,6 +11,7 @@ import {
   useUploadAttachment,
 } from '@/lib/queries';
 import { useWorkspace } from '@/lib/session';
+import { cn } from '@/lib/utils';
 
 const MAX_SIDE = 2000;
 
@@ -99,43 +99,125 @@ export function ReceiptsField({
     if (n) toast.success(n === 1 ? 'Receipt attached' : `${n} files attached`);
   }
 
+  // Dragging files over the dialog: the zone lights up; a drop elsewhere mustn't open the file
+  // in the tab (and lose the form).
+  const [dragging, setDragging] = useState(false);
+  const depth = useRef(0);
+  useEffect(() => {
+    if (disabled) return;
+    const keep = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes('Files')) e.preventDefault();
+    };
+    window.addEventListener('dragover', keep);
+    window.addEventListener('drop', keep);
+    return () => {
+      window.removeEventListener('dragover', keep);
+      window.removeEventListener('drop', keep);
+    };
+  }, [disabled]);
+
+  function accept(files: File[]) {
+    const usable = files.filter((f) => f.type.startsWith('image/') || f.type === 'application/pdf');
+    if (usable.length < files.length) toast.error('Only photos and PDFs can be attached');
+    void add(usable);
+  }
+
+  const count = saved.length + queued.length;
   return (
     <div className="grid grid-cols-1 gap-1.5">
       <Label>Receipts</Label>
-      <div className="flex flex-wrap gap-2">
-        {saved.map((a) => (
-          <Thumb
-            key={a.id}
-            name={a.fileName}
-            href={attachmentUrl(ws.id, a.id)}
-            image={a.contentType.startsWith('image/')}
-            onRemove={
-              disabled
-                ? undefined
-                : () => remove.mutate(a.id, { onError: (e) => toast.error(errorMessage(e)) })
-            }
-          />
-        ))}
-        {queued.map((file) => (
-          <QueuedThumb
-            key={`${file.name}-${file.size}-${file.lastModified}`}
-            file={file}
-            onRemove={() => onQueue(queued.filter((q) => q !== file))}
-          />
-        ))}
-        {!disabled && (
-          <Button
-            type="button"
-            variant="outline"
-            className="h-16 w-16 flex-col gap-1 p-0 text-[11px]"
-            onClick={() => input.current?.click()}
-            disabled={busy}
+      {count > 0 && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {saved.map((a) => (
+            <Thumb
+              key={a.id}
+              name={a.fileName}
+              href={attachmentUrl(ws.id, a.id)}
+              image={a.contentType.startsWith('image/')}
+              onRemove={
+                disabled
+                  ? undefined
+                  : () => remove.mutate(a.id, { onError: (e) => toast.error(errorMessage(e)) })
+              }
+            />
+          ))}
+          {queued.map((file) => (
+            <QueuedThumb
+              key={`${file.name}-${file.size}-${file.lastModified}`}
+              file={file}
+              onRemove={() => onQueue(queued.filter((q) => q !== file))}
+            />
+          ))}
+        </div>
+      )}
+      {!disabled && (
+        <button
+          id="receipts-add"
+          type="button"
+          onClick={() => input.current?.click()}
+          disabled={busy}
+          onDragEnter={(e) => {
+            if (!e.dataTransfer.types.includes('Files')) return;
+            depth.current++;
+            setDragging(true);
+          }}
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes('Files')) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+          }}
+          onDragLeave={() => {
+            depth.current = Math.max(0, depth.current - 1);
+            if (depth.current === 0) setDragging(false);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            depth.current = 0;
+            setDragging(false);
+            accept([...e.dataTransfer.files]);
+          }}
+          className={cn(
+            'flex w-full items-center gap-3 rounded-xl border-2 border-dashed px-4 text-left transition-colors focus-visible:border-primary disabled:opacity-60',
+            count > 0 ? 'py-2.5' : 'py-4',
+            dragging
+              ? 'border-primary bg-accent text-accent-foreground'
+              : 'border-input bg-muted/30 hover:border-primary/50 hover:bg-muted/60',
+          )}
+        >
+          <span
+            className={cn(
+              'grid shrink-0 place-items-center rounded-full bg-accent text-accent-foreground',
+              count > 0 ? 'size-8' : 'size-10',
+            )}
           >
-            {busy ? <Loader2 className="animate-spin" /> : <Camera />}
-            Add
-          </Button>
-        )}
-      </div>
+            {busy ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : (
+              <ImagePlus className={count > 0 ? 'size-4' : 'size-5'} />
+            )}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-medium">
+              {busy
+                ? 'Uploading…'
+                : dragging
+                  ? 'Drop to attach'
+                  : count > 0
+                    ? 'Add another receipt'
+                    : 'Add a receipt'}
+            </span>
+            {count === 0 && !dragging && (
+              <span className="block text-xs text-muted-foreground">
+                <span className="hidden sm:inline">
+                  Drag a photo or PDF here, or click to choose.{' '}
+                </span>
+                <span className="sm:hidden">Take a photo or choose a file. </span>
+                JPG, PNG or PDF, up to 5 MB.
+              </span>
+            )}
+          </span>
+        </button>
+      )}
       <input
         ref={input}
         type="file"

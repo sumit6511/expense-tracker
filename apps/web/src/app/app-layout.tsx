@@ -29,6 +29,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { UserAvatar } from '@/components/person';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -489,9 +490,7 @@ function UserMenu() {
           type="button"
           className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-muted"
         >
-          <span className="grid grid-cols-1 size-7 place-items-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-            {me.user.name.slice(0, 1).toUpperCase()}
-          </span>
+          <UserAvatar id={me.user.id} name={me.user.name} avatar={me.user.avatar} size="sm" />
           <span className="min-w-0 truncate text-sm">{me.user.name}</span>
         </button>
       </DropdownMenuTrigger>
