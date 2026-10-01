@@ -29,6 +29,7 @@ import {
   Loader2,
   MessageSquareText,
   Save,
+  Smartphone,
   Undo2,
   Upload,
   Wand2,
@@ -45,6 +46,7 @@ import { Field, Input, NativeSelect, Textarea } from '@/components/ui/input';
 import { Checkbox, Segmented } from '@/components/ui/menu';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
+import { canReadPhoneSms, readPhoneAlerts } from '@/lib/native';
 import {
   useAccountMap,
   useAccounts,
@@ -191,6 +193,10 @@ export function ImportPage() {
   const [profileName, setProfileName] = useState('');
   const [mode, setMode] = useState<'file' | 'sms'>('file');
   const [smsText, setSmsText] = useState('');
+  const fromPhone = canReadPhoneSms();
+  const [readingPhone, setReadingPhone] = useState(false);
+  /** Marks the phone's messages as read once they're imported. */
+  const phoneDone = useRef<(() => void) | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const session = useSession();
   const { data: categoryGroups = [] } = useCategories();
@@ -288,6 +294,30 @@ export function ImportPage() {
       setStep('map');
     } catch (err) {
       toast.error(errorMessage(err));
+    }
+  }
+
+  async function onPhone() {
+    setReadingPhone(true);
+    try {
+      const { alerts, done } = await readPhoneAlerts(
+        session.workspace.id,
+        (body) => parseBankSms(body, { today: f.today, digits }).rows.length > 0,
+      );
+      if (alerts.length === 0) {
+        done();
+        toast('No new bank or wallet alerts on this phone');
+        return;
+      }
+      phoneDone.current = done;
+      setSmsText(alerts.map((m) => m.body.trim()).join('\n\n'));
+      toast.success(
+        `Found ${alerts.length} alert${alerts.length === 1 ? '' : 's'}. Check them, then read them in.`,
+      );
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setReadingPhone(false);
     }
   }
 
@@ -392,6 +422,10 @@ export function ImportPage() {
         })),
       });
       setResult(batch);
+      if (file?.source === 'sms') {
+        phoneDone.current?.();
+        phoneDone.current = null;
+      }
       setStep('done');
     } catch (err) {
       toast.error(errorMessage(err));
@@ -466,7 +500,7 @@ export function ImportPage() {
               onChange={setMode}
               options={[
                 { value: 'file', label: 'Statement file' },
-                { value: 'sms', label: 'Paste SMS alerts' },
+                { value: 'sms', label: fromPhone ? 'SMS alerts' : 'Paste SMS alerts' },
               ]}
             />
             {mode === 'sms' ? (
@@ -486,6 +520,17 @@ export function ImportPage() {
                     }
                   />
                 </Field>
+                {fromPhone && (
+                  <Button
+                    variant="outline"
+                    className="justify-self-start"
+                    onClick={onPhone}
+                    disabled={readingPhone}
+                  >
+                    {readingPhone ? <Loader2 className="animate-spin" /> : <Smartphone />} Read
+                    alerts from this phone
+                  </Button>
+                )}
                 <Button
                   className="justify-self-start"
                   onClick={onSms}
@@ -937,7 +982,8 @@ export function ImportPage() {
             </Button>
             <Button onClick={doImport} disabled={commit.isPending || include.every((x) => !x)}>
               {commit.isPending ? <Loader2 className="animate-spin" /> : <Upload />} Import{' '}
-              {include.filter(Boolean).length} transactions
+              {include.filter(Boolean).length} transaction
+              {include.filter(Boolean).length === 1 ? '' : 's'}
             </Button>
           </div>
         </div>
@@ -947,7 +993,9 @@ export function ImportPage() {
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
             <CircleCheck className="size-10 text-positive" />
-            <h2 className="text-lg font-semibold">Imported {result.created} transactions</h2>
+            <h2 className="text-lg font-semibold">
+              Imported {result.created} transaction{result.created === 1 ? '' : 's'}
+            </h2>
             <p className="max-w-md text-sm text-muted-foreground">
               {result.skipped > 0 ? `${result.skipped} skipped. ` : ''}They wait in the review inbox
               so you can check categories quickly (unless a rule already confirmed them).

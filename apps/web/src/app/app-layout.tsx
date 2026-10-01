@@ -64,6 +64,7 @@ import {
   useCanWrite,
   useSession,
 } from '@/lib/session';
+import { takeSharedReceipts } from '@/lib/shared-receipts';
 import { cn } from '@/lib/utils';
 import { CommandPalette } from './command-palette';
 import { OutboxBanner } from './outbox-banner';
@@ -215,6 +216,19 @@ function Shell() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [openNew, canWrite]);
+
+  // A receipt shared to the installed app (public/share-sw.js) starts a new expense with it.
+  const router = useRouter();
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('shared')) return;
+    url.searchParams.delete('shared');
+    router.history.replace(`${url.pathname}${url.search}${url.hash}`);
+    if (!canWrite) return;
+    void takeSharedReceipts().then(({ files, text }) => {
+      if (files.length || text) openNew({ mode: 'expense', files, ...(text && { notes: text }) });
+    });
+  }, [router, openNew, canWrite]);
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_1fr] print:block">

@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/components
 import { Switch } from '@/components/ui/menu';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
+import { isNativeApp } from '@/lib/native';
 import {
   currentSubscription,
   deviceLabel,
@@ -224,7 +225,9 @@ function PushCard() {
   const blocked = support === 'supported' && Notification.permission === 'denied';
   const hint =
     support !== 'supported'
-      ? 'This browser can’t show notifications from the app. On iPhone and iPad, add the app to your Home Screen first, then open it from there.'
+      ? isNativeApp()
+        ? 'The Android app can’t show push notifications yet. Open the app in Chrome (and install it from there) to get them, or turn on email above.'
+        : 'This browser can’t show notifications from the app. On iPhone and iPad, add the app to your Home Screen first, then open it from there.'
       : blocked
         ? 'Notifications are blocked for this site. Allow them in your browser’s site settings, then try again.'
         : state === 'on'

@@ -11,7 +11,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['favicon.svg', 'theme-init.js', 'push-sw.js'],
+      includeAssets: ['favicon.svg', 'theme-init.js', 'push-sw.js', 'share-sw.js'],
       manifest: {
         name: 'Expense Tracker',
         short_name: 'Expenses',
@@ -31,11 +31,23 @@ export default defineConfig({
             purpose: 'maskable',
           },
         ],
+        // "Share" a receipt photo or PDF to the installed app to start an expense with it.
+        share_target: {
+          action: '/share-target',
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: {
+            title: 'title',
+            text: 'text',
+            url: 'url',
+            files: [{ name: 'receipt', accept: ['image/*', 'application/pdf'] }],
+          },
+        },
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        // Shows push notifications and opens the app when one is tapped.
-        importScripts: ['/push-sw.js'],
+        // Shows push notifications and opens the app when one is tapped; receives shared receipts.
+        importScripts: ['/push-sw.js', '/share-sw.js'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
         // So the app opens and quick add works offline, keep the last copy of the reference data

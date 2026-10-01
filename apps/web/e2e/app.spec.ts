@@ -718,8 +718,8 @@ test.describe('everyday use', () => {
     await page.getByRole('button', { name: 'Read messages' }).click();
     await expect(page.getByText('1 of 1 will be imported into Nabil Bank')).toBeVisible();
     await expect(page.getByText(/didn’t look like a transaction/)).toBeVisible();
-    await page.getByRole('button', { name: 'Import 1 transactions' }).click();
-    await expect(page.getByRole('heading', { name: 'Imported 1 transactions' })).toBeVisible();
+    await page.getByRole('button', { name: 'Import 1 transaction' }).click();
+    await expect(page.getByRole('heading', { name: 'Imported 1 transaction' })).toBeVisible();
   });
 
   test('add an expense offline; it syncs when back online', async ({ signedIn: page }) => {
@@ -848,7 +848,7 @@ test.describe('everyday use', () => {
     try {
       await page.goto('/settings?tab=integrations');
       await page.getByRole('button', { name: 'Add webhook' }).click();
-      await page.getByLabel('Address').fill(`http://127.0.0.1:${port}/hook`);
+      await page.getByLabel('Address', { exact: true }).fill(`http://127.0.0.1:${port}/hook`);
       await page.getByLabel('Description').fill('Spreadsheet');
       await page.getByRole('button', { name: 'Add webhook' }).last().click();
       const secret = await page.getByLabel('Signing secret').inputValue();
@@ -916,6 +916,68 @@ test.describe('everyday use', () => {
     const log = page.getByRole('list', { name: 'Recent emails' });
     await expect(log.getByText('Fwd: tea 120 cash at Chiya Pasal')).toBeVisible();
     await expect(log.getByText('Added')).toBeVisible();
+  });
+
+  test('in the Android app, read bank alerts from the phone', async ({ signedIn: page }) => {
+    // Stand in for the native shell: its bridge, and an inbox with two alerts and a chat.
+    await page.addInitScript(() => {
+      const now = Date.now();
+      const w = window as unknown as Record<string, unknown>;
+      w.androidBridge = { postMessage() {} };
+      w.Capacitor = {
+        PluginHeaders: [{ name: 'SmsInbox', methods: [{ name: 'read', rtype: 'promise' }] }],
+        nativePromise: async () => ({
+          messages: [
+            {
+              id: '2',
+              sender: 'NABIL_ALERT',
+              date: now - 3_600_000,
+              body: 'Dear Customer, your A/C 01XXXX456 has been debited by NPR 1,250.00. Remarks: POS/BHAT BHATENI. Ref: 445566. Bal: NPR 45,000.00',
+            },
+            { id: '1', sender: '9841000000', date: now - 7_200_000, body: 'See you at 5?' },
+          ],
+        }),
+      };
+    });
+    await page.goto('/import');
+    await page.getByLabel('Import into account').selectOption({ label: 'Nabil Bank (NPR)' });
+    await page.getByText('SMS alerts', { exact: true }).click();
+    await page.getByRole('button', { name: 'Read alerts from this phone' }).click();
+    await expect(page.getByText('Found 1 alert.', { exact: false })).toBeVisible();
+    await expect(page.getByLabel('Alert messages')).toHaveValue(/BHAT BHATENI/);
+    await expect(page.getByLabel('Alert messages')).not.toHaveValue(/See you/);
+    await page.getByRole('button', { name: 'Read messages' }).click();
+    await page.getByRole('button', { name: /^Import 1 transaction/ }).click();
+    await expect(page.getByRole('heading', { name: 'Imported 1 transaction' })).toBeVisible();
+  });
+
+  test('share a receipt to the installed app', async ({ signedIn: page }) => {
+    await page.goto('/');
+    await page.waitForFunction(
+      async () => (await navigator.serviceWorker.ready).active?.state === 'activated',
+    );
+    await page.reload();
+    await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+    // What Android does when a photo is shared to the app: a form POST the service worker takes.
+    const status = await page.evaluate(async () => {
+      const png = Uint8Array.from(
+        atob(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        ),
+        (c) => c.charCodeAt(0),
+      );
+      const form = new FormData();
+      form.append('receipt', new File([png], 'bill.png', { type: 'image/png' }));
+      form.append('text', 'Dinner at Thakali Kitchen');
+      const res = await fetch('/share-target', { method: 'POST', body: form, redirect: 'manual' });
+      return res.type;
+    });
+    expect(status).toBe('opaqueredirect');
+    await page.goto('/?shared=1');
+    const dialog = page.getByRole('dialog', { name: 'New expense' });
+    await expect(dialog.getByRole('button', { name: 'Remove bill.png' })).toBeVisible();
+    await expect(dialog.getByLabel('Notes')).toHaveValue('Dinner at Thakali Kitchen');
+    await expect(page).toHaveURL(/\/$/);
   });
 
   test('reports and settings pages load', async ({ signedIn: page }) => {
