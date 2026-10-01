@@ -3,6 +3,7 @@ import type { AiProvider } from './ai/provider';
 import type { Auth } from './auth';
 import type { Db } from './db/client';
 import type { Env } from './env';
+import type { WebhookSender } from './lib/webhook-http';
 import type { Logger } from './logger';
 import type { Mailer } from './mailer';
 import type { Pusher } from './push';
@@ -19,6 +20,8 @@ export interface Deps {
   pusher: Pusher | null;
   /** Null when no AI provider is set up. */
   ai: AiProvider | null;
+  /** Sends webhook requests (a fake in tests). */
+  webhookSender: WebhookSender;
 }
 
 export interface SessionUser {

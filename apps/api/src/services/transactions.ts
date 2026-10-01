@@ -14,7 +14,7 @@ import {
 import { and, asc, eq, inArray, isNotNull, isNull, ne, type SQL, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { WorkspaceCtx } from '../context';
-import type { Db, Executor } from '../db/client';
+import { type Db, type Executor, inParallel } from '../db/client';
 import {
   accounts,
   attachments,
@@ -53,40 +53,45 @@ async function hydrate(
     ...new Set(rows.map((r) => r.transferGroupId).filter((g): g is string => g !== null)),
   ];
 
-  const [splits, tagRows, payeeRows, accountRows, peerRows, attachmentRows] = await Promise.all([
-    db
-      .select()
-      .from(transactionSplits)
-      .where(inArray(transactionSplits.transactionId, ids))
-      .orderBy(asc(transactionSplits.sortOrder), asc(transactionSplits.id)),
-    db.select().from(transactionTags).where(inArray(transactionTags.transactionId, ids)),
-    payeeIds.length
-      ? db
-          .select({ id: payees.id, name: payees.name })
-          .from(payees)
-          .where(inArray(payees.id, payeeIds))
-      : Promise.resolve([]),
-    db
-      .select({ id: accounts.id, currency: accounts.currency })
-      .from(accounts)
-      .where(inArray(accounts.id, accountIds)),
-    groups.length
-      ? db
-          .select({
-            id: transactions.id,
-            accountId: transactions.accountId,
-            amountMinor: transactions.amountMinor,
-            group: transactions.transferGroupId,
-          })
-          .from(transactions)
-          .where(inArray(transactions.transferGroupId, groups))
-      : Promise.resolve([]),
-    db
-      .select({ id: attachments.transactionId, n: sql<number>`count(*)::int` })
-      .from(attachments)
-      .where(inArray(attachments.transactionId, ids))
-      .groupBy(attachments.transactionId),
-  ]);
+  const [splits, tagRows, payeeRows, accountRows, peerRows, attachmentRows] = await inParallel(db, [
+    () =>
+      db
+        .select()
+        .from(transactionSplits)
+        .where(inArray(transactionSplits.transactionId, ids))
+        .orderBy(asc(transactionSplits.sortOrder), asc(transactionSplits.id)),
+    () => db.select().from(transactionTags).where(inArray(transactionTags.transactionId, ids)),
+    () =>
+      payeeIds.length
+        ? db
+            .select({ id: payees.id, name: payees.name })
+            .from(payees)
+            .where(inArray(payees.id, payeeIds))
+        : Promise.resolve([]),
+    () =>
+      db
+        .select({ id: accounts.id, currency: accounts.currency })
+        .from(accounts)
+        .where(inArray(accounts.id, accountIds)),
+    () =>
+      groups.length
+        ? db
+            .select({
+              id: transactions.id,
+              accountId: transactions.accountId,
+              amountMinor: transactions.amountMinor,
+              group: transactions.transferGroupId,
+            })
+            .from(transactions)
+            .where(inArray(transactions.transferGroupId, groups))
+        : Promise.resolve([]),
+    () =>
+      db
+        .select({ id: attachments.transactionId, n: sql<number>`count(*)::int` })
+        .from(attachments)
+        .where(inArray(attachments.transactionId, ids))
+        .groupBy(attachments.transactionId),
+  ] as const);
 
   const splitsByTx = Map.groupBy(splits, (s) => s.transactionId);
   const tagsByTx = Map.groupBy(tagRows, (t) => t.transactionId);

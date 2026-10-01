@@ -18,10 +18,12 @@ import type {
   CreateApiToken,
   CreateCategoryInput,
   CreatedApiToken,
+  CreatedWebhook,
   CreateInvitationInput,
   CreateSplitGroupInput,
   CreateTransactionInput,
   CreateTransferInput,
+  CreateWebhook,
   CreateWorkspaceInput,
   DailySpending,
   Dashboard,
@@ -78,7 +80,11 @@ import type {
   UpdateMeInput,
   UpdateNotificationPrefs,
   UpdateTransactionInput,
+  UpdateWebhook,
   UpdateWorkspaceInput,
+  Webhook,
+  WebhookDelivery,
+  WebhookTestResult,
   Workspace,
 } from '@et/shared';
 import {
@@ -1103,3 +1109,47 @@ export const useCreateApiToken = () =>
   );
 export const useRevokeApiToken = () =>
   useWsMutation((base, id: string) => api<undefined>(`${base}/tokens/${id}`, { method: 'DELETE' }));
+
+// Webhooks (owners and admins) ----------------------------------------------------------------
+
+export function useWebhooks(enabled = true) {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'webhooks'],
+    queryFn: () => api<Webhook[]>(`${base}/webhooks`),
+    enabled,
+  });
+}
+export function useWebhookDeliveries(id: string, enabled: boolean) {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'webhooks', id, 'deliveries'],
+    queryFn: () => api<WebhookDelivery[]>(`${base}/webhooks/${id}/deliveries`),
+    enabled,
+    refetchInterval: enabled ? 10_000 : false,
+  });
+}
+export const useCreateWebhook = () =>
+  useWsMutation((base, input: CreateWebhook) =>
+    api<CreatedWebhook>(`${base}/webhooks`, { method: 'POST', body: input }),
+  );
+export const useUpdateWebhook = () =>
+  useWsMutation((base, { id, ...body }: UpdateWebhook & { id: string }) =>
+    api<Webhook>(`${base}/webhooks/${id}`, { method: 'PATCH', body }),
+  );
+export const useDeleteWebhook = () =>
+  useWsMutation((base, id: string) =>
+    api<undefined>(`${base}/webhooks/${id}`, { method: 'DELETE' }),
+  );
+export const useRotateWebhookSecret = () =>
+  useWsMutation((base, id: string) =>
+    api<{ secret: string }>(`${base}/webhooks/${id}/secret`, { method: 'POST' }),
+  );
+export const useTestWebhook = () =>
+  useWsMutation((base, id: string) =>
+    api<WebhookTestResult>(`${base}/webhooks/${id}/test`, { method: 'POST' }),
+  );
+export const useRetryWebhookDelivery = () =>
+  useWsMutation((base, { id, deliveryId }: { id: string; deliveryId: string }) =>
+    api<undefined>(`${base}/webhooks/${id}/deliveries/${deliveryId}/retry`, { method: 'POST' }),
+  );

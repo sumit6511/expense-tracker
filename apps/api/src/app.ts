@@ -30,6 +30,7 @@ import { rulesRouter } from './routes/rules';
 import { splitRouter } from './routes/split';
 import { tokensRouter } from './routes/tokens';
 import { transactionsRouter } from './routes/transactions';
+import { webhooksRouter } from './routes/webhooks';
 import { workspaceRouter } from './routes/workspace';
 
 const CONTENT_SECURITY_POLICY = [
@@ -125,6 +126,7 @@ export function createApp(deps: Deps) {
     insightsRouter,
     aiRouter,
     tokensRouter,
+    webhooksRouter,
   ]) {
     api.route('/', router);
   }

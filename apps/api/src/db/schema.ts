@@ -975,3 +975,74 @@ export const apiTokens = pgTable(
     }).onDelete('cascade'),
   ],
 );
+
+// ---------------------------------------------------------------------------------------------
+// Integrations: webhooks
+// ---------------------------------------------------------------------------------------------
+
+export const webhookDeliveryStatusEnum = pgEnum('webhook_delivery_status', [
+  'pending',
+  'succeeded',
+  'failed',
+]);
+
+/** Where to send transaction changes. The signing secret is kept sealed (see lib/secrets.ts). */
+export const webhooks = pgTable(
+  'webhooks',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    url: text().notNull(),
+    description: text().notNull().default(''),
+    events: text().array().notNull(),
+    secretSealed: text().notNull(),
+    enabled: boolean().notNull().default(true),
+    disabledReason: text(),
+    createdBy: text().references(() => user.id, { onDelete: 'set null' }),
+    lastSuccessAt: timestamp({ withTimezone: true }),
+    failingSince: timestamp({ withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index().on(t.workspaceId)],
+);
+
+/**
+ * Transaction changes waiting to become webhook deliveries. Filled by database triggers on
+ * transactions, their splits and tags (only for workspaces with a webhook turned on), so every
+ * way of changing a transaction is covered, and only changes that were committed.
+ */
+export const webhookOutbox = pgTable('webhook_outbox', {
+  id: bigint({ mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  workspaceId: uuid().notNull(),
+  transactionId: uuid().notNull(),
+  /** created | updated | deleted */
+  op: text().notNull(),
+  at: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});
+
+export const webhookDeliveries = pgTable(
+  'webhook_deliveries',
+  {
+    id: uuid().primaryKey(),
+    webhookId: uuid()
+      .notNull()
+      .references(() => webhooks.id, { onDelete: 'cascade' }),
+    /** The event's id, shared by its deliveries to every webhook and sent as `webhook-id`. */
+    eventId: uuid().notNull(),
+    event: text().notNull(),
+    payload: jsonb().notNull(),
+    status: webhookDeliveryStatusEnum().notNull().default('pending'),
+    attempts: smallint().notNull().default(0),
+    nextAttemptAt: timestamp({ withTimezone: true }),
+    responseStatus: integer(),
+    error: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    index().on(t.webhookId, t.createdAt.desc()),
+    index().on(t.nextAttemptAt).where(sql`${t.status} = 'pending'`),
+  ],
+);

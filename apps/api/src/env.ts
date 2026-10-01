@@ -73,6 +73,19 @@ const EnvSchema = z.object({
   AI_MODEL: z.string().default('claude-opus-5-5'),
   /** AI requests allowed per workspace per day. */
   AI_DAILY_LIMIT: z.coerce.number().int().min(0).default(200),
+  /**
+   * Key for secrets the server must read back (webhook signing secrets, bank connections). Defaults
+   * to one derived from AUTH_SECRET; set it to change AUTH_SECRET without losing those.
+   */
+  ENCRYPTION_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(32).optional()),
+  /**
+   * Let webhooks reach private network addresses (e.g. Home Assistant on 192.168.x.x). Off by
+   * default so the server can't be used to probe its own network.
+   */
+  WEBHOOK_ALLOW_PRIVATE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
   /** Allow new sign-ups. Set to false on a personal server once your account exists. */
   ALLOW_SIGNUP: z
     .enum(['true', 'false'])

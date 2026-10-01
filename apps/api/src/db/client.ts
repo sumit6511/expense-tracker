@@ -25,3 +25,20 @@ export function createDb(connectionString: string, max = 10) {
 }
 
 export { schema };
+
+/**
+ * Runs independent queries side by side on the pool, but one after another inside a transaction:
+ * a transaction has a single connection, and overlapping queries on one connection are
+ * deprecated in node-postgres.
+ */
+export async function inParallel<T extends readonly (() => PromiseLike<unknown>)[]>(
+  db: Executor,
+  tasks: T,
+): Promise<{ -readonly [K in keyof T]: Awaited<ReturnType<T[K]>> }> {
+  if ('rollback' in db) {
+    const results: unknown[] = [];
+    for (const task of tasks) results.push(await task());
+    return results as never;
+  }
+  return Promise.all(tasks.map((task) => task())) as never;
+}

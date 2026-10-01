@@ -2,6 +2,7 @@ import { createDb } from './db/client';
 import { runMigrations } from './db/migrate';
 import { loadEnv } from './env';
 import { startJobs } from './jobs';
+import { httpSender } from './lib/webhook-http';
 import { createLogger } from './logger';
 import { createMailer } from './mailer';
 import { createPusher } from './push';
@@ -11,17 +12,18 @@ const env = loadEnv();
 const logger = createLogger(env.LOG_LEVEL, env.NODE_ENV === 'development');
 const { db, pool } = createDb(env.DATABASE_URL, 4);
 await runMigrations(db);
-const boss = await startJobs(
+const jobs = await startJobs(
   db,
   env,
   logger,
   createMailer(env, logger),
   await createPusher(db, env, logger),
+  httpSender({ allowPrivate: env.WEBHOOK_ALLOW_PRIVATE }),
 );
 logger.info('worker started');
 
 async function shutdown() {
-  await boss.stop({ graceful: true, timeout: 10_000 });
+  await jobs.stop();
   await pool.end();
   process.exit(0);
 }

@@ -46,6 +46,8 @@ export default defineConfig({
       FX_NRB_ENABLED: 'false',
       // Tests sign up many users a minute; production keeps the limit on.
       AUTH_RATE_LIMIT: 'false',
+      // The webhook test receives on localhost.
+      WEBHOOK_ALLOW_PRIVATE: 'true',
       LOG_LEVEL: 'warn',
     },
   },

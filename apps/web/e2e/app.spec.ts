@@ -1,3 +1,6 @@
+import { createHmac } from 'node:crypto';
+import { createServer, type IncomingHttpHeaders } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { createUser, expect, test, totp } from './fixtures';
 
 test.describe('getting started', () => {
@@ -828,6 +831,56 @@ test.describe('everyday use', () => {
     await expect(page.getByText('No tokens yet.')).toBeVisible();
     expect((await script.get('/api/v1/me')).status()).toBe(401);
     await script.dispose();
+  });
+
+  test('send new transactions to a webhook', async ({ signedIn: page }) => {
+    const received: Array<{ headers: IncomingHttpHeaders; body: string }> = [];
+    const server = createServer((req, res) => {
+      let body = '';
+      req.on('data', (c) => (body += c));
+      req.on('end', () => {
+        received.push({ headers: req.headers, body });
+        res.writeHead(200).end();
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address() as AddressInfo;
+    try {
+      await page.goto('/settings?tab=integrations');
+      await page.getByRole('button', { name: 'Add webhook' }).click();
+      await page.getByLabel('Address').fill(`http://127.0.0.1:${port}/hook`);
+      await page.getByLabel('Description').fill('Spreadsheet');
+      await page.getByRole('button', { name: 'Add webhook' }).last().click();
+      const secret = await page.getByLabel('Signing secret').inputValue();
+      expect(secret).toMatch(/^whsec_/);
+
+      await page.keyboard.press('n');
+      const dialog = page.getByRole('dialog');
+      await dialog.getByLabel('Amount').fill('320');
+      await dialog.getByRole('button', { name: 'Dining Out' }).click();
+      await dialog.getByLabel('Payee').fill('Tea stall');
+      await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+
+      await expect.poll(() => received.length, { timeout: 20_000 }).toBe(1);
+      const [delivery] = received;
+      const event = JSON.parse(delivery!.body);
+      expect(event).toMatchObject({
+        type: 'transaction.created',
+        data: { transaction: { payeeName: 'Tea stall', amountMinor: -32_000 } },
+      });
+      // Signed with the secret shown once in the app.
+      const key = Buffer.from(secret.slice('whsec_'.length), 'base64');
+      const signed = `${delivery!.headers['webhook-id']}.${delivery!.headers['webhook-timestamp']}.${delivery!.body}`;
+      expect(delivery!.headers['webhook-signature']).toBe(
+        `v1,${createHmac('sha256', key).update(signed).digest('base64')}`,
+      );
+
+      await page.getByRole('button', { name: 'Log' }).click();
+      await expect(page.getByText('transaction.created')).toBeVisible();
+      await expect(page.getByText('Delivered', { exact: true })).toBeVisible();
+    } finally {
+      server.close();
+    }
   });
 
   test('reports and settings pages load', async ({ signedIn: page }) => {

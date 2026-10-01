@@ -6,6 +6,7 @@ import { createDb } from './db/client';
 import { runMigrations } from './db/migrate';
 import { loadEnv } from './env';
 import { startJobs } from './jobs';
+import { httpSender } from './lib/webhook-http';
 import { createLogger } from './logger';
 import { createMailer } from './mailer';
 import { createPusher } from './push';
@@ -19,8 +20,11 @@ const auth = createAuth(db, env);
 const mailer = createMailer(env, logger);
 const pusher = await createPusher(db, env, logger);
 const ai = createAiProvider(env, logger);
-const app = createApp({ db, env, auth, logger, mailer, pusher, ai });
-const boss = env.RUN_WORKER ? await startJobs(db, env, logger, mailer, pusher) : null;
+const webhookSender = httpSender({ allowPrivate: env.WEBHOOK_ALLOW_PRIVATE });
+const app = createApp({ db, env, auth, logger, mailer, pusher, ai, webhookSender });
+const jobs = env.RUN_WORKER
+  ? await startJobs(db, env, logger, mailer, pusher, webhookSender)
+  : null;
 
 const server = serve({ fetch: app.fetch, port: env.PORT, hostname: env.HOST }, (info) => {
   logger.info(`API listening on http://${info.address}:${info.port}`);
@@ -32,7 +36,7 @@ async function shutdown(signal: string) {
   stopping = true;
   logger.info({ signal }, 'shutting down');
   server.close();
-  await boss?.stop({ graceful: true, timeout: 10_000 });
+  await jobs?.stop();
   await pool.end();
   process.exit(0);
 }

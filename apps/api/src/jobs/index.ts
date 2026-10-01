@@ -1,7 +1,9 @@
 import { addDays, todayIn } from '@et/shared';
+import pg from 'pg';
 import { PgBoss } from 'pg-boss';
 import type { Db } from '../db/client';
 import type { Env } from '../env';
+import type { WebhookSender } from '../lib/webhook-http';
 import type { Logger } from '../logger';
 import type { Mailer } from '../mailer';
 import type { Pusher } from '../push';
@@ -11,6 +13,7 @@ import { sendPendingPushes } from '../services/push';
 import { fetchNrbRates, storePublishedRates } from '../services/rates';
 import { postDueRecurring } from '../services/recurring';
 import { purgeTrash } from '../services/transactions';
+import { pruneDeliveries, runWebhooks } from '../services/webhooks';
 
 export const QUEUES = {
   fxRefresh: 'fx-refresh',
@@ -46,6 +49,7 @@ export async function startJobs(
   logger: Logger,
   mailer: Mailer | null,
   pusher: Pusher | null,
+  webhookSender: WebhookSender,
 ) {
   const boss = new PgBoss({ connectionString: env.DATABASE_URL, schema: 'pgboss' });
   boss.on('error', (err) => logger.error({ err }, 'job runner error'));
@@ -57,6 +61,7 @@ export async function startJobs(
     const purged = await purgeTrash(db, 30);
     logger.info({ purged }, 'purged old transactions from trash');
     await pruneNotifications(db);
+    await pruneDeliveries(db);
   });
 
   // Hourly, so each workspace's items are recorded soon after midnight in its own time zone.
@@ -109,5 +114,81 @@ export async function startJobs(
     );
   }
 
-  return boss;
+  const webhookDispatcher = await startWebhookDispatcher(db, env, logger, webhookSender);
+
+  return {
+    boss,
+    async stop() {
+      await webhookDispatcher.stop();
+      await boss.stop({ graceful: true, timeout: 10_000 });
+    },
+  };
+}
+
+/**
+ * Webhooks go out within a second or two of a change: the outbox trigger NOTIFYs, and we LISTEN.
+ * A timer also runs every 15 seconds, for retries and in case a notification is missed.
+ */
+export async function startWebhookDispatcher(
+  db: Db,
+  env: Env,
+  logger: Logger,
+  sender: WebhookSender,
+) {
+  let running = false;
+  let again = false;
+  let stopped = false;
+  async function run() {
+    if (stopped) return;
+    if (running) {
+      again = true;
+      return;
+    }
+    running = true;
+    try {
+      do {
+        again = false;
+        await runWebhooks(db, env, sender, logger);
+      } while (again && !stopped);
+    } catch (err) {
+      logger.error({ err }, 'webhook dispatch failed');
+    } finally {
+      running = false;
+    }
+  }
+
+  let debounce: NodeJS.Timeout | undefined;
+  let listener: pg.Client | null = null;
+  async function listen() {
+    const client = new pg.Client({ connectionString: env.DATABASE_URL });
+    client.on('notification', () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => void run(), 300);
+    });
+    client.on('error', (err) => {
+      logger.warn({ err }, 'webhook listener lost its connection; retrying');
+      listener = null;
+      void client.end().catch(() => {});
+      if (!stopped) setTimeout(() => void listen().catch(() => {}), 5_000);
+    });
+    await client.connect();
+    await client.query('LISTEN webhook_outbox');
+    listener = client;
+  }
+  try {
+    await listen();
+  } catch (err) {
+    logger.warn({ err }, 'could not listen for webhook changes; checking every 15 seconds');
+  }
+  const timer = setInterval(() => void run(), 15_000);
+  void run();
+
+  return {
+    async stop() {
+      stopped = true;
+      clearInterval(timer);
+      clearTimeout(debounce);
+      await listener?.end().catch(() => {});
+    },
+  };
 }

@@ -134,6 +134,13 @@
       "when": 1790819800130,
       "tag": "0018_api_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790832400331,
+      "tag": "0019_webhooks",
+      "breakpoints": true
     }
   ]
 }
