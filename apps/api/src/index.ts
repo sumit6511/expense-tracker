@@ -23,7 +23,7 @@ const ai = createAiProvider(env, logger);
 const webhookSender = httpSender({ allowPrivate: env.WEBHOOK_ALLOW_PRIVATE });
 const app = createApp({ db, env, auth, logger, mailer, pusher, ai, webhookSender });
 const jobs = env.RUN_WORKER
-  ? await startJobs(db, env, logger, mailer, pusher, webhookSender)
+  ? await startJobs(db, env, logger, mailer, pusher, webhookSender, ai)
   : null;
 
 const server = serve({ fetch: app.fetch, port: env.PORT, hostname: env.HOST }, (info) => {

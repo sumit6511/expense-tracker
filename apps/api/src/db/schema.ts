@@ -166,6 +166,10 @@ export const workspaces = pgTable('workspaces', {
   envelopeSince: date({ mode: 'string' }),
   /** Optional AI helpers (receipt scan, quick add, questions); off until an owner turns them on. */
   aiEnabled: boolean().notNull().default(false),
+  /** The secret part of the workspace's email-in address (made when first needed). */
+  emailInToken: text().unique(),
+  /** Where emailed receipts and alerts go when nothing says otherwise. */
+  emailInAccountId: uuid(),
   ...timestamps,
 });
 
@@ -349,6 +353,7 @@ export const importSourceEnum = pgEnum('import_source', [
   'camt',
   'sms',
   'pdf',
+  'email',
 ]);
 
 export const importBatches = pgTable(
@@ -1045,4 +1050,76 @@ export const webhookDeliveries = pgTable(
     index().on(t.webhookId, t.createdAt.desc()),
     index().on(t.nextAttemptAt).where(sql`${t.status} = 'pending'`),
   ],
+);
+
+// ---------------------------------------------------------------------------------------------
+// Integrations: email in
+// ---------------------------------------------------------------------------------------------
+
+/** Senders besides members whose mail is read (e.g. a bank's alert address), and their account. */
+export const emailSenders = pgTable(
+  'email_senders',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    /** "alerts@bank.com.np", or "@bank.com.np" for the whole domain. Lower case. */
+    sender: text().notNull(),
+    accountId: uuid().references(() => accounts.id, { onDelete: 'set null' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex().on(t.workspaceId, t.sender)],
+);
+
+export const inboundEmailStatusEnum = pgEnum('inbound_email_status', [
+  'recorded',
+  'needs_review',
+  'duplicate',
+  'ignored',
+]);
+
+/** Every email received for a workspace, and what became of it. */
+export const inboundEmails = pgTable(
+  'inbound_emails',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    messageId: text(),
+    fromAddress: text().notNull(),
+    fromName: text().notNull().default(''),
+    subject: text().notNull().default(''),
+    status: inboundEmailStatusEnum().notNull(),
+    detail: text().notNull().default(''),
+    /** The account it was for: entries about private accounts are only shown to their owner. */
+    accountId: uuid().references(() => accounts.id, { onDelete: 'set null' }),
+    transactionIds: uuid().array().notNull().default(sql`'{}'`),
+    /** What could be read from it, to start a transaction by hand. */
+    draft: jsonb(),
+    /** The member who sent it (null for a trusted sender such as a bank). */
+    userId: text().references(() => user.id, { onDelete: 'set null' }),
+    receivedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index().on(t.workspaceId, t.receivedAt.desc()),
+    uniqueIndex().on(t.workspaceId, t.messageId).where(sql`${t.messageId} is not null`),
+  ],
+);
+
+/** Receipts from an email that didn't become a transaction yet. */
+export const inboundEmailFiles = pgTable(
+  'inbound_email_files',
+  {
+    id: uuid().primaryKey(),
+    inboundEmailId: uuid()
+      .notNull()
+      .references(() => inboundEmails.id, { onDelete: 'cascade' }),
+    fileName: text().notNull(),
+    contentType: text().notNull(),
+    sizeBytes: integer().notNull(),
+    data: bytea().notNull(),
+  },
+  (t) => [index().on(t.inboundEmailId)],
 );

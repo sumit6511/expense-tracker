@@ -27,6 +27,8 @@ import type {
   CreateWorkspaceInput,
   DailySpending,
   Dashboard,
+  EmailIn,
+  EmailSenderInput,
   ExchangeRate,
   FinishReconcileInput,
   Forecast,
@@ -1152,4 +1154,42 @@ export const useTestWebhook = () =>
 export const useRetryWebhookDelivery = () =>
   useWsMutation((base, { id, deliveryId }: { id: string; deliveryId: string }) =>
     api<undefined>(`${base}/webhooks/${id}/deliveries/${deliveryId}/retry`, { method: 'POST' }),
+  );
+
+// Email in -------------------------------------------------------------------------------------
+
+export function useEmailIn() {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'email-in'],
+    queryFn: () => api<EmailIn>(`${base}/email-in`),
+    refetchInterval: 30_000,
+  });
+}
+export const useUpdateEmailIn = () =>
+  useWsMutation((base, input: { defaultAccountId: string | null }) =>
+    api<EmailIn>(`${base}/email-in`, { method: 'PATCH', body: input }),
+  );
+export const useNewEmailAddress = () =>
+  useWsMutation((base, _: undefined) =>
+    api<EmailIn>(`${base}/email-in/address`, { method: 'POST' }),
+  );
+export const useAddEmailSender = () =>
+  useWsMutation((base, input: EmailSenderInput) =>
+    api<EmailIn>(`${base}/email-in/senders`, { method: 'POST', body: input }),
+  );
+export const useRemoveEmailSender = () =>
+  useWsMutation((base, id: string) =>
+    api<EmailIn>(`${base}/email-in/senders/${id}`, { method: 'DELETE' }),
+  );
+export const useDismissEmail = () =>
+  useWsMutation((base, id: string) =>
+    api<undefined>(`${base}/email-in/messages/${id}`, { method: 'DELETE' }),
+  );
+export const useLinkEmail = () =>
+  useWsMutation((base, { id, transactionId }: { id: string; transactionId: string }) =>
+    api<undefined>(`${base}/email-in/messages/${id}/link`, {
+      method: 'POST',
+      body: { transactionId },
+    }),
   );

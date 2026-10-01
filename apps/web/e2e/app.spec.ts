@@ -883,6 +883,41 @@ test.describe('everyday use', () => {
     }
   });
 
+  test('email a receipt in and find it waiting for review', async ({
+    signedIn: page,
+    user,
+    request,
+  }) => {
+    await page.goto('/settings?tab=integrations');
+    const address = await page.getByLabel('Email-in address').inputValue();
+    expect(address).toMatch(/^money\+et[a-z2-7]{14}@example\.com$/);
+
+    const raw = [
+      `From: Asha Test <${user.email}>`,
+      `To: ${address}`,
+      'Subject: Fwd: tea 120 cash at Chiya Pasal',
+      `Message-ID: <e2e-${Date.now()}@example.com>`,
+      'Content-Type: text/plain; charset=utf-8',
+      '',
+      'Forwarded receipt',
+    ].join('\r\n');
+    const res = await request.post('/api/inbound/email', {
+      headers: {
+        authorization: 'Bearer e2e-email-in-secret-0123456789',
+        'content-type': 'message/rfc822',
+      },
+      data: raw,
+    });
+    expect(res.status()).toBe(202);
+
+    await page.goto('/inbox');
+    await expect(page.getByText('Chiya Pasal')).toBeVisible();
+    await page.goto('/settings?tab=integrations');
+    const log = page.getByRole('list', { name: 'Recent emails' });
+    await expect(log.getByText('Fwd: tea 120 cash at Chiya Pasal')).toBeVisible();
+    await expect(log.getByText('Added')).toBeVisible();
+  });
+
   test('reports and settings pages load', async ({ signedIn: page }) => {
     await page.goto('/reports?tab=cashflow');
     await expect(page.getByText('Income and spending per month')).toBeVisible();

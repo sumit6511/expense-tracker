@@ -143,3 +143,86 @@ export const WebhookTestResultSchema = z.object({
   ms: z.number().int(),
 });
 export type WebhookTestResult = z.infer<typeof WebhookTestResultSchema>;
+
+/**
+ * Email in: each workspace gets a private address. Forward receipts (photos or PDFs, with "lunch
+ * 450" as the subject if you like) or have your bank's alert emails sent there, and they become
+ * transactions waiting in the review inbox. Only mail from members, or from senders you trust
+ * (such as your bank's alert address), is read.
+ */
+export const INBOUND_EMAIL_STATUSES = ['recorded', 'needs_review', 'duplicate', 'ignored'] as const;
+export type InboundEmailStatus = (typeof INBOUND_EMAIL_STATUSES)[number];
+
+export const InboundEmailFileSchema = z.object({
+  id: Id,
+  fileName: z.string(),
+  contentType: z.string(),
+  sizeBytes: z.number().int(),
+});
+
+export const InboundEmailSchema = z.object({
+  id: Id,
+  from: z.string(),
+  fromName: z.string(),
+  subject: z.string(),
+  receivedAt: z.string(),
+  /**
+   * recorded: became a transaction; needs_review: nothing to go on (no amount), kept for you to
+   * add by hand; duplicate: you already had it; ignored: not from a member or a trusted sender.
+   */
+  status: z.enum(INBOUND_EMAIL_STATUSES),
+  detail: z.string(),
+  transactionIds: z.array(Id),
+  /** Files kept until it's added or dismissed (30 days at most). */
+  files: z.array(InboundEmailFileSchema),
+  /** What could be read, to start the transaction from. */
+  draft: z
+    .object({
+      accountId: Id.nullable(),
+      date: z.string().nullable(),
+      amountMinor: z.number().int().nullable(),
+      payee: z.string().nullable(),
+      notes: z.string().nullable(),
+    })
+    .nullable(),
+});
+export type InboundEmail = z.infer<typeof InboundEmailSchema>;
+
+/** An exact address ("alerts@bank.com.np") or a whole domain ("@bank.com.np"). */
+export const EmailSenderPattern = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^(?:[^@\s]+)?@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}$/, {
+    error: 'Enter an email address, or @ and a domain (e.g. @nabilbank.com)',
+  });
+
+export const EmailSenderSchema = z.object({
+  id: Id,
+  sender: z.string(),
+  /** Alerts from this sender are for this account (else the default account). */
+  accountId: Id.nullable(),
+  createdAt: z.string(),
+});
+export type EmailSender = z.infer<typeof EmailSenderSchema>;
+
+export const EmailSenderInputSchema = z.object({
+  sender: EmailSenderPattern,
+  accountId: Id.nullable(),
+});
+export type EmailSenderInput = z.infer<typeof EmailSenderInputSchema>;
+
+export const EmailInSchema = z.object({
+  /** Whether this server receives email at all. */
+  available: z.boolean(),
+  /** The workspace's address (null when email in isn't set up on the server). */
+  address: z.string().nullable(),
+  /** Where receipts and alerts go when nothing says otherwise. */
+  defaultAccountId: Id.nullable(),
+  senders: z.array(EmailSenderSchema),
+  /** The latest 50 emails. */
+  messages: z.array(InboundEmailSchema),
+});
+export type EmailIn = z.infer<typeof EmailInSchema>;
+
+export const UpdateEmailInSchema = z.object({ defaultAccountId: Id.nullable() });

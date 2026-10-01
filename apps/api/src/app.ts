@@ -18,6 +18,7 @@ import { accountsRouter } from './routes/accounts';
 import { aiRouter } from './routes/ai';
 import { budgetsRouter } from './routes/budgets';
 import { labelsRouter } from './routes/categories';
+import { emailInRouter, mountInboundEmail } from './routes/email-in';
 import { goalsRouter } from './routes/goals';
 import { importsRouter } from './routes/imports';
 import { insightsRouter } from './routes/insights';
@@ -88,6 +89,9 @@ export function createApp(deps: Deps) {
     return c.json({ ok: true });
   });
 
+  // Raw emails from a mail service (its own secret; no session or CSRF check).
+  mountInboundEmail(app);
+
   // Better Auth handles sign-up, sign-in, sessions and account deletion under /api/auth/*.
   app.on(['GET', 'POST'], '/api/auth/*', (c) => deps.auth.handler(c.req.raw));
 
@@ -127,6 +131,7 @@ export function createApp(deps: Deps) {
     aiRouter,
     tokensRouter,
     webhooksRouter,
+    emailInRouter,
   ]) {
     api.route('/', router);
   }

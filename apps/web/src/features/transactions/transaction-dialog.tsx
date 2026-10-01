@@ -78,6 +78,14 @@ export interface NewTransactionDefaults {
   accountId?: string;
   date?: IsoDate;
   categoryId?: string | null;
+  /** Positive, in the account's currency. */
+  amountMinor?: number;
+  payee?: string;
+  notes?: string;
+  /** Receipts to attach once it's saved. */
+  files?: File[];
+  /** Called with the new transaction once it's saved (not for offline saves). */
+  onCreated?: (tx: Transaction) => void;
 }
 
 interface DialogState {
@@ -248,7 +256,9 @@ function EditorForm({
   const amountText = (minor: number, cur: string) =>
     toDecimalString(Math.abs(minor), f.digits(cur));
   const [amount, setAmount] = useState(() => {
-    if (!existing) return '';
+    if (!existing) {
+      return defaults.amountMinor ? amountText(defaults.amountMinor, currency) : '';
+    }
     if (isTransfer) {
       const out =
         existing.amountMinor < 0 ? existing.amountMinor : existing.transfer!.peerAmountMinor;
@@ -263,7 +273,7 @@ function EditorForm({
     return amountText(incoming, toAccount?.currency ?? f.base);
   });
   const [date, setDate] = useState<IsoDate>(existing?.date ?? defaults.date ?? f.today);
-  const [payee, setPayee] = useState(existing?.payeeName ?? '');
+  const [payee, setPayee] = useState(existing?.payeeName ?? defaults.payee ?? '');
   const [categoryId, setCategoryId] = useState<string | null>(
     existing
       ? existing.splits.length === 1
@@ -272,10 +282,10 @@ function EditorForm({
       : (defaults.categoryId ?? null),
   );
   const categoryTouched = useRef(existing !== null || defaults.categoryId !== undefined);
-  const [notes, setNotes] = useState(existing?.notes ?? '');
+  const [notes, setNotes] = useState(existing?.notes ?? defaults.notes ?? '');
   const [tagIds, setTagIds] = useState<string[]>(existing?.tagIds ?? []);
   const [pending, setPending] = useState(existing?.status === 'pending');
-  const [queuedFiles, setQueuedFiles] = useState<File[]>([]);
+  const [queuedFiles, setQueuedFiles] = useState<File[]>(defaults.files ?? []);
   const upload = useUploadAttachment();
   const [splitMode, setSplitMode] = useState(existing ? existing.splits.length > 1 : false);
   const [lines, setLines] = useState<SplitLine[]>(() =>
@@ -469,6 +479,7 @@ function EditorForm({
           if (created) {
             const id = created.id;
             if (queuedFiles.length) await uploadAll(upload, id, queuedFiles);
+            defaults.onCreated?.(created);
             toast.success(mode === 'expense' ? t('Expense added') : t('Income added'), {
               description: summary,
               action: { label: t('Undo'), onClick: () => deleteTx.mutate(id) },

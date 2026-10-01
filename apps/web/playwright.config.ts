@@ -48,6 +48,8 @@ export default defineConfig({
       AUTH_RATE_LIMIT: 'false',
       // The webhook test receives on localhost.
       WEBHOOK_ALLOW_PRIVATE: 'true',
+      EMAIL_IN_ADDRESS: 'money+{token}@example.com',
+      EMAIL_IN_SECRET: 'e2e-email-in-secret-0123456789',
       LOG_LEVEL: 'warn',
     },
   },

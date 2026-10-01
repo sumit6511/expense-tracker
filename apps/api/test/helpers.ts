@@ -11,6 +11,7 @@ import { FakeAi } from './fake-ai';
 import { FakeReceiver } from './fake-receiver';
 
 export const ORIGIN = 'http://localhost:5173';
+export const EMAIL_IN_SECRET = 'test-email-in-secret-0123456789';
 
 let shared: ReturnType<typeof build> | null = null;
 
@@ -23,6 +24,8 @@ function build() {
     LOG_LEVEL: process.env.TEST_LOG_LEVEL ?? 'silent',
     RUN_WORKER: 'false',
     FX_NRB_ENABLED: 'false',
+    EMAIL_IN_ADDRESS: 'money+{token}@example.com',
+    EMAIL_IN_SECRET: EMAIL_IN_SECRET,
   });
   const logger = createLogger(env.LOG_LEVEL, false);
   const { db, pool } = createDb(env.DATABASE_URL, 5);

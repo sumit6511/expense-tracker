@@ -1,13 +1,16 @@
 import { addDays, todayIn } from '@et/shared';
 import pg from 'pg';
 import { PgBoss } from 'pg-boss';
+import type { AiProvider } from '../ai/provider';
 import type { Db } from '../db/client';
 import type { Env } from '../env';
 import type { WebhookSender } from '../lib/webhook-http';
 import type { Logger } from '../logger';
 import type { Mailer } from '../mailer';
 import type { Pusher } from '../push';
+import { pruneInboundEmails } from '../services/email-in';
 import { runHeadsUp } from '../services/insights';
+import { pollMailbox } from '../services/mailbox';
 import { pruneNotifications, runNotifications } from '../services/notifications';
 import { sendPendingPushes } from '../services/push';
 import { fetchNrbRates, storePublishedRates } from '../services/rates';
@@ -22,6 +25,7 @@ export const QUEUES = {
   notifications: 'notifications',
   headsUp: 'heads-up',
   push: 'push',
+  mailbox: 'email-in-mailbox',
 } as const;
 
 /** Fetches the last `days` days of NRB rates and stores them. */
@@ -50,6 +54,7 @@ export async function startJobs(
   mailer: Mailer | null,
   pusher: Pusher | null,
   webhookSender: WebhookSender,
+  ai: AiProvider | null,
 ) {
   const boss = new PgBoss({ connectionString: env.DATABASE_URL, schema: 'pgboss' });
   boss.on('error', (err) => logger.error({ err }, 'job runner error'));
@@ -62,6 +67,7 @@ export async function startJobs(
     logger.info({ purged }, 'purged old transactions from trash');
     await pruneNotifications(db);
     await pruneDeliveries(db);
+    await pruneInboundEmails(db);
   });
 
   // Hourly, so each workspace's items are recorded soon after midnight in its own time zone.
@@ -112,6 +118,25 @@ export async function startJobs(
       { days: 30 },
       { singletonKey: 'startup', singletonSeconds: 3600 },
     );
+  }
+
+  // Email in from a mailbox (IMAP), checked every minute.
+  const imapUrl = env.EMAIL_IN_IMAP_URL;
+  if (imapUrl && env.EMAIL_IN_ADDRESS) {
+    await boss.createQueue(QUEUES.mailbox);
+    await boss.schedule(QUEUES.mailbox, '* * * * *');
+    await boss.work(QUEUES.mailbox, async () => {
+      try {
+        const handled = await pollMailbox(
+          { db, env, ai, logger },
+          imapUrl,
+          env.EMAIL_IN_IMAP_FOLDER,
+        );
+        if (handled) logger.info({ handled }, 'read new emails');
+      } catch (err) {
+        logger.warn({ err }, 'could not check the email-in mailbox');
+      }
+    });
   }
 
   const webhookDispatcher = await startWebhookDispatcher(db, env, logger, webhookSender);

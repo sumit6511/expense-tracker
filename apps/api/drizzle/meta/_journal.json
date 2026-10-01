@@ -141,6 +141,13 @@
       "when": 1790832400331,
       "tag": "0019_webhooks",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790833273902,
+      "tag": "0020_email_in",
+      "breakpoints": true
     }
   ]
 }

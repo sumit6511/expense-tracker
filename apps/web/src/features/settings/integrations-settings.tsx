@@ -52,11 +52,13 @@ import {
   useWebhooks,
 } from '@/lib/queries';
 import { useCanWrite, useWorkspace } from '@/lib/session';
+import { EmailInCard } from './email-in-settings';
 
 export function IntegrationsSettings() {
   const { role } = useWorkspace();
   return (
     <div className="grid grid-cols-1 gap-5">
+      <EmailInCard />
       <TokensCard />
       {(role === 'owner' || role === 'admin') && <WebhooksCard />}
     </div>

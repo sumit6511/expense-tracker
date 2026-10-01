@@ -157,7 +157,8 @@ async function applyRulesToRows(
 export async function commitImport(
   db: Db,
   ws: WorkspaceCtx,
-  userId: string,
+  /** Who imported it (null when it came in by itself, e.g. a bank's email). */
+  userId: string | null,
   input: z.output<typeof CommitImportSchema>,
 ): Promise<ImportBatch> {
   const batchId = uuidv7();

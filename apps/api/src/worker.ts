@@ -1,3 +1,4 @@
+import { createAiProvider } from './ai/claude';
 import { createDb } from './db/client';
 import { runMigrations } from './db/migrate';
 import { loadEnv } from './env';
@@ -19,6 +20,7 @@ const jobs = await startJobs(
   createMailer(env, logger),
   await createPusher(db, env, logger),
   httpSender({ allowPrivate: env.WEBHOOK_ALLOW_PRIVATE }),
+  createAiProvider(env, logger),
 );
 logger.info('worker started');
 

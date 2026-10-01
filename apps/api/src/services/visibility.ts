@@ -58,11 +58,19 @@ export async function loadHiddenAccountIds(db: Executor, workspaceId: string, us
 }
 
 /** What a background job sees when it acts for one member (their view, private accounts and all). */
-export async function memberContexts(db: Executor): Promise<WorkspaceCtx[]> {
+export async function memberContexts(
+  db: Executor,
+  only?: { workspaceId: string; userId: string },
+): Promise<WorkspaceCtx[]> {
   const rows = await db
     .select({ w: workspaces, userId: workspaceMembers.userId, role: workspaceMembers.role })
     .from(workspaces)
-    .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id));
+    .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
+    .where(
+      only
+        ? and(eq(workspaces.id, only.workspaceId), eq(workspaceMembers.userId, only.userId))
+        : undefined,
+    );
   const out: WorkspaceCtx[] = [];
   for (const { w, userId, role } of rows) {
     out.push({
@@ -83,4 +91,10 @@ export async function memberContexts(db: Executor): Promise<WorkspaceCtx[]> {
     });
   }
   return out;
+}
+
+/** One member's view of a workspace, for work done on their behalf (null if not a member). */
+export async function memberContext(db: Executor, workspaceId: string, userId: string) {
+  const [ctx] = await memberContexts(db, { workspaceId, userId });
+  return ctx ?? null;
 }

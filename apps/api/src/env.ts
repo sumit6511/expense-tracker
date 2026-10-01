@@ -86,6 +86,28 @@ const EnvSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+  /**
+   * Email in: the address pattern for workspaces, with {token} where each workspace's secret
+   * goes, e.g. "money+{token}@gmail.com" (one mailbox, read over IMAP) or "{token}@in.example.com"
+   * (a domain whose mail is posted to /api/inbound/email). Empty = email in is off.
+   */
+  EMAIL_IN_ADDRESS: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z
+      .string()
+      .refine((v) => /^[^@\s]*\{token\}[^@\s]*@[^@\s]+$/.test(v), {
+        error: 'EMAIL_IN_ADDRESS must look like money+{token}@example.com',
+      })
+      .optional(),
+  ),
+  /** Bearer secret for POST /api/inbound/email (raw messages from a mail service or worker). */
+  EMAIL_IN_SECRET: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(24).optional()),
+  /** Read email in from a mailbox: imaps://user:app-password@imap.gmail.com:993 */
+  EMAIL_IN_IMAP_URL: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.url({ protocol: /^imaps?$/ }).optional(),
+  ),
+  EMAIL_IN_IMAP_FOLDER: z.string().default('INBOX'),
   /** Allow new sign-ups. Set to false on a personal server once your account exists. */
   ALLOW_SIGNUP: z
     .enum(['true', 'false'])
