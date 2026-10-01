@@ -229,8 +229,8 @@ export function Segmented<T extends string>({
           aria-pressed={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            'flex-1 rounded-md font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground',
-            size === 'md' ? 'h-8 px-3 text-sm' : 'h-7 px-2.5 text-xs',
+            'flex-1 rounded-md leading-tight font-medium text-balance text-muted-foreground transition-colors hover:text-foreground',
+            size === 'md' ? 'min-h-8 px-3 py-1 text-sm' : 'min-h-7 px-2.5 py-1 text-xs',
             value === o.value && 'bg-card text-foreground shadow-sm',
           )}
         >

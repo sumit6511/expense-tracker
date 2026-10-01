@@ -113,10 +113,10 @@ export function SplitGroupPage() {
         </div>
         {canWrite && (
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setDialog({ kind: 'settle' })}>
+            <Button variant="outline" size="sm" onClick={() => setDialog({ kind: 'settle' })}>
               <HandCoins /> Settle up
             </Button>
-            <Button onClick={() => setDialog({ kind: 'expense' })}>
+            <Button size="sm" onClick={() => setDialog({ kind: 'expense' })}>
               <Plus /> Add expense
             </Button>
             <GroupMenu g={g} onEdit={() => setDialog({ kind: 'edit' })} />

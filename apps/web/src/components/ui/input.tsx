@@ -41,7 +41,7 @@ export function Field({
 }) {
   const tr = useTr();
   return (
-    <div className={cn('grid grid-cols-1 gap-1.5', className)}>
+    <div className={cn('grid grid-cols-1 content-start gap-1.5', className)}>
       <Label htmlFor={htmlFor}>{tr(label)}</Label>
       {children}
       {error ? (

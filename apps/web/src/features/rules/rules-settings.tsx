@@ -52,7 +52,7 @@ export function RulesSettings() {
           same thing.
         </p>
         {canWrite && (
-          <Button onClick={() => openRule()}>
+          <Button size="sm" onClick={() => openRule()}>
             <Plus /> New rule
           </Button>
         )}

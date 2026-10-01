@@ -175,25 +175,32 @@ test.describe('push notifications', () => {
       });
       void cdp.send('ServiceWorker.enable');
     });
-    for (const registrationId of registrationIds) {
-      await cdp.send('ServiceWorker.deliverPushMessage', {
-        origin: baseURL!,
-        registrationId,
-        data: JSON.stringify({
-          title: 'Rent due tomorrow',
-          body: 'Rs. 25,000',
-          url: '/recurring',
-          tag: 't1',
-        }),
-      });
-    }
+    const deliver = async () => {
+      for (const registrationId of registrationIds) {
+        await cdp.send('ServiceWorker.deliverPushMessage', {
+          origin: baseURL!,
+          registrationId,
+          data: JSON.stringify({
+            title: 'Rent due tomorrow',
+            body: 'Rs. 25,000',
+            url: '/recurring',
+            tag: 't1',
+          }),
+        });
+      }
+    };
+    await deliver();
+    // A push can still be dropped while the worker starts up: send it again until it shows
+    // (the same tag replaces the notification, so there is only ever one).
     await expect
-      .poll(() =>
-        page.evaluate(async () => {
+      .poll(async () => {
+        const shown = await page.evaluate(async () => {
           const reg = await navigator.serviceWorker.getRegistration();
           return (await reg!.getNotifications()).map((n) => `${n.title}: ${n.body}`);
-        }),
-      )
+        });
+        if (shown.length === 0) await deliver();
+        return shown;
+      })
       .toEqual(['Rent due tomorrow: Rs. 25,000']);
 
     await toggle.click();

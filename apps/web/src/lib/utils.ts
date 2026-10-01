@@ -1,5 +1,5 @@
 import { type ClassValue, clsx } from 'clsx';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { twMerge } from 'tailwind-merge';
 
 export function cn(...inputs: ClassValue[]) {
@@ -44,4 +44,17 @@ export function useDebouncedValue<T>(value: T, ms = 350): T {
     return () => clearTimeout(t);
   }, [value, ms]);
   return debounced;
+}
+
+/** Whether a media query matches, kept up to date (e.g. '(min-width: 1024px)'). */
+export function useMediaQuery(query: string): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const media = matchMedia(query);
+      media.addEventListener('change', onChange);
+      return () => media.removeEventListener('change', onChange);
+    },
+    () => matchMedia(query).matches,
+    () => false,
+  );
 }

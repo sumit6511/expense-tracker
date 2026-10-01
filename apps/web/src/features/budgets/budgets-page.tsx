@@ -126,8 +126,7 @@ export function BudgetsPage() {
   if (view === 'goals') {
     return (
       <div className="pb-10">
-        <PageHeader title="Goals" actions={viewSwitch} />
-        <GoalsView />
+        <GoalsView viewSwitch={viewSwitch} />
       </div>
     );
   }

@@ -190,7 +190,8 @@ export function TransactionsPage() {
             aria-label="Search transactions"
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        {/* One row that scrolls sideways on phones; wraps on wider screens. */}
+        <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&>*]:shrink-0">
           <DateRangePicker
             value={{ from: search.from, to: search.to }}
             onChange={(r) => setSearch({ from: r.from, to: r.to })}

@@ -20,12 +20,12 @@ import {
   Tags,
   Trash2,
 } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, type ReactNode, useState } from 'react';
 import { toast } from 'sonner';
 import { DatePicker } from '@/components/date-picker';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
-import { EmptyState } from '@/components/page';
+import { EmptyState, PageHeader } from '@/components/page';
 import { AccountSelect, AmountInput, CategoryPicker } from '@/components/pickers';
 import { Button } from '@/components/ui/button';
 import { Badge, Card, CardContent, Progress, Skeleton } from '@/components/ui/card';
@@ -65,30 +65,44 @@ import { cn } from '@/lib/utils';
 
 type Editing = { goal?: Goal } | null;
 
-export function GoalsView() {
+export function GoalsView({ viewSwitch }: { viewSwitch: ReactNode }) {
   const { data: goals, isPending } = useGoals();
   const canWrite = useCanWrite();
   const [editing, setEditing] = useState<Editing>(null);
   const [adding, setAdding] = useState<Goal | null>(null);
   const [showArchived, setShowArchived] = useState(false);
 
-  if (isPending || !goals) return <Skeleton className="h-64" />;
+  const header = (
+    <PageHeader
+      title="Goals"
+      className="mb-1"
+      description="Save for a bike, a trip, Dashain or an emergency fund: track a savings account, a budget category that keeps what’s left each month, or amounts you put aside yourself."
+      actions={
+        <>
+          {viewSwitch}
+          {canWrite && (
+            <Button size="sm" onClick={() => setEditing({})}>
+              <Plus /> New goal
+            </Button>
+          )}
+        </>
+      }
+    />
+  );
+  if (isPending || !goals) {
+    return (
+      <div className="grid grid-cols-1 gap-4">
+        {header}
+        <Skeleton className="h-64" />
+      </div>
+    );
+  }
   const active = goals.filter((g) => !g.archived);
   const archived = goals.filter((g) => g.archived);
 
   return (
     <div className="grid grid-cols-1 gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          Save for a bike, a trip, Dashain or an emergency fund. Track a savings account, a budget
-          category that keeps what’s left each month, or amounts you put aside yourself.
-        </p>
-        {canWrite && (
-          <Button onClick={() => setEditing({})}>
-            <Plus /> New goal
-          </Button>
-        )}
-      </div>
+      {header}
       {active.length === 0 ? (
         <Card>
           <EmptyState
@@ -98,7 +112,7 @@ export function GoalsView() {
           />
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {active.map((g) => (
             <GoalCard
               key={g.id}

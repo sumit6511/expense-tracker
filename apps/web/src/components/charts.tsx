@@ -136,18 +136,25 @@ export function PaceChart({
   data,
   height = 200,
   paceLabel,
+  fill,
 }: {
   data: PacePoint[];
   height?: number;
   paceLabel: string;
+  /** Grow to the height of its container (at least 13rem). */
+  fill?: boolean;
 }) {
   const { f, unit, major, tick } = useMajorUnits();
   const scale = niceTicks(
     Math.max(0, ...data.flatMap((d) => [major(d.spent) ?? 0, major(d.pace) ?? 0])),
   );
   return (
-    <div role="img" aria-label="Cumulative spending this month compared with an even pace">
-      <ResponsiveContainer width="100%" height={height}>
+    <div
+      role="img"
+      aria-label="Cumulative spending this month compared with an even pace"
+      className={fill ? 'h-full min-h-52' : undefined}
+    >
+      <ResponsiveContainer width="100%" height={fill ? '100%' : height}>
         <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id="pace-fill" x1="0" x2="0" y1="0" y2="1">

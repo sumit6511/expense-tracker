@@ -101,19 +101,19 @@ export function InboxPage() {
         description="Check imported transactions and give everything a category."
         actions={
           <>
-            <Button variant="outline" asChild>
+            <Button variant="outline" size="sm" asChild>
               <Link to="/settings" search={{ tab: 'rules' }}>
                 <Wand2 /> Rules
               </Link>
             </Button>
             {canWrite && tab === 'uncategorized' && aiOn && items.length > 0 && (
-              <Button onClick={suggest} disabled={suggestion.isPending}>
+              <Button size="sm" onClick={suggest} disabled={suggestion.isPending}>
                 {suggestion.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />} Suggest
                 categories
               </Button>
             )}
             {canWrite && tab === 'review' && items.length > 0 && (
-              <Button onClick={confirmAll} disabled={bulk.isPending}>
+              <Button size="sm" onClick={confirmAll} disabled={bulk.isPending}>
                 <CheckCheck /> Confirm {items.length < total ? `these ${items.length}` : 'all'}
               </Button>
             )}

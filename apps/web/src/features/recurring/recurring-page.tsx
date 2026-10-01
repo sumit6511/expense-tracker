@@ -19,7 +19,7 @@ import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
-import { EmptyState, ErrorState, PageHeader } from '@/components/page';
+import { EmptyState, ErrorState, PageHeader, StatCard } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge, Card, CardHeader, CardTitle, Skeleton } from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/dialog';
@@ -82,7 +82,7 @@ export function RecurringPage() {
         description="Bills, subscriptions, salary and regular transfers."
         actions={
           canWrite && (
-            <Button onClick={() => openRecurring()}>
+            <Button size="sm" onClick={() => openRecurring()}>
               <Plus /> New recurring
             </Button>
           )
@@ -94,17 +94,24 @@ export function RecurringPage() {
         <Skeleton className="h-96" />
       ) : (
         <>
-          <Card className="grid grid-cols-1 divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-            <Summary label="Bills per month" hint="Recurring expenses, averaged">
-              <Money minor={monthlyOut} trimZero />
-            </Summary>
-            <Summary label="Income per month" hint="Salary and other regular income">
-              <Money minor={monthlyIn} trimZero />
-            </Summary>
-            <Summary label="Due in the next 7 days" hint={`${f.base} bills`}>
-              <Money minor={weekOut} trimZero />
-            </Summary>
-          </Card>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <StatCard
+              label="Bills per month"
+              value={<Money minor={monthlyOut} trimZero />}
+              hint="Recurring expenses, averaged"
+              className="col-span-2 sm:col-span-1"
+            />
+            <StatCard
+              label="Income per month"
+              value={<Money minor={monthlyIn} trimZero />}
+              hint="Salary and other regular income"
+            />
+            <StatCard
+              label="Due in the next 7 days"
+              value={<Money minor={weekOut} trimZero />}
+              hint={`${f.base} bills`}
+            />
+          </div>
 
           {due.length > 0 && (
             <Card className="border-warning/50">
@@ -178,25 +185,6 @@ export function RecurringPage() {
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-function Summary({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint: string;
-  children: React.ReactNode;
-}) {
-  // A row on phones, a column on wider screens.
-  return (
-    <div className="flex items-center justify-between gap-3 px-4 py-3 sm:block sm:px-5 sm:py-4">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="text-lg font-semibold tabular sm:mt-1 sm:text-xl">{children}</p>
-      <p className="hidden text-xs text-muted-foreground sm:mt-0.5 sm:block">{hint}</p>
     </div>
   );
 }

@@ -21,7 +21,7 @@ import { useMemo, useState } from 'react';
 import { ChartLegend, NetWorthChart } from '@/components/charts';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
-import { EmptyState, ErrorState } from '@/components/page';
+import { EmptyState, ErrorState, StatCard } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle, Progress, Skeleton } from '@/components/ui/card';
 import { Segmented } from '@/components/ui/menu';
 import { useFormat } from '@/lib/format';
@@ -40,15 +40,7 @@ import { useWorkspace } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
 function Tile({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
-  return (
-    <Card>
-      <CardContent className="pt-4">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="mt-1 text-base font-semibold break-words sm:text-xl">{value}</p>
-        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-      </CardContent>
-    </Card>
-  );
+  return <StatCard label={label} value={value} hint={hint} />;
 }
 
 // ---------------------------------------------------------------------------------------------

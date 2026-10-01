@@ -215,8 +215,8 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
       )}
 
       {/* Headline */}
-      <Card className="lg:col-span-2">
-        <CardContent className="grid grid-cols-1 gap-4 pt-5">
+      <Card className="flex flex-col lg:col-span-2">
+        <CardContent className="flex flex-1 flex-col gap-4 pt-5">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-sm text-muted-foreground">
@@ -311,7 +311,8 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
               </div>
             </div>
           )}
-          <div>
+          {/* The chart takes the room the cards beside it leave. */}
+          <div className="flex flex-1 flex-col">
             {hasBudget && (
               <ChartLegend
                 className="mb-1"
@@ -325,7 +326,9 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
                 ]}
               />
             )}
-            <PaceChart data={pace} paceLabel={t('Even pace')} />
+            <div className="flex-1">
+              <PaceChart data={pace} paceLabel={t('Even pace')} fill />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -496,12 +499,12 @@ function Stat({
   note?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <div>
+    <div>
+      <div className="flex items-baseline justify-between gap-3">
         <p className="text-sm text-muted-foreground">{label}</p>
-        {note && <p className="mt-0.5 text-xs">{note}</p>}
+        <p className="text-lg font-semibold">{value}</p>
       </div>
-      <p className="text-lg font-semibold">{value}</p>
+      {note && <p className="mt-0.5 text-right text-xs">{note}</p>}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTr } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import { Card, CardContent } from './ui/card';
 
 export function PageHeader({
   title,
@@ -19,7 +20,9 @@ export function PageHeader({
     <header className={cn('mb-5 flex flex-wrap items-end justify-between gap-3', className)}>
       <div className="min-w-0">
         <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{tr(title)}</h1>
-        {description && <p className="mt-0.5 text-sm text-muted-foreground">{tr(description)}</p>}
+        {description && (
+          <p className="mt-0.5 max-w-3xl text-sm text-muted-foreground">{tr(description)}</p>
+        )}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>
@@ -74,5 +77,39 @@ export function ErrorState({ error, retry }: { error: unknown; retry?: () => voi
         </button>
       )}
     </div>
+  );
+}
+
+/** A headline figure on its own card: a label, the value, and an optional note. */
+export function StatCard({
+  label,
+  value,
+  hint,
+  emphasis,
+  className,
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  hint?: ReactNode;
+  /** Larger, for the one figure that matters most in a row. */
+  emphasis?: boolean;
+  className?: string;
+}) {
+  const tr = useTr();
+  return (
+    <Card className={className}>
+      <CardContent className="py-4">
+        <p className="text-xs font-medium text-muted-foreground">{tr(label)}</p>
+        <p
+          className={cn(
+            'mt-1 font-semibold tracking-tight break-words tabular',
+            emphasis ? 'text-xl sm:text-2xl' : 'text-lg sm:text-xl',
+          )}
+        >
+          {value}
+        </p>
+        {hint && <p className="mt-0.5 text-xs text-muted-foreground">{tr(hint)}</p>}
+      </CardContent>
+    </Card>
   );
 }

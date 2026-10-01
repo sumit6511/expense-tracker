@@ -55,7 +55,7 @@ export function MonthlyReport() {
     });
 
   return (
-    <div className="mx-auto max-w-3xl pb-10 print:max-w-none print:pb-0">
+    <div className="mx-auto max-w-4xl pb-10 print:max-w-none print:pb-0">
       <div className="mb-4 flex flex-wrap items-center gap-2 print:hidden">
         <Button variant="ghost" size="sm" asChild>
           <Link to="/reports">
@@ -82,7 +82,7 @@ export function MonthlyReport() {
             <ChevronRight />
           </Button>
         </div>
-        <Button onClick={() => window.print()}>
+        <Button size="sm" onClick={() => window.print()}>
           <Download /> {t('Download PDF')}
         </Button>
       </div>
@@ -348,7 +348,7 @@ function Tile({
       <p className="text-xs text-muted-foreground">{label}</p>
       <p
         className={cn(
-          'mt-0.5 text-lg font-semibold tabular',
+          'mt-0.5 text-lg font-semibold whitespace-nowrap tabular',
           tone === 'positive' && 'text-positive',
           tone === 'negative' && 'text-destructive',
         )}

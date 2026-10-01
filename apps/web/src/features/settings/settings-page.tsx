@@ -12,10 +12,12 @@ import {
   UsersRound,
   Wand2,
 } from 'lucide-react';
+import type { ComponentProps } from 'react';
 import { PageHeader } from '@/components/page';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/menu';
 import { NotificationSettings } from '@/features/notifications/notification-settings';
 import { RulesSettings } from '@/features/rules/rules-settings';
+import { cn, useMediaQuery } from '@/lib/utils';
 import { CategoriesSettings } from './categories-settings';
 import { DataSettings } from './data-settings';
 import { GeneralSettings } from './general-settings';
@@ -42,47 +44,51 @@ export function SettingsPage() {
   const search = useSearch({ from: '/app/settings' });
   const navigate = useNavigate({ from: '/settings' });
   const tab: Tab = search.tab ?? 'general';
+  // A list down the side on desktop (every section in view), tabs across on smaller screens.
+  const wide = useMediaQuery('(min-width: 1024px)');
   return (
     <div className="pb-10">
       <PageHeader title="Settings" />
       <Tabs
         value={tab}
         onValueChange={(v) => navigate({ search: { tab: v as Tab }, replace: true })}
+        orientation={wide ? 'vertical' : 'horizontal'}
+        className="lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-start lg:gap-8"
       >
-        <TabsList className="mb-5 flex w-full justify-start">
-          <TabsTrigger value="general">
+        <TabsList className="mb-5 flex w-full justify-start lg:sticky lg:top-8 lg:mb-0 lg:h-auto lg:flex-col lg:items-stretch lg:gap-0.5 lg:overflow-visible lg:bg-transparent lg:p-0">
+          <SettingsTab value="general">
             <Settings2 /> General
-          </TabsTrigger>
-          <TabsTrigger value="members">
+          </SettingsTab>
+          <SettingsTab value="members">
             <UsersRound /> Members
-          </TabsTrigger>
-          <TabsTrigger value="categories">
+          </SettingsTab>
+          <SettingsTab value="categories">
             <Tags /> Categories
-          </TabsTrigger>
-          <TabsTrigger value="payees">
+          </SettingsTab>
+          <SettingsTab value="payees">
             <Users /> Payees
-          </TabsTrigger>
-          <TabsTrigger value="tags">
+          </SettingsTab>
+          <SettingsTab value="tags">
             <Hash /> Tags
-          </TabsTrigger>
-          <TabsTrigger value="rules">
+          </SettingsTab>
+          <SettingsTab value="rules">
             <Wand2 /> Rules
-          </TabsTrigger>
-          <TabsTrigger value="rates">
+          </SettingsTab>
+          <SettingsTab value="rates">
             <Landmark /> Exchange rates
-          </TabsTrigger>
-          <TabsTrigger value="notifications">
+          </SettingsTab>
+          <SettingsTab value="notifications">
             <Bell /> Notifications
-          </TabsTrigger>
-          <TabsTrigger value="integrations">
+          </SettingsTab>
+          <SettingsTab value="integrations">
             <Plug /> Integrations
-          </TabsTrigger>
-          <TabsTrigger value="data">
+          </SettingsTab>
+          <SettingsTab value="data">
             <Database /> Data
-          </TabsTrigger>
-          <TabsTrigger value="profile">
+          </SettingsTab>
+          <SettingsTab value="profile">
             <UserRound /> Profile
-          </TabsTrigger>
+          </SettingsTab>
         </TabsList>
         <TabsContent value="general">
           <GeneralSettings />
@@ -119,5 +125,18 @@ export function SettingsPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+/** On desktop, styled like the main navigation in the sidebar. */
+function SettingsTab({ className, ...props }: ComponentProps<typeof TabsTrigger>) {
+  return (
+    <TabsTrigger
+      className={cn(
+        'lg:h-9 lg:justify-start lg:gap-2.5 lg:px-3 lg:hover:bg-muted lg:data-[state=active]:bg-accent lg:data-[state=active]:text-accent-foreground lg:data-[state=active]:shadow-none lg:[&_svg]:size-[18px]',
+        className,
+      )}
+      {...props}
+    />
   );
 }

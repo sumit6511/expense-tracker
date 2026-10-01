@@ -1,4 +1,5 @@
-import type { ComponentProps } from 'react';
+import { ChevronRight } from 'lucide-react';
+import type { ComponentProps, ReactNode } from 'react';
 import { useTr } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -14,7 +15,7 @@ export function Card({ className, ...props }: ComponentProps<'section'>) {
 export function CardHeader({ className, ...props }: ComponentProps<'div'>) {
   return (
     <div
-      className={cn('flex items-center justify-between gap-3 px-5 pt-4 pb-2', className)}
+      className={cn('flex items-center justify-between gap-3 px-5 pt-4 pb-3', className)}
       {...props}
     />
   );
@@ -101,5 +102,33 @@ export function Progress({
         style={{ width: `${clamped}%` }}
       />
     </div>
+  );
+}
+
+/** A section that opens and closes (a native <details>), with the app's chevron. */
+export function Disclosure({
+  summary,
+  children,
+  className,
+  summaryClassName,
+}: {
+  summary: ReactNode;
+  children: ReactNode;
+  className?: string;
+  summaryClassName?: string;
+}) {
+  return (
+    <details className={cn('group', className)}>
+      <summary
+        className={cn(
+          'flex cursor-pointer list-none items-center gap-1.5 select-none [&::-webkit-details-marker]:hidden',
+          summaryClassName,
+        )}
+      >
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+        {summary}
+      </summary>
+      {children}
+    </details>
   );
 }

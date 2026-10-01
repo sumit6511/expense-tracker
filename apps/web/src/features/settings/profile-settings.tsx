@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { Loader2, LogOut } from 'lucide-react';
+import { Loader2, LogOut, TriangleAlert } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -160,9 +160,15 @@ export function ProfileSettings() {
       <SecuritySettings />
       <Card className="border-destructive/40 lg:col-span-2">
         <CardHeader>
-          <CardTitle className="text-destructive">Delete account</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <TriangleAlert className="size-4" /> Delete account
+          </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-3">
+          <p className="basis-full text-sm text-muted-foreground">
+            Permanently delete your account and your private accounts. Workspaces you share stay
+            with the other members; ones only you use are deleted.
+          </p>
           <Field label="Confirm with your password" htmlFor="delete-password" className="w-64">
             <Input
               id="delete-password"

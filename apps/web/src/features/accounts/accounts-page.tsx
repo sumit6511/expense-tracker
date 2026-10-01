@@ -10,9 +10,9 @@ import { ChevronRight, Landmark, Lock, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
-import { EmptyState, ErrorState, PageHeader } from '@/components/page';
+import { EmptyState, ErrorState, PageHeader, StatCard } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, Skeleton } from '@/components/ui/card';
+import { Card, Skeleton } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
 import { useFormat } from '@/lib/format';
 import { useAccounts } from '@/lib/queries';
@@ -60,14 +60,14 @@ export function AccountsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-5">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Summary
+            <StatCard
               label="Net worth"
-              minor={assets + debts}
-              strong
+              value={<Money minor={assets + debts} trimZero />}
+              emphasis
               className="col-span-2 sm:col-span-1"
             />
-            <Summary label="What you have" minor={assets} />
-            <Summary label="What you owe" minor={-debts} />
+            <StatCard label="What you have" value={<Money minor={assets} trimZero />} />
+            <StatCard label="What you owe" value={<Money minor={-debts} trimZero />} />
           </div>
           {active.length === 0 && (
             <Card>
@@ -127,35 +127,6 @@ export function AccountsPage() {
         {adding && <AccountFormDialog onDone={() => setAdding(false)} />}
       </Dialog>
     </div>
-  );
-}
-
-function Summary({
-  label,
-  minor,
-  strong,
-  className,
-}: {
-  label: string;
-  minor: number;
-  strong?: boolean;
-  className?: string;
-}) {
-  return (
-    <Card className={className}>
-      <CardContent className="pt-4">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p
-          className={
-            strong
-              ? 'mt-1 text-lg font-semibold sm:text-2xl'
-              : 'mt-1 text-lg font-medium sm:text-xl'
-          }
-        >
-          <Money minor={minor} trimZero />
-        </p>
-      </CardContent>
-    </Card>
   );
 }
 

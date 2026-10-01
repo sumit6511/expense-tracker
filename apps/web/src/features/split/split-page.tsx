@@ -80,7 +80,7 @@ export function SplitPage() {
   const archived = groups.data?.filter((g) => g.archived) ?? [];
 
   const newButton = canWrite && (
-    <Button onClick={() => setCreating(true)}>
+    <Button size="sm" onClick={() => setCreating(true)}>
       <Plus /> New group
     </Button>
   );
@@ -94,7 +94,7 @@ export function SplitPage() {
       />
       {groups.error && <ErrorState error={groups.error} retry={() => groups.refetch()} />}
       {groups.isPending ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           <Skeleton className="h-28" />
           <Skeleton className="h-28" />
         </div>
@@ -109,7 +109,7 @@ export function SplitPage() {
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {active.map((g) => (
               <GroupCard key={g.id} g={g} />
             ))}

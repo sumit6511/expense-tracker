@@ -6,7 +6,14 @@ import { ChartLegend, ForecastChart, type ForecastChartPoint } from '@/component
 import { Money } from '@/components/money';
 import { EmptyState, ErrorState, PageHeader } from '@/components/page';
 import { AccountSelect } from '@/components/pickers';
-import { Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Disclosure,
+  Skeleton,
+} from '@/components/ui/card';
 import { Segmented } from '@/components/ui/menu';
 import { useFormat } from '@/lib/format';
 import { useForecast, useInsights } from '@/lib/queries';
@@ -196,10 +203,11 @@ function ForecastBody({ data: raw }: { data: Forecast }) {
           ` Missing exchange rates for ${data.missingRates.join(', ')}: those amounts are left out.`}
       </p>
       {data.events.length > 0 && (
-        <details className="group rounded-lg border">
-          <summary className="cursor-pointer px-3 py-2 text-sm font-medium select-none">
-            Scheduled in the next {data.points.length - 1} days ({data.events.length})
-          </summary>
+        <Disclosure
+          className="rounded-lg border"
+          summaryClassName="px-3 py-2 text-sm font-medium hover:bg-muted/50"
+          summary={`Scheduled in the next ${data.points.length - 1} days (${data.events.length})`}
+        >
           <ul className="divide-y border-t text-sm">
             {data.events.map((e) => (
               <li
@@ -217,7 +225,7 @@ function ForecastBody({ data: raw }: { data: Forecast }) {
               </li>
             ))}
           </ul>
-        </details>
+        </Disclosure>
       )}
     </div>
   );

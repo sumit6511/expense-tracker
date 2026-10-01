@@ -40,7 +40,7 @@ import { Money } from '@/components/money';
 import { PageHeader } from '@/components/page';
 import { CategoryPicker } from '@/components/pickers';
 import { Button } from '@/components/ui/button';
-import { Badge, Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge, Card, CardContent, CardHeader, CardTitle, Disclosure } from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/dialog';
 import { Field, Input, Textarea } from '@/components/ui/input';
 import { Checkbox, Segmented } from '@/components/ui/menu';
@@ -821,10 +821,10 @@ export function ImportPage() {
                 </p>
               )}
               {normalized && normalized.errors.length > 0 && (
-                <details className="border-t px-4 py-3 text-xs text-muted-foreground">
-                  <summary className="cursor-pointer">
-                    Rows that will be skipped ({normalized.errors.length})
-                  </summary>
+                <Disclosure
+                  className="border-t px-4 py-3 text-xs text-muted-foreground"
+                  summary={`Rows that will be skipped (${normalized.errors.length})`}
+                >
                   <ul className="mt-2 grid grid-cols-1 gap-1">
                     {normalized.errors.slice(0, 20).map((e) => (
                       <li key={e.line}>
@@ -832,7 +832,7 @@ export function ImportPage() {
                       </li>
                     ))}
                   </ul>
-                </details>
+                </Disclosure>
               )}
             </div>
           </Card>
