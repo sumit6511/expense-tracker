@@ -29,6 +29,9 @@ export async function createUser(
     headers,
   });
   expect(signUp.ok()).toBeTruthy();
+  // Tests start where they need to; the getting-started tour has its own test.
+  const toured = await request.patch('/api/v1/me', { headers, data: { tourCompleted: true } });
+  expect(toured.ok()).toBeTruthy();
   let workspaceId = '';
   if (options.withWorkspace !== false) {
     const ws = await request.post('/api/v1/workspaces', {

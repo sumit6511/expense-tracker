@@ -34,6 +34,9 @@ intelligence, and integrations.
   (fetched automatically), the INR peg (1 INR = 1.60 NPR), or rates you enter yourself.
 - Dark mode, keyboard shortcuts (<kbd>?</kbd>), a command palette (<kbd>Ctrl/⌘ K</kbd>), and
   accessible, mobile-first UI.
+- **A getting-started tour** the first time someone opens the app: a spotlight on each main part
+  (on desktop or phone), ending with their first expense. It can be taken again from the profile
+  menu, the *More* sheet on phones, or the command palette.
 
 **Automation and depth (Phase 2):**
 

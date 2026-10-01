@@ -11,6 +11,7 @@ import {
   ArrowLeftRight,
   ChartPie,
   ChevronsUpDown,
+  Compass,
   Handshake,
   House,
   Inbox,
@@ -48,6 +49,7 @@ import {
 import { NotificationBell } from '@/features/notifications/notification-bell';
 import { RecurringDialogProvider } from '@/features/recurring/recurring-dialog';
 import { RuleDialogProvider } from '@/features/rules/rule-dialog';
+import { TourProvider, useTour } from '@/features/tour/tour';
 import {
   TransactionDialogProvider,
   useTransactionDialog,
@@ -152,7 +154,9 @@ export function AppLayout() {
       <RuleDialogProvider>
         <RecurringDialogProvider>
           <TransactionDialogProvider>
-            <Shell />
+            <TourProvider>
+              <Shell />
+            </TourProvider>
           </TransactionDialogProvider>
         </RecurringDialogProvider>
       </RuleDialogProvider>
@@ -166,6 +170,11 @@ export function FullPageSpinner() {
       <Loader2 className="size-6 animate-spin text-muted-foreground" aria-label="Loading" />
     </div>
   );
+}
+
+/** How the getting-started tour finds a navigation link, e.g. "nav-budgets". */
+function tourMark(to: string) {
+  return `nav-${to.slice(1) || 'home'}`;
 }
 
 function isActive(pathname: string, to: string) {
@@ -184,6 +193,7 @@ function Shell() {
   const canWrite = useCanWrite();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const { startTour } = useTour();
   const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
@@ -241,7 +251,7 @@ function Shell() {
           <NotificationBell />
         </div>
         {canWrite && (
-          <Button className="mt-4 w-full justify-start" onClick={() => openNew()}>
+          <Button className="mt-4 w-full justify-start" onClick={() => openNew()} data-tour="add">
             <Plus /> {t('New transaction')}
             <kbd className="ml-auto rounded bg-primary-foreground/20 px-1.5 text-[11px]">N</kbd>
           </Button>
@@ -249,6 +259,7 @@ function Shell() {
         <button
           type="button"
           onClick={() => setPaletteOpen(true)}
+          data-tour="search"
           className="mt-2 flex h-9 items-center gap-2 rounded-lg border bg-card px-3 text-sm text-muted-foreground hover:bg-muted"
         >
           <Search className="size-4" /> {t('Search & jump')}
@@ -259,6 +270,7 @@ function Shell() {
             <Link
               key={item.to}
               to={item.to}
+              data-tour={tourMark(item.to)}
               className={cn(
                 'flex h-9 items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground [&_svg]:size-[18px]',
                 isActive(pathname, item.to) && 'bg-accent text-accent-foreground hover:bg-accent',
@@ -272,6 +284,7 @@ function Shell() {
         <div className="mt-auto grid grid-cols-1 gap-0.5">
           <Link
             to="/settings"
+            data-tour="nav-settings"
             className={cn(
               'flex h-9 items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground [&_svg]:size-[18px]',
               isActive(pathname, '/settings') && 'bg-accent text-accent-foreground',
@@ -293,6 +306,7 @@ function Shell() {
             size="icon"
             aria-label={t('Search')}
             onClick={() => setPaletteOpen(true)}
+            data-tour="search"
           >
             <Search />
           </Button>
@@ -317,6 +331,7 @@ function Shell() {
               type="button"
               aria-label={t('Add transaction')}
               onClick={() => openNew()}
+              data-tour="add"
               className="-mt-5 grid grid-cols-1 size-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background active:scale-95"
             >
               <Plus className="size-7" />
@@ -327,6 +342,7 @@ function Shell() {
         <button
           type="button"
           onClick={() => setMoreOpen(true)}
+          data-tour="nav-more"
           className={cn(
             'flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground',
             MORE_NAV.some((item) => isActive(pathname, item.to)) && 'text-primary',
@@ -353,6 +369,17 @@ function Shell() {
                 {item.to === '/inbox' && <ReviewBadge />}
               </Link>
             ))}
+            <button
+              type="button"
+              onClick={() => {
+                setMoreOpen(false);
+                // Let the sheet close first: the tour points at the navigation behind it.
+                setTimeout(startTour, 250);
+              }}
+              className="col-span-2 flex items-center justify-center gap-2 rounded-xl p-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground [&_svg]:size-4"
+            >
+              <Compass /> {t('Take the tour')}
+            </button>
           </DialogBody>
         </DialogContent>
       </Dialog>
@@ -372,6 +399,7 @@ function BottomLink({ item, active }: { item: NavItem; active: boolean }) {
   return (
     <Link
       to={item.to}
+      data-tour={tourMark(item.to)}
       className={cn(
         'flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground',
         active && 'text-primary',
@@ -390,6 +418,7 @@ function WorkspaceMenu({ compact }: { compact?: boolean }) {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          data-tour="workspace"
           className={cn(
             'flex min-w-0 items-center gap-2.5 rounded-lg text-left hover:bg-muted',
             compact ? 'px-1.5 py-1' : 'w-full px-2 py-1.5',
@@ -433,6 +462,7 @@ function WorkspaceMenu({ compact }: { compact?: boolean }) {
 
 function UserMenu() {
   const { me } = useSession();
+  const { startTour } = useTour();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const confirm = useConfirm();
@@ -471,6 +501,9 @@ function UserMenu() {
           onSelect={() => navigate({ to: '/settings', search: { tab: 'profile' } })}
         >
           <Settings /> Profile & security
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={startTour}>
+          <Compass /> Take the tour
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={signOut}>

@@ -199,4 +199,46 @@ export const NE: Record<string, string> = {
   'Amounts in {currencies} are left out: there’s no exchange rate for them yet.':
     '{currencies} का रकम समावेश छैनन्: तिनको विनिमय दर अझै छैन।',
   'No payee': 'भुक्तानी पाउने छैन',
+
+  // Getting-started tour
+  'Welcome, {name}': 'स्वागत छ, {name}',
+  'Here’s a one-minute look around: where to record spending, see where it goes, and plan ahead.':
+    'एक मिनेटमा एक फन्को: खर्च कहाँ लेख्ने, पैसा कहाँ गयो हेर्ने, र अगाडिको योजना बनाउने।',
+  'Add a transaction': 'कारोबार थप्नुहोस्',
+  'Record spending, income or a transfer between your accounts in a few taps.':
+    'खर्च, आम्दानी वा आफ्नै खाताबीचको स्थानान्तरण केही ट्यापमै लेख्नुहोस्।',
+  'On a keyboard, press N from anywhere.': 'किबोर्डमा जहाँबाट पनि N थिच्नुहोस्।',
+  'Go to any page, account or category, or find a past transaction.':
+    'कुनै पनि पृष्ठ, खाता वा वर्गमा जानुहोस्, वा पुरानो कारोबार खोज्नुहोस्।',
+  'On a keyboard: Ctrl K (⌘K on a Mac).': 'किबोर्डमा: Ctrl K (म्याकमा ⌘K)।',
+  'Everything you’ve recorded, with search and filters. Select several to change them at once.':
+    'तपाईंले लेखेका सबै कारोबार, खोज र फिल्टरसहित। धेरै छानेर एकैपटक बदल्न सकिन्छ।',
+  'Imported transactions wait here for a quick check. Rules can sort them into categories for you.':
+    'आयात गरिएका कारोबार छोटो जाँचका लागि यहाँ पर्खन्छन्। नियमहरूले तिनलाई आफैँ वर्गमा राख्न सक्छन्।',
+  'Budgets and goals': 'बजेट र लक्ष्य',
+  'Set a monthly budget for each category and see what’s left to spend. Save towards goals, too.':
+    'हरेक वर्गको मासिक बजेट राख्नुहोस् र खर्च गर्न कति बाँकी छ हेर्नुहोस्। लक्ष्यका लागि बचत पनि गर्नुहोस्।',
+  'Where your money went, cash flow and net worth over time, and a monthly report you can print.':
+    'पैसा कहाँ गयो, समयसँगै नगद प्रवाह र कुल सम्पत्ति, र छाप्न मिल्ने मासिक रिपोर्ट।',
+  'Bring in a bank statement (Excel, CSV or OFX), or paste the SMS alerts from your bank, eSewa or Khalti.':
+    'बैंक स्टेटमेन्ट (Excel, CSV वा OFX) ल्याउनुहोस्, वा बैंक, eSewa वा Khalti का SMS सूचना टाँस्नुहोस्।',
+  'Review, recurring bills, splitting with friends, reports, accounts, import and settings are here.':
+    'समीक्षा, नियमित बिल, साथीसँग बाँडफाँड, रिपोर्ट, खाता, आयात र सेटिङ यहाँ छन्।',
+  'Your workspace': 'तपाईंको कार्यक्षेत्र',
+  'Accounts, budgets and reports live in a workspace. Invite family to share it, or keep separate ones for home and business.':
+    'खाता, बजेट र रिपोर्ट कार्यक्षेत्रभित्र हुन्छन्। परिवारलाई निम्ता दिएर साझा गर्नुहोस्, वा घर र व्यवसायका लागि छुट्टाछुट्टै राख्नुहोस्।',
+  'Categories, rules, currency, the BS or AD calendar, language (नेपाली) and notifications.':
+    'वर्ग, नियम, मुद्रा, वि.सं. वा ई.सं. पात्रो, भाषा (English) र सूचनाहरू।',
+  'Ready to start': 'सुरु गर्न तयार',
+  'A good first step: add something you spent today. You can take this tour again any time from the menu.':
+    'राम्रो सुरुवात: आज गरेको कुनै खर्च लेख्नुहोस्। यो टुर मेनुबाट जुनसुकै बेला फेरि हेर्न सकिन्छ।',
+  'Skip tour': 'टुर छोड्नुहोस्',
+  'Show me around': 'घुमाएर देखाउनुहोस्',
+  'Add first expense': 'पहिलो खर्च थप्नुहोस्',
+  'Take the tour': 'टुर हेर्नुहोस्',
+  'Close tour': 'टुर बन्द गर्नुहोस्',
+  '{n} of {total}': '{total} मध्ये {n}',
+  Next: 'अर्को',
+  Back: 'पछाडि',
+  Done: 'सकियो',
 };

@@ -53,6 +53,8 @@ export const user = pgTable('user', {
   locale: localeEnum().notNull().default('en'),
   defaultWorkspaceId: uuid(),
   twoFactorEnabled: boolean().notNull().default(false),
+  /** When they finished (or skipped) the getting-started tour; null shows it. */
+  tourCompletedAt: timestamp({ withTimezone: true }),
   ...timestamps,
 });
 

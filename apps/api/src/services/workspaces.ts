@@ -87,6 +87,7 @@ export async function getMe(db: Db, userId: string): Promise<Me> {
       numberGrouping: u.numberGrouping,
       locale: u.locale,
       twoFactorEnabled: u.twoFactorEnabled,
+      tourCompleted: u.tourCompletedAt !== null,
     },
     workspaces: list,
     defaultWorkspaceId: defaultId,
@@ -112,6 +113,9 @@ export async function updateMe(db: Db, userId: string, input: UpdateMeInput): Pr
   if (input.numberGrouping !== undefined) patch.numberGrouping = input.numberGrouping;
   if (input.locale !== undefined) patch.locale = input.locale;
   if (input.defaultWorkspaceId !== undefined) patch.defaultWorkspaceId = input.defaultWorkspaceId;
+  if (input.tourCompleted !== undefined) {
+    patch.tourCompletedAt = input.tourCompleted ? new Date() : null;
+  }
   if (Object.keys(patch).length > 0) await db.update(user).set(patch).where(eq(user.id, userId));
   return getMe(db, userId);
 }

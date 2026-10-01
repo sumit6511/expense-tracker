@@ -5,6 +5,7 @@ import {
   ArrowLeftRight,
   ArrowUpRight,
   ChartPie,
+  Compass,
   House,
   Inbox,
   Keyboard,
@@ -24,6 +25,7 @@ import { CategoryIcon } from '@/components/icons';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { commandGroups, menuItem } from '@/components/ui/menu';
 import { useRecurringDialog } from '@/features/recurring/recurring-dialog';
+import { useTour } from '@/features/tour/tour';
 import { useTransactionDialog } from '@/features/transactions/transaction-dialog';
 import { useAccounts, useCategories } from '@/lib/queries';
 import { useCanWrite } from '@/lib/session';
@@ -47,6 +49,7 @@ export function CommandPalette({
   const { openRecurring } = useRecurringDialog();
   const canWrite = useCanWrite();
   const { preference, setPreference } = useTheme();
+  const { startTour } = useTour();
   const { data: accounts = [] } = useAccounts();
   const { data: groups = [] } = useCategories();
   const [search, setSearch] = useState('');
@@ -215,6 +218,13 @@ export function CommandPalette({
                 className={item}
               >
                 <Keyboard /> Keyboard shortcuts
+              </Command.Item>
+              <Command.Item
+                value="take the tour getting started walkthrough help"
+                onSelect={() => run(startTour)}
+                className={item}
+              >
+                <Compass /> Take the tour
               </Command.Item>
             </Command.Group>
           </Command.List>

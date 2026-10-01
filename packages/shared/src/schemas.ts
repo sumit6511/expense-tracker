@@ -130,6 +130,8 @@ export const MeSchema = z.object({
     locale: LocaleSchema,
     /** Signing in also needs a code from an authenticator app. */
     twoFactorEnabled: z.boolean(),
+    /** They have finished (or skipped) the getting-started tour. */
+    tourCompleted: z.boolean(),
   }),
   workspaces: z.array(WorkspaceSchema),
   defaultWorkspaceId: z.string().nullable(),
@@ -141,6 +143,8 @@ export const UpdateMeSchema = z.object({
   numberGrouping: NumberGroupingSchema.optional(),
   locale: LocaleSchema.optional(),
   defaultWorkspaceId: Id.optional(),
+  /** true when the tour is finished or skipped; false shows it again on the next visit. */
+  tourCompleted: z.boolean().optional(),
 });
 export type UpdateMeInput = z.infer<typeof UpdateMeSchema>;
 

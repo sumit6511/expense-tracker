@@ -19,8 +19,18 @@ describe('authentication and tenancy', () => {
     const user = await signUp('Asha');
     const me = await user.get('/api/v1/me');
     expect(me.status).toBe(200);
-    expect(me.body.user).toMatchObject({ name: 'Asha', numberGrouping: 'lakh' });
+    expect(me.body.user).toMatchObject({
+      name: 'Asha',
+      numberGrouping: 'lakh',
+      tourCompleted: false,
+    });
     expect(me.body.workspaces).toEqual([]);
+    // The getting-started tour shows until it is finished or skipped, and can be shown again.
+    const done = await user.patch('/api/v1/me', { tourCompleted: true });
+    expect(done.body.user.tourCompleted).toBe(true);
+    expect((await user.get('/api/v1/me')).body.user.tourCompleted).toBe(true);
+    const again1 = await user.patch('/api/v1/me', { tourCompleted: false });
+    expect(again1.body.user.tourCompleted).toBe(false);
 
     const again = new Client();
     const bad = await again.post('/api/auth/sign-in/email', {

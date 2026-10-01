@@ -21,8 +21,22 @@ test.describe('getting started', () => {
     await expect(page.getByText('Festivals & Gifts')).toBeVisible();
     await page.getByRole('button', { name: 'Start tracking' }).click();
 
-    await expect(page.getByText('Let’s record your first expense')).toBeVisible();
-    await page.getByRole('button', { name: 'Add expense' }).click();
+    // The first time, a short tour shows where things are (phones see fewer stops).
+    await expect(page.getByRole('heading', { name: 'Welcome, Sita' })).toBeVisible();
+    await page.getByRole('button', { name: 'Show me around' }).click();
+    const card = page.getByTestId('tour');
+    // Step 1 is the welcome, the last one the invitation to add an expense.
+    const counter = await card.getByText(/^2 of \d+$/).textContent();
+    const total = Number(counter!.split(' of ')[1]);
+    for (let n = 2; n < total - 1; n++) {
+      await expect(card.getByText(`${n} of ${total}`)).toBeVisible();
+      await card.getByRole('button', { name: 'Next' }).click();
+    }
+    await expect(card.getByText(`${total - 1} of ${total}`)).toBeVisible();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('heading', { name: 'Ready to start' })).toBeVisible();
+    await page.getByRole('button', { name: 'Add first expense' }).click();
+
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Amount').fill('250+50');
     await expect(dialog.getByText('= 300.00')).toBeVisible();
@@ -33,6 +47,12 @@ test.describe('getting started', () => {
 
     await expect(page.getByText('Spent this month')).toBeVisible();
     await expect(page.getByText('Rs. 300').first()).toBeVisible();
+
+    // Finished once, it doesn't come back.
+    await page.reload();
+    await expect(page.getByText('Spent this month')).toBeVisible();
+    await page.waitForTimeout(1000);
+    await expect(page.getByTestId('tour')).toBeHidden();
   });
 
   test('signing in and out', async ({ page, baseURL, browser }) => {
@@ -230,6 +250,8 @@ test.describe('sharing', () => {
     await partner.getByLabel('Password').fill('correct-horse-battery');
     await partner.getByRole('button', { name: 'Create account' }).click();
     await partner.getByRole('button', { name: 'Join “Home”' }).click();
+    // New to the app: they get the tour too, and can skip it.
+    await partner.getByRole('button', { name: 'Skip tour' }).click();
     await expect(partner.getByText('Let’s record your first expense')).toBeVisible();
 
     await partner.keyboard.press('n');
