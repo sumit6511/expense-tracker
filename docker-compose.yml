@@ -35,6 +35,14 @@ services:
       FX_NRB_ENABLED: ${FX_NRB_ENABLED:-true}
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-Expense Tracker <no-reply@localhost>}
+      WEB_PUSH: ${WEB_PUSH:-true}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      PUSH_EXTRA_HOSTS: ${PUSH_EXTRA_HOSTS:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-claude-opus-5-5}
+      AI_DAILY_LIMIT: ${AI_DAILY_LIMIT:-200}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       - "${PORT:-3000}:3000"

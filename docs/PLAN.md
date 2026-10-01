@@ -1,6 +1,6 @@
 # Expense Tracker: Research & Product/Technical Plan
 
-> Status: **Approved on 30 Sep 2026** with the decisions in [§0.1](#01-decisions-approved-30-sep-2026). **Phases 0, 1 and 2 are implemented** (see [§12.1](#121-implementation-notes-phase-0--1) and [§12.2](#122-implementation-notes-phase-2)); Phase 3 is next.
+> Status: **Approved on 30 Sep 2026** with the decisions in [§0.1](#01-decisions-approved-30-sep-2026). **Phases 0 to 3 are implemented** (see [§12.1](#121-implementation-notes-phase-0--1), [§12.2](#122-implementation-notes-phase-2) and [§12.3](#123-implementation-notes-phase-3)); Phase 4 is next.
 > Research date: September 2026.
 
 ---
@@ -648,6 +648,64 @@ Built in eight slices, each with unit, API integration and end-to-end tests. Dif
   "trust this device for 30 days", and account lockout after repeated wrong codes. **Passkeys** sign
   in on their own (they already combine something you have with a biometric or PIN), so they skip
   the TOTP step.
+
+### 12.3 Implementation notes (Phase 3)
+
+Built in seven slices, each with unit, API integration and end-to-end tests. Differences from the
+plan, and known limits:
+
+- **Sharing.** Invitations are links that work once, for 7 days, and only for the invited email
+  address (emailed when SMTP is set up, shown to copy either way). Deleting your login hands a
+  shared workspace to its longest-standing admin, or else member, instead of orphaning it.
+- **Private accounts** are enforced through a scope object (the workspace id plus the accounts
+  hidden from the person asking) that every lookup takes instead of a bare workspace id; jobs use an
+  explicit system scope or each member's own scope. **Postgres row-level security was not added**:
+  the scope gives the same guarantee in one place, and integration tests cover each surface (lists,
+  search, reports, budgets, exports, backups, attachments, history). A transfer between a shared and
+  a private account shows its shared side to others as "another account", read-only. *Limit:* a
+  member who leaves keeps their private accounts in the workspace, hidden from everyone else; they
+  only see them again if they rejoin, and deleting their login deletes them.
+- **Split groups** settle up by having the largest debtor pay the largest creditor repeatedly, which
+  needs at most (people − 1) payments and is what Splitwise-style apps do (the true minimum is
+  NP-hard). Leftover paisa from rounding go to the largest remainders, so shares always add up exactly.
+- **Envelope mode** computes Ready to assign from the on-budget accounts: money there before the
+  first budgeted month, then each month's income, minus what's assigned, uncategorized spending and
+  last month's overspending. *Limit:* a transfer from an on-budget account to an off-budget one
+  (investments, a loan) is not taken out of Ready to assign; record such a move as spending in a
+  category, or put the destination account on budget.
+- **Insights are deterministic**, as planned: spending above the mean + 2σ of the previous months,
+  categories well under their usual, good-month streaks, budgets kept three months running, price
+  changes and payments worth tracking. Each person dismisses items for themselves. The **forecast**
+  adds scheduled items to the average everyday money in and out over the last 90 days (leaving out
+  payees that now have a schedule, so a salary isn't counted twice), with an 80% band widening with
+  √days. It doesn't model seasonal spikes such as Dashain.
+- **Web push** uses VAPID keys from the environment, or a pair made on first start and kept in the
+  database. Subscriptions are only accepted for the major browsers' push services (plus
+  `PUSH_EXTRA_HOSTS`), so the server can't be pointed at internal addresses. New notifications are
+  pushed every minute, more than three collapse into one summary, and devices the push service
+  reports as gone are forgotten. *Limit:* on iPhone and iPad, push needs the app added to the home
+  screen (iOS 16.4+), as for any web app.
+- **AI helpers** use the Claude API behind a provider interface (tests use a scripted fake). They are
+  off unless the server has `ANTHROPIC_API_KEY` *and* a workspace owner or admin turns them on, with
+  a per-workspace daily limit (`AI_DAILY_LIMIT`). Extraction (receipts, sentences, PDF statements,
+  categories) uses structured outputs validated with Zod; "ask your money" runs the model with
+  read-only report tools limited to the asker's view, never SQL. The model defaults to
+  `claude-opus-5-5` and can be changed with `AI_MODEL` (e.g. `claude-haiku-4-5` for lower cost).
+  Natural-language quick add tries a deterministic parser first (amounts with lakh and Devanagari
+  digits, relative dates, accounts, categories, a few Nepali words) and only asks the model when it
+  finds nothing useful; the same parser runs in the browser when offline.
+- **Import presets** recognise YNAB, Actual Budget, Mint and Splitwise exports by their header row.
+  Transfers, starting balances and settle-up payments are left out (and counted). Splitwise imports
+  your share of each expense as spending; it does not recreate the groups.
+- **PDF report export** is a print-ready monthly report saved with the browser's "Save as PDF",
+  rather than server-side PDF generation: the browser already shapes Devanagari, lakh grouping and
+  BS dates correctly, and the server needs no headless browser or font files.
+- **Translations:** Nepali (नेपाली) is a per-person setting, with Devanagari digits, रु. and Nepali
+  month and weekday names. *Limit:* it covers navigation, the dashboard, the transaction dialog, the
+  monthly report and shared labels; deeper settings pages, insight sentences and server-written
+  notifications and emails are still English. Untranslated text falls back to English, and the
+  catalogue (`apps/web/src/lib/locales/ne.ts`) is keyed by the English text so it can grow page by
+  page.
 
 ### Phase 0: Foundations
 - Monorepo, TypeScript config, Biome, Vitest, Playwright, CI

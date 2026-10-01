@@ -57,6 +57,7 @@ function useMajorUnits() {
   const unit = 10 ** f.digits();
   return {
     f,
+    unit,
     major: (minor: number | null) => (minor === null ? null : minor / unit),
     tick: (value: number) =>
       f.compact(Math.round(value * unit)).replace(/^(-?)(?:Rs\.|रु\.) /, '$1'),
@@ -140,7 +141,7 @@ export function PaceChart({
   height?: number;
   paceLabel: string;
 }) {
-  const { f, major, tick } = useMajorUnits();
+  const { f, unit, major, tick } = useMajorUnits();
   const scale = niceTicks(
     Math.max(0, ...data.flatMap((d) => [major(d.spent) ?? 0, major(d.pace) ?? 0])),
   );
@@ -188,7 +189,10 @@ export function PaceChart({
                 rows.push({
                   label: paceLabel,
                   color: 'var(--chart-reference)',
-                  value: f.money(p.pace),
+                  // An even share of the budget rarely lands on whole rupees; paisa is noise here.
+                  value: f.money(Math.round(p.pace / unit) * unit, undefined, {
+                    trimZeroFraction: true,
+                  }),
                 });
               return <TooltipCard title={f.date(p.date, 'medium')} rows={rows} />;
             }}

@@ -7,7 +7,8 @@ Bank exchange rates.** Works on phones and desktops and installs like an app (PW
 ![Dashboard](docs/screenshots/dashboard.png)
 
 The research and design behind it are in [`docs/PLAN.md`](docs/PLAN.md). This repository contains
-**Phase 0 (foundations), Phase 1 (MVP) and Phase 2 (automation & depth)** of that plan.
+**Phase 0 (foundations), Phase 1 (MVP), Phase 2 (automation & depth) and Phase 3 (collaboration &
+intelligence)** of that plan.
 
 ## What it does
 
@@ -59,6 +60,38 @@ The research and design behind it are in [`docs/PLAN.md`](docs/PLAN.md). This re
 |---|---|---|---|
 | ![Quick add](docs/screenshots/quick-add.png) | ![Budgets](docs/screenshots/budgets.png) | ![Cash flow](docs/screenshots/cash-flow.png) | ![Mobile quick add](docs/screenshots/mobile-quick-add.png) |
 
+**Sharing and intelligence (Phase 3):**
+
+- **Share a workspace** with your household: invite people by email as admin, editor or viewer.
+  Every transaction shows who added it, and the list can be filtered by person. An account can be
+  shared with everyone or kept **"Only me"**: a private account, its balance and its transactions
+  are left out of everything other members see (lists, totals, reports, budgets, exports).
+- **Split groups** for trips, flatmates and dinners: split expenses equally, by exact amounts,
+  percentages or shares, see who owes whom, and settle up in the fewest payments. People don't need
+  an account. What you paid can be recorded in your own accounts too, so your spending equals your
+  share once everyone has settled.
+- **Envelope budgeting** (optional, per workspace): give every rupee a job. "Ready to assign" shows
+  money not yet budgeted, leftovers carry over, and overspending is covered by moving money.
+- **Insights** found in your own history (no AI): subscriptions and bills detected automatically,
+  price changes, unusually high spending, categories well under their usual, good months and
+  budgets kept. A **cash-flow forecast** projects your balance 30–90 days ahead from scheduled
+  items and your everyday spending, with a likely range.
+- **Push notifications** on phones and computers, even with the app closed.
+- **Optional AI helpers** (Claude API, off unless the server has a key *and* a workspace admin turns
+  them on): describe a transaction in a sentence, scan a receipt photo or PDF, suggest categories in
+  the review inbox, read PDF bank statements, and **ask questions about your money** ("how much did
+  we spend eating out last month?"). Quick add understands sentences like
+  "lunch 450 at Bhojan Griha yesterday via eSewa" without AI too.
+- **Bring your history** from YNAB, Actual Budget, Mint or Splitwise: their CSV exports are
+  recognised and read without matching columns.
+- **Monthly report** laid out for paper, saved as a **PDF** from the browser.
+- **Nepali interface** (नेपाली), chosen per person, for the everyday screens: Devanagari digits,
+  रु. and Nepali month names. Quick add understands आज, हिजो and अस्ति too.
+
+| Insights & forecast | Split group | Monthly report | नेपाली |
+|---|---|---|---|
+| ![Insights](docs/screenshots/insights.png) | ![Split group](docs/screenshots/split-group.png) | ![Monthly report](docs/screenshots/monthly-report.png) | ![Nepali on a phone](docs/screenshots/mobile-nepali.png) |
+
 ## Run it yourself (Docker)
 
 ```bash
@@ -80,10 +113,15 @@ Useful settings (environment variables, see [`.env.example`](.env.example)):
 | `FX_NRB_ENABLED` | Fetch daily rates from Nepal Rastra Bank (default `true`). |
 | `SMTP_URL` | Optional SMTP server for email notifications, e.g. `smtps://user:pass@smtp.example.com:465`. People opt in under Settings → Notifications. |
 | `MAIL_FROM` | Sender for those emails, e.g. `Expense Tracker <money@example.com>`. |
+| `WEB_PUSH` | Push notifications to browsers and installed apps (default `true`). The server makes its VAPID keys on first start; set `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` to manage them yourself. |
+| `ANTHROPIC_API_KEY` | Optional. Enables the AI helpers; each workspace's owner or admin still has to turn them on. |
+| `AI_MODEL` | The Claude model the helpers use (default `claude-opus-5-5`; `claude-haiku-4-5` costs less). |
+| `AI_DAILY_LIMIT` | AI requests allowed per workspace per day (default `200`). |
 | `POSTGRES_PASSWORD` | Database password used by compose. |
 
 Put a TLS-terminating reverse proxy (Caddy, nginx, Cloudflare Tunnel) in front for internet
-access. Passkeys are tied to the host name in `PUBLIC_URL`, so set it before people add them.
+access. Passkeys are tied to the host name in `PUBLIC_URL`, so set it before people add them, and
+browsers only allow push notifications on https (or `localhost`).
 
 ## Develop
 
@@ -134,13 +172,21 @@ A few decisions worth knowing:
   database dump backs them up too and there's no separate file store to run. Uploads are checked
   by their content, not their name, and served with a sandboxing Content-Security-Policy.
 - **Background jobs** (pg-boss, stored in PostgreSQL) record recurring items, check for
-  notifications every 15 minutes, refresh exchange rates and empty the trash.
+  notifications every 15 minutes, send push notifications, refresh exchange rates and empty the trash.
+- **Private accounts are enforced in one place:** every request carries the list of accounts hidden
+  from that person, and lookups take that scope instead of a bare workspace id, so a new query
+  can't forget it. Background jobs work out notifications per person in the same way.
+- **Insights and the forecast are plain statistics** (averages, standard deviations, detected
+  rhythms), not AI, so they're predictable, private and free. The AI helpers sit behind an
+  interface with a scripted fake for tests; only what a helper needs is sent, and questions are
+  answered through read-only report tools limited to what the asker can see.
+- **Push subscriptions** are only accepted for the major browsers' push services, so the server
+  can't be made to send requests to arbitrary addresses.
 - Reports convert each day's totals at that day's exchange rate, and tell you when a rate is missing
   instead of silently guessing.
 
 ## What's next
 
-Phase 3 of the plan adds household sharing (invites, roles, shared and private accounts), split
-groups with settle-up, an envelope budgeting mode, a cash-flow forecast, web push notifications and
-opt-in AI helpers (receipt scanning, natural-language quick add). See
+Phase 4 of the plan: bank sync where a provider exists, email-in for receipts and alerts, a public
+API with personal access tokens and webhooks, and a native mobile wrapper. See
 [`docs/PLAN.md`](docs/PLAN.md#12-roadmap--milestones).

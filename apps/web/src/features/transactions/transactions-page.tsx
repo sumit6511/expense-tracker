@@ -295,7 +295,7 @@ export function TransactionsPage() {
 
       {list.error && <ErrorState error={list.error} retry={() => list.refetch()} />}
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-clip">
         {list.isPending ? (
           <div className="grid grid-cols-1 gap-3 p-4">
             {Array.from({ length: 6 }, (_, i) => (

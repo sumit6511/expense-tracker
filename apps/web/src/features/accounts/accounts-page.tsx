@@ -53,8 +53,13 @@ export function AccountsPage() {
         !error && <Skeleton className="h-64" />
       ) : (
         <div className="grid grid-cols-1 gap-5">
-          <div className="grid grid-cols-3 gap-3">
-            <Summary label="Net worth" minor={assets + debts} strong />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <Summary
+              label="Net worth"
+              minor={assets + debts}
+              strong
+              className="col-span-2 sm:col-span-1"
+            />
             <Summary label="What you have" minor={assets} />
             <Summary label="What you owe" minor={-debts} />
           </div>
@@ -119,9 +124,19 @@ export function AccountsPage() {
   );
 }
 
-function Summary({ label, minor, strong }: { label: string; minor: number; strong?: boolean }) {
+function Summary({
+  label,
+  minor,
+  strong,
+  className,
+}: {
+  label: string;
+  minor: number;
+  strong?: boolean;
+  className?: string;
+}) {
   return (
-    <Card>
+    <Card className={className}>
       <CardContent className="pt-4">
         <p className="text-xs text-muted-foreground">{label}</p>
         <p

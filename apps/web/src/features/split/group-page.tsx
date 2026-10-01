@@ -405,8 +405,13 @@ function Balances({ g, canWrite, onAdd }: { g: SplitGroup; canWrite: boolean; on
                 {m.you && <span className="font-normal text-muted-foreground"> (you)</span>}
               </span>
               <span className="block text-xs text-muted-foreground tabular">
-                Paid {f.money(m.paidMinor, g.currency, { trimZeroFraction: true })} · share{' '}
-                {f.money(m.shareMinor, g.currency, { trimZeroFraction: true })}
+                <span className="whitespace-nowrap">
+                  Paid {f.money(m.paidMinor, g.currency, { trimZeroFraction: true })}
+                </span>{' '}
+                ·{' '}
+                <span className="whitespace-nowrap">
+                  share {f.money(m.shareMinor, g.currency, { trimZeroFraction: true })}
+                </span>
               </span>
             </span>
             <span
