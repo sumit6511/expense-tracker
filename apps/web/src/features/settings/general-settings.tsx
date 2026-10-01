@@ -6,8 +6,9 @@ import { useTheme } from '@/app/theme';
 import { CurrencySelect } from '@/components/pickers';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, Input, NativeSelect } from '@/components/ui/input';
+import { Field, Input } from '@/components/ui/input';
 import { Segmented, Switch } from '@/components/ui/menu';
+import { Select, SelectItem } from '@/components/ui/select';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
 import { useAiStatus, useUpdateMe, useUpdateWorkspace } from '@/lib/queries';
@@ -136,48 +137,48 @@ export function GeneralSettings() {
                 htmlFor="set-start"
                 hint="Useful if you’re paid on a fixed day, e.g. the 25th."
               >
-                <NativeSelect
+                <Select
                   id="set-start"
-                  value={monthStartDay}
-                  onChange={(e) => setMonthStartDay(Number(e.target.value))}
+                  value={String(monthStartDay)}
+                  onValueChange={(v) => setMonthStartDay(Number(v))}
                   disabled={!canEdit}
                 >
                   {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                    <option key={d} value={d}>
+                    <SelectItem key={d} value={String(d)}>
                       {d}
-                    </option>
+                    </SelectItem>
                   ))}
-                </NativeSelect>
+                </Select>
               </Field>
             )}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Week starts on" htmlFor="set-week">
-                <NativeSelect
+                <Select
                   id="set-week"
-                  value={weekStart}
-                  onChange={(e) => setWeekStart(Number(e.target.value))}
+                  value={String(weekStart)}
+                  onValueChange={(v) => setWeekStart(Number(v))}
                   disabled={!canEdit}
                 >
                   {WEEKDAY_NAMES.map((d, i) => (
-                    <option key={d} value={i}>
+                    <SelectItem key={d} value={String(i)}>
                       {d}
-                    </option>
+                    </SelectItem>
                   ))}
-                </NativeSelect>
+                </Select>
               </Field>
               <Field label="Time zone" htmlFor="set-tz" hint="Decides when “today” starts.">
-                <NativeSelect
+                <Select
                   id="set-tz"
                   value={timezone}
-                  onChange={(e) => setTimezone(e.target.value)}
+                  onValueChange={setTimezone}
                   disabled={!canEdit}
                 >
                   {zones.map((z) => (
-                    <option key={z} value={z}>
+                    <SelectItem key={z} value={z}>
                       {z.replace('_', ' ')}
-                    </option>
+                    </SelectItem>
                   ))}
-                </NativeSelect>
+                </Select>
               </Field>
             </div>
             {canEdit && (

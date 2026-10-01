@@ -21,8 +21,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, Input, NativeSelect } from '@/components/ui/input';
+import { Field, Input } from '@/components/ui/input';
 import { Segmented, Switch } from '@/components/ui/menu';
+import { Select, SelectItem } from '@/components/ui/select';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
 import { useCreateAccount, useMemberNames, useUpdateAccount } from '@/lib/queries';
@@ -133,11 +134,11 @@ export function AccountFormDialog({
           </Field>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Type" htmlFor="acct-type">
-              <NativeSelect
+              <Select
                 id="acct-type"
                 value={type}
-                onChange={(e) => {
-                  const next = e.target.value as AccountType;
+                onValueChange={(v) => {
+                  const next = v as AccountType;
                   setType(next);
                   const p = ACCOUNT_PRESETS.find((x) => x.type === next);
                   if (!account && p) {
@@ -147,11 +148,11 @@ export function AccountFormDialog({
                 }}
               >
                 {Object.entries(ACCOUNT_TYPE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
+                  <SelectItem key={value} value={value}>
                     {label}
-                  </option>
+                  </SelectItem>
                 ))}
-              </NativeSelect>
+              </Select>
             </Field>
             <Field
               label="Currency"

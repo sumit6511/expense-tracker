@@ -2,10 +2,12 @@ import type { BankAccountLink, BankConnection } from '@et/shared';
 import { ExternalLink, Landmark, Plus, RefreshCw } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { toast } from 'sonner';
+import { DatePicker } from '@/components/date-picker';
 import { Button } from '@/components/ui/button';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/dialog';
-import { Input, NativeSelect, Textarea } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/input';
+import { Select, SelectItem } from '@/components/ui/select';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
 import {
@@ -224,41 +226,38 @@ function LinkRow({ link: a, manager }: { link: BankAccountLink; manager: boolean
       </div>
       {manager ? (
         <>
-          <NativeSelect
+          <Select
             aria-label={`Account for ${a.name}`}
             value={a.accountId ?? ''}
             className="h-9 text-[13px] sm:w-48"
-            onChange={(e) =>
+            onValueChange={(v) =>
               update.mutate(
-                { id: a.id, accountId: e.target.value || null },
+                { id: a.id, accountId: v || null },
                 {
                   onSuccess: () =>
-                    e.target.value &&
-                    toast.success('Linked. Use “Sync now” to bring in its transactions.'),
+                    v && toast.success('Linked. Use “Sync now” to bring in its transactions.'),
                   onError,
                 },
               )
             }
           >
-            <option value="">Don’t sync</option>
+            <SelectItem value="">Don’t sync</SelectItem>
             {choices.map((x) => (
-              <option key={x.id} value={x.id}>
+              <SelectItem key={x.id} value={x.id}>
                 {x.name}
-              </option>
+              </SelectItem>
             ))}
-          </NativeSelect>
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          </Select>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             From
-            <Input
-              type="date"
+            <DatePicker
               aria-label={`Bring in ${a.name} transactions from`}
               value={a.syncFrom}
-              className="h-9 w-36 text-[13px]"
-              onChange={(e) =>
-                e.target.value && update.mutate({ id: a.id, syncFrom: e.target.value }, { onError })
-              }
+              max={f.today}
+              className="h-9 w-44 text-[13px] text-foreground"
+              onChange={(date) => update.mutate({ id: a.id, syncFrom: date }, { onError })}
             />
-          </label>
+          </div>
         </>
       ) : (
         <span className="text-xs text-muted-foreground sm:col-span-2">

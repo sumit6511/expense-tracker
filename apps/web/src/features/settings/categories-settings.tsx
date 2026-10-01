@@ -26,7 +26,7 @@ import {
   DialogTitle,
   useConfirm,
 } from '@/components/ui/dialog';
-import { Field, Input, NativeSelect } from '@/components/ui/input';
+import { Field, Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +35,7 @@ import {
   DropdownMenuTrigger,
   Segmented,
 } from '@/components/ui/menu';
+import { Select, SelectItem } from '@/components/ui/select';
 import { errorMessage } from '@/lib/api';
 import {
   useCategories,
@@ -328,19 +329,15 @@ function CategoryDialog({
             />
           </div>
           <Field label="Group" htmlFor="cat-group">
-            <NativeSelect
-              id="cat-group"
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-            >
+            <Select id="cat-group" value={groupId} onValueChange={setGroupId}>
               {groups
                 .filter((g) => g.kind === kind)
                 .map((g) => (
-                  <option key={g.id} value={g.id}>
+                  <SelectItem key={g.id} value={g.id}>
                     {g.name}
-                  </option>
+                  </SelectItem>
                 ))}
-            </NativeSelect>
+            </Select>
           </Field>
           <div className="grid grid-cols-1 gap-2">
             <span className="text-[13px] font-medium">Icon</span>

@@ -22,16 +22,16 @@ import {
 import { useState } from 'react';
 import { CategoryIcon } from '@/components/icons';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { commandGroups, menuItem } from '@/components/ui/menu';
 import { useRecurringDialog } from '@/features/recurring/recurring-dialog';
 import { useTransactionDialog } from '@/features/transactions/transaction-dialog';
 import { useAccounts, useCategories } from '@/lib/queries';
 import { useCanWrite } from '@/lib/session';
+import { cn } from '@/lib/utils';
 import { useTheme } from './theme';
 
-const item =
-  'flex cursor-default items-center gap-3 rounded-lg px-3 py-2 text-sm outline-none select-none data-[selected=true]:bg-muted [&>svg]:size-4 [&>svg]:text-muted-foreground';
-const group =
-  '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-muted-foreground';
+const item = cn(menuItem, 'gap-3 px-3 [&>svg]:text-muted-foreground');
+const group = cn(commandGroups, '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pt-3');
 
 export function CommandPalette({
   open,

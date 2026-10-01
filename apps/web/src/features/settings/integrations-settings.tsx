@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/dialog';
-import { Field, Input, NativeSelect } from '@/components/ui/input';
+import { Field, Input } from '@/components/ui/input';
 import {
   Checkbox,
   DropdownMenu,
@@ -36,6 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/menu';
+import { Select, SelectItem } from '@/components/ui/select';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
 import {
@@ -162,30 +163,22 @@ function NewTokenForm({
         />
       </Field>
       <Field label="Access" htmlFor="token-scope">
-        <NativeSelect
-          id="token-scope"
-          value={scope}
-          onChange={(e) => setScope(e.target.value as TokenScope)}
-        >
-          <option value="read">Read only</option>
-          <option value="write" disabled={!canWrite}>
+        <Select id="token-scope" value={scope} onValueChange={(v) => setScope(v as TokenScope)}>
+          <SelectItem value="read">Read only</SelectItem>
+          <SelectItem value="write" disabled={!canWrite}>
             Read and write
-          </option>
-        </NativeSelect>
+          </SelectItem>
+        </Select>
       </Field>
       <Field label="Expires" htmlFor="token-expires">
-        <NativeSelect
-          id="token-expires"
-          value={lifetime}
-          onChange={(e) => setLifetime(e.target.value)}
-        >
+        <Select id="token-expires" value={lifetime} onValueChange={setLifetime}>
           {TOKEN_LIFETIMES.map((d) => (
-            <option key={d} value={String(d)}>
+            <SelectItem key={d} value={String(d)}>
               {`After ${LIFETIME_LABEL[d]}`}
-            </option>
+            </SelectItem>
           ))}
-          <option value="never">Never</option>
-        </NativeSelect>
+          <SelectItem value="never">Never</SelectItem>
+        </Select>
       </Field>
       <div className="flex justify-end gap-2 sm:col-span-3">
         <Button type="button" variant="ghost" onClick={onCancel}>

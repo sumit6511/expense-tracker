@@ -17,7 +17,7 @@ import {
   DialogTitle,
   useConfirm,
 } from '@/components/ui/dialog';
-import { Field, Input, NativeSelect } from '@/components/ui/input';
+import { Field, Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/menu';
+import { Select, SelectItem } from '@/components/ui/select';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
 import {
@@ -220,20 +221,20 @@ function MergeDialog({
         </DialogDescription>
       </DialogHeader>
       <DialogBody>
-        <NativeSelect
+        <Select
           value={target}
-          onChange={(e) => setTarget(e.target.value)}
+          onValueChange={setTarget}
           aria-label="Merge into"
+          placeholder="Choose payee"
         >
-          <option value="">Choose payee</option>
           {payees
             .filter((p) => p.id !== payee.id)
             .map((p) => (
-              <option key={p.id} value={p.id}>
+              <SelectItem key={p.id} value={p.id}>
                 {p.name}
-              </option>
+              </SelectItem>
             ))}
-        </NativeSelect>
+        </Select>
       </DialogBody>
       <DialogFooter>
         <Button

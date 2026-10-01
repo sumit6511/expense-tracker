@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { createServer, type IncomingHttpHeaders } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { createUser, expect, test, totp } from './fixtures';
+import { choose, createUser, expect, test, totp } from './fixtures';
 
 test.describe('getting started', () => {
   test('sign up, set up a workspace and record the first expense @mobile', async ({ page }) => {
@@ -14,7 +14,7 @@ test.describe('getting started', () => {
     await expect(page).toHaveURL(/\/onboarding$/);
     await expect(page.getByRole('heading', { name: /Namaste, Sita/ })).toBeVisible();
     // Defaults: NPR and Bikram Sambat.
-    await expect(page.getByLabel('Main currency')).toHaveValue('NPR');
+    await expect(page.getByLabel('Main currency')).toContainText('NPR');
     await page.getByRole('button', { name: 'Continue' }).click();
     await page.getByLabel('Cash balance').fill('5,000');
     await page.getByRole('button', { name: 'Continue' }).click();
@@ -234,10 +234,10 @@ test.describe('sharing', () => {
 
     await page.goto('/transactions');
     await expect(page.getByRole('img', { name: 'Added by Partner' })).toBeVisible();
-    await page.getByLabel('Added by', { exact: true }).selectOption({ label: 'Added by Partner' });
+    await choose(page.getByLabel('Added by', { exact: true }), 'Added by Partner');
     await expect(page.getByText('1 transaction', { exact: true })).toBeVisible();
     await page.goto('/settings?tab=members');
-    await expect(page.getByLabel('Role for Partner')).toHaveValue('editor');
+    await expect(page.getByLabel('Role for Partner')).toHaveText('Editor');
     await expect(page.getByText('Waiting to join')).toBeHidden();
 
     // A private account stays the partner's own.
@@ -273,7 +273,7 @@ test.describe('split with friends', () => {
     await expense.getByLabel('What for').fill('Dinner');
     await expense.getByLabel('Amount').fill('3000');
     await expense.getByRole('switch').click();
-    await expense.getByLabel('Paid from').selectOption({ label: 'Cash' });
+    await choose(expense.getByLabel('Paid from'), 'Cash');
     await expense.getByRole('button', { name: 'Add expense' }).click();
     await expect(page.getByText('You’re owed Rs. 2,000')).toBeVisible();
     await expect(page.getByText('you lent Rs. 2,000')).toBeVisible();
@@ -331,7 +331,7 @@ test.describe('everyday use', () => {
     await expect(dialog.getByRole('heading', { name: 'New expense' })).toBeVisible();
     await expect(dialog.getByLabel('Amount')).toHaveValue(/^450/);
     await expect(dialog.getByLabel('Payee')).toHaveValue('Bhojan Griha');
-    await expect(dialog.getByLabel('Account').locator('option:checked')).toHaveText(/eSewa/);
+    await expect(dialog.getByLabel('Account')).toHaveText(/eSewa/);
     await expect(describe).toHaveValue('');
     await dialog.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Expense added')).toBeVisible();
@@ -351,8 +351,8 @@ test.describe('everyday use', () => {
     await page.keyboard.press('t');
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Amount sent').fill('20000');
-    await dialog.getByLabel('From').selectOption({ label: 'Nabil Bank' });
-    await dialog.getByLabel('To').selectOption({ label: 'eSewa' });
+    await choose(dialog.getByLabel('From'), 'Nabil Bank');
+    await choose(dialog.getByLabel('To'), 'eSewa');
     await dialog.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Transfer saved')).toBeVisible();
 
@@ -412,9 +412,7 @@ test.describe('everyday use', () => {
     const move = page.getByRole('dialog', { name: 'Move money' });
     await move.getByLabel('Amount').fill('5000');
     const to = move.getByLabel('To');
-    await to.selectOption(
-      (await to.locator('option', { hasText: 'Transport' }).getAttribute('value'))!,
-    );
+    await choose(to, /^Transport/);
     await move.getByRole('button', { name: 'Move', exact: true }).click();
     await expect(page.getByText('Money moved')).toBeVisible();
     await expect(ready).toContainText('Rs. 43,000');
@@ -469,7 +467,7 @@ test.describe('everyday use', () => {
 
   test('import a bank statement CSV, then undo it', async ({ signedIn: page }) => {
     await page.goto('/import');
-    await page.getByLabel('Import into account').selectOption({ label: 'Nabil Bank (NPR)' });
+    await choose(page.getByLabel('Import into account'), 'Nabil Bank (NPR)');
     const csv = [
       'Txn Date,Description,Withdrawal,Deposit,Balance,Ref No',
       '2083-06-01,POS/BHAT BHATENI SUPERMARKET/KTM,"2,450.00",,"47,550.00",R1',
@@ -481,7 +479,7 @@ test.describe('everyday use', () => {
       .setInputFiles({ name: 'nabil.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
 
     // Columns and the Bikram Sambat date format are detected automatically.
-    await expect(page.getByLabel('Date format')).toHaveValue('bs-ymd');
+    await expect(page.getByLabel('Date format')).toContainText('Bikram Sambat Year-Month-Day');
     await expect(page.getByText('3 readable')).toBeVisible();
     await page.getByRole('button', { name: /Review 3 rows/ }).click();
     await expect(page.getByText('3 of 3 will be imported into Nabil Bank')).toBeVisible();
@@ -505,7 +503,7 @@ test.describe('everyday use', () => {
     signedIn: page,
   }) => {
     await page.goto('/import');
-    await page.getByLabel('Import into account').selectOption({ label: 'Cash (NPR)' });
+    await choose(page.getByLabel('Import into account'), 'Cash (NPR)');
     const csv = [
       'Date,Description,Category,Cost,Currency,Asha Test,Bikash',
       '2026-09-01,Dinner by the lake,Dining out,3000.00,NPR,1500.00,-1500.00',
@@ -518,7 +516,7 @@ test.describe('everyday use', () => {
       .setInputFiles({ name: 'splitwise.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
     await expect(page.getByText('Looks like a Splitwise export')).toBeVisible();
     // The signed-in person (Asha Test) is picked out already.
-    await expect(page.getByLabel('Which one is you?')).toHaveValue('Asha Test');
+    await expect(page.getByLabel('Which one is you?')).toHaveText('Asha Test');
     await expect(page.getByText('2 transactions to check')).toBeVisible();
     await expect(page.getByText(/1 left out \(Settling up/)).toBeVisible();
     await page.getByRole('button', { name: 'Continue' }).click();
@@ -535,7 +533,7 @@ test.describe('everyday use', () => {
 
   test('review imported transactions and turn a choice into a rule', async ({ signedIn: page }) => {
     await page.goto('/import');
-    await page.getByLabel('Import into account').selectOption({ label: 'Nabil Bank (NPR)' });
+    await choose(page.getByLabel('Import into account'), 'Nabil Bank (NPR)');
     const csv = [
       'Date,Description,Amount',
       '2026-10-02,POS/DARAZ ONLINE PVT LTD,-2899',
@@ -654,7 +652,7 @@ test.describe('everyday use', () => {
     await page.keyboard.press('n');
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Amount').fill('1,000');
-    await dialog.getByLabel('Account').selectOption({ label: 'Nabil Bank' });
+    await choose(dialog.getByLabel('Account'), 'Nabil Bank');
     await dialog.getByLabel('Payee').fill('Daraz');
     // A 1×1 PNG, queued until the expense is saved.
     await page.locator('input[type=file]').setInputFiles({
@@ -689,7 +687,7 @@ test.describe('everyday use', () => {
 
   test('import an OFX statement and pasted SMS alerts', async ({ signedIn: page }) => {
     await page.goto('/import');
-    await page.getByLabel('Import into account').selectOption({ label: 'Nabil Bank (NPR)' });
+    await choose(page.getByLabel('Import into account'), 'Nabil Bank (NPR)');
     const ofx = [
       'OFXHEADER:100',
       '<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><CURDEF>NPR',
@@ -798,7 +796,7 @@ test.describe('everyday use', () => {
     await page.goto('/settings?tab=integrations');
     await page.getByRole('button', { name: 'New token' }).click();
     await page.getByLabel('Name').fill('Spreadsheet');
-    await page.getByLabel('Access').selectOption('write');
+    await choose(page.getByLabel('Access'), 'Read and write');
     await page.getByRole('button', { name: 'Make token' }).click();
     const token = await page.getByLabel('New access token').inputValue();
     expect(token).toMatch(/^et_/);
@@ -940,7 +938,7 @@ test.describe('everyday use', () => {
       };
     });
     await page.goto('/import');
-    await page.getByLabel('Import into account').selectOption({ label: 'Nabil Bank (NPR)' });
+    await choose(page.getByLabel('Import into account'), 'Nabil Bank (NPR)');
     await page.getByText('SMS alerts', { exact: true }).click();
     await page.getByRole('button', { name: 'Read alerts from this phone' }).click();
     await expect(page.getByText('Found 1 alert.', { exact: false })).toBeVisible();
@@ -985,7 +983,7 @@ test.describe('everyday use', () => {
     await page.getByRole('button', { name: 'Add account' }).click();
     const form = page.getByRole('dialog');
     await form.getByLabel('Name').fill('Meroshare');
-    await form.getByLabel('Type').selectOption('investment');
+    await choose(form.getByLabel('Type'), 'Investment');
     await form.getByRole('button', { name: /^(Add|Create|Save)/ }).click();
     await page.getByRole('link', { name: /Meroshare/ }).click();
 
@@ -1019,8 +1017,52 @@ test.describe('everyday use', () => {
     await page.getByRole('tab', { name: 'Compare' }).click();
     await expect(page.getByText('Spending now')).toBeVisible();
     await page.goto('/settings');
-    await expect(page.getByLabel('Main currency')).toHaveValue('NPR');
+    await expect(page.getByLabel('Main currency')).toContainText('NPR');
     await page.getByRole('tab', { name: 'Categories' }).click();
     await expect(page.getByText('Remittance')).toBeVisible();
+  });
+});
+
+test.describe('dark mode', () => {
+  test.use({ colorScheme: 'dark' });
+
+  test('dropdowns use the theme; past payees are suggested as you type', async ({
+    signedIn: page,
+  }) => {
+    await page.keyboard.press('n');
+    let dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Amount').fill('120');
+    await dialog.getByLabel('Payee').fill('Himalayan Java');
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Expense added')).toBeVisible();
+
+    await page.keyboard.press('n');
+    dialog = page.getByRole('dialog');
+    const payee = dialog.getByLabel('Payee');
+    await payee.fill('java');
+    await expect(page.getByRole('option', { name: 'Himalayan Java' })).toBeVisible();
+    await payee.press('ArrowDown');
+    await payee.press('Enter');
+    await expect(payee).toHaveValue('Himalayan Java');
+    await expect(page.getByRole('listbox')).toBeHidden();
+
+    // The list is drawn by the app on the popover colour, not by the system in its own.
+    await dialog.getByLabel('Account').click();
+    const colors = await page.getByRole('listbox').evaluate((list) => {
+      const probe = document.createElement('div');
+      probe.style.background = 'var(--popover)';
+      document.body.append(probe);
+      const popover = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return {
+        dark: document.documentElement.classList.contains('dark'),
+        list: getComputedStyle(list).backgroundColor,
+        popover,
+      };
+    });
+    expect(colors.dark).toBe(true);
+    expect(colors.list).toBe(colors.popover);
+    await page.getByRole('option', { name: 'eSewa', exact: true }).click();
+    await expect(dialog.getByLabel('Account')).toHaveText('eSewa');
   });
 });

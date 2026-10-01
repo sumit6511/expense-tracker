@@ -207,12 +207,14 @@ export function DatePicker({
   id,
   className,
   max,
+  'aria-label': ariaLabel,
 }: {
   value: IsoDate;
   onChange: (date: IsoDate) => void;
   id?: string;
   className?: string;
   max?: IsoDate;
+  'aria-label'?: string;
 }) {
   const f = useFormat();
   const ws = useWorkspace();
@@ -222,8 +224,9 @@ export function DatePicker({
       <PopoverTrigger asChild>
         <Button
           id={id}
+          aria-label={ariaLabel}
           variant="outline"
-          className={cn('h-10 w-full justify-start px-3 font-normal', className)}
+          className={cn('h-10 w-full justify-start px-3 font-normal shadow-xs', className)}
         >
           <CalendarDays className="text-muted-foreground" />
           <span className="truncate">{f.relativeDate(value)}</span>

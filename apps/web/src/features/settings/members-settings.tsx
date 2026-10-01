@@ -31,13 +31,14 @@ import { PersonAvatar } from '@/components/person';
 import { Button } from '@/components/ui/button';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/dialog';
-import { Field, Input, NativeSelect } from '@/components/ui/input';
+import { Field, Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/menu';
+import { Select, SelectItem } from '@/components/ui/select';
 import { api, errorMessage } from '@/lib/api';
 import {
   meKey,
@@ -127,30 +128,28 @@ function MemberRow({ m, me }: { m: Member; me: Role }) {
         <p className="truncate text-xs text-muted-foreground">{m.email}</p>
       </div>
       {manageable ? (
-        <NativeSelect
+        <Select
           value={m.role}
           aria-label={`Role for ${m.name}`}
           className="h-8 w-28 text-[13px]"
           disabled={update.isPending}
-          onChange={(e) =>
+          onValueChange={(v) =>
             update.mutate(
-              { userId: m.userId, role: e.target.value as AssignableRole },
+              { userId: m.userId, role: v as AssignableRole },
               {
                 onSuccess: () =>
-                  toast.success(
-                    `${m.name} is now ${roleWithArticle(e.target.value as AssignableRole)}`,
-                  ),
+                  toast.success(`${m.name} is now ${roleWithArticle(v as AssignableRole)}`),
                 onError: (err) => toast.error(errorMessage(err)),
               },
             )
           }
         >
           {ASSIGNABLE.map((r) => (
-            <option key={r} value={r}>
+            <SelectItem key={r} value={r}>
               {ROLE_LABEL[r]}
-            </option>
+            </SelectItem>
           ))}
-        </NativeSelect>
+        </Select>
       ) : (
         <Badge tone={m.role === 'owner' ? 'primary' : 'neutral'}>
           {m.role === 'owner' && <Crown className="size-3" />} {ROLE_LABEL[m.role]}
@@ -238,18 +237,18 @@ function InviteCard({ onCreated }: { onCreated: (c: InvitationCreated) => void }
       </Field>
       <Field label="Role" htmlFor="invite-role" hint={`${ROLE_DESCRIPTIONS[role]}.`}>
         <div className="flex gap-2">
-          <NativeSelect
+          <Select
             id="invite-role"
             value={role}
-            onChange={(e) => setRole(e.target.value as AssignableRole)}
+            onValueChange={(v) => setRole(v as AssignableRole)}
             className="flex-1"
           >
             {ASSIGNABLE.map((r) => (
-              <option key={r} value={r}>
+              <SelectItem key={r} value={r}>
                 {ROLE_LABEL[r]}
-              </option>
+              </SelectItem>
             ))}
-          </NativeSelect>
+          </Select>
           <Button type="submit" disabled={invite.isPending}>
             {invite.isPending ? <Loader2 className="animate-spin" /> : <UserPlus />} Invite
           </Button>

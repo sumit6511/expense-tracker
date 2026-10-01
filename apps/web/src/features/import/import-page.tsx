@@ -42,8 +42,9 @@ import { CategoryPicker } from '@/components/pickers';
 import { Button } from '@/components/ui/button';
 import { Badge, Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/dialog';
-import { Field, Input, NativeSelect, Textarea } from '@/components/ui/input';
+import { Field, Input, Textarea } from '@/components/ui/input';
 import { Checkbox, Segmented } from '@/components/ui/menu';
+import { Select, SelectItem } from '@/components/ui/select';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
 import { canReadPhoneSms, readPhoneAlerts } from '@/lib/native';
@@ -150,22 +151,20 @@ function ColumnSelect({
 }) {
   return (
     <Field label={label} htmlFor={id}>
-      <NativeSelect
+      <Select
         id={id}
-        value={value === null || value === undefined ? '-1' : String(value)}
-        onChange={(e) => onChange(e.target.value === '-1' ? null : Number(e.target.value))}
+        value={value === null || value === undefined ? (optional ? '-1' : '') : String(value)}
+        onValueChange={(v) => onChange(v === '-1' ? null : Number(v))}
+        placeholder="Choose column"
       >
-        {optional && <option value="-1">— Not in file —</option>}
-        {!optional && (value === null || value === undefined) && (
-          <option value="-1">Choose column</option>
-        )}
+        {optional && <SelectItem value="-1">— Not in file —</SelectItem>}
         {headers.map((h, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: columns are positional
-          <option key={i} value={i}>
+          <SelectItem key={i} value={String(i)}>
             {h}
-          </option>
+          </SelectItem>
         ))}
-      </NativeSelect>
+      </Select>
     </Field>
   );
 }
@@ -480,18 +479,18 @@ export function ImportPage() {
         <Card>
           <CardContent className="grid grid-cols-1 gap-5 pt-5">
             <Field label="Import into account" htmlFor="imp-account">
-              <NativeSelect
+              <Select
                 id="imp-account"
                 value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
+                onValueChange={setAccountId}
+                placeholder="Choose account"
               >
-                <option value="">Choose account</option>
                 {activeAccounts.map((a) => (
-                  <option key={a.id} value={a.id}>
+                  <SelectItem key={a.id} value={a.id}>
                     {a.name} ({a.currency})
-                  </option>
+                  </SelectItem>
                 ))}
-              </NativeSelect>
+              </Select>
             </Field>
             <Segmented
               label="Import from"
@@ -608,22 +607,22 @@ export function ImportPage() {
                 {file.name} · {file.rows.length} rows
               </CardTitle>
               {(profiles.data?.length ?? 0) > 0 && (
-                <NativeSelect
+                <Select
                   className="h-8 w-48 text-[13px]"
-                  defaultValue=""
+                  value=""
+                  placeholder="Apply saved mapping…"
                   aria-label="Apply saved mapping"
-                  onChange={(e) => {
-                    const p = profiles.data?.find((x) => x.id === e.target.value);
+                  onValueChange={(v) => {
+                    const p = profiles.data?.find((x) => x.id === v);
                     if (p) setMapping(p.mapping);
                   }}
                 >
-                  <option value="">Apply saved mapping…</option>
                   {profiles.data?.map((p) => (
-                    <option key={p.id} value={p.id}>
+                    <SelectItem key={p.id} value={p.id}>
                       {p.name}
-                    </option>
+                    </SelectItem>
                   ))}
-                </NativeSelect>
+                </Select>
               )}
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-4">
@@ -643,20 +642,20 @@ export function ImportPage() {
                   onChange={(v) => setMapping((m) => ({ ...m, date: v ?? undefined }))}
                 />
                 <Field label="Date format" htmlFor="map-date-format">
-                  <NativeSelect
+                  <Select
                     id="map-date-format"
                     value={mapping.dateFormat ?? ''}
-                    onChange={(e) =>
-                      setMapping((m) => ({ ...m, dateFormat: e.target.value as DateFormat }))
+                    onValueChange={(v) =>
+                      setMapping((m) => ({ ...m, dateFormat: v as DateFormat }))
                     }
+                    placeholder="Choose format"
                   >
-                    {!mapping.dateFormat && <option value="">Choose format</option>}
                     {DATE_FORMATS.map((d) => (
-                      <option key={d} value={d}>
+                      <SelectItem key={d} value={d}>
                         {DATE_FORMAT_LABELS[d]}
-                      </option>
+                      </SelectItem>
                     ))}
-                  </NativeSelect>
+                  </Select>
                 </Field>
               </div>
               <Field label="Amounts">
@@ -1124,33 +1123,33 @@ function PresetStep({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {info.accounts.length > 1 && (
             <Field label="Account in the file" htmlFor="preset-account">
-              <NativeSelect
+              <Select
                 id="preset-account"
                 value={choice.account}
-                onChange={(e) => onChoice({ ...choice, account: e.target.value })}
+                onValueChange={(v) => onChoice({ ...choice, account: v })}
               >
                 {info.accounts.map((a) => (
-                  <option key={a} value={a}>
+                  <SelectItem key={a} value={a}>
                     {a}
-                  </option>
+                  </SelectItem>
                 ))}
-              </NativeSelect>
+              </Select>
             </Field>
           )}
           {preset === 'splitwise' && (
             <Field label="Which one is you?" htmlFor="preset-you">
-              <NativeSelect
+              <Select
                 id="preset-you"
                 value={choice.you}
-                onChange={(e) => onChoice({ ...choice, you: e.target.value })}
+                onValueChange={(v) => onChoice({ ...choice, you: v })}
+                placeholder="Choose…"
               >
-                <option value="">Choose…</option>
                 {info.people.map((p) => (
-                  <option key={p} value={p}>
+                  <SelectItem key={p} value={p}>
                     {p}
-                  </option>
+                  </SelectItem>
                 ))}
-              </NativeSelect>
+              </Select>
             </Field>
           )}
         </div>

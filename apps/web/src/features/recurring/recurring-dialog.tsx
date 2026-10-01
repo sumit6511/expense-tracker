@@ -47,8 +47,9 @@ import {
   DialogTitle,
   useConfirm,
 } from '@/components/ui/dialog';
-import { Field, Input, NativeSelect } from '@/components/ui/input';
+import { Field, Input } from '@/components/ui/input';
 import { Checkbox, Segmented } from '@/components/ui/menu';
+import { Select, SelectItem } from '@/components/ui/select';
 import { errorMessage } from '@/lib/api';
 import { type Formatters, useFormat } from '@/lib/format';
 import {
@@ -464,17 +465,17 @@ function RecurringEditor({ start, onDone }: { start?: RecurringStart; onDone: ()
                 onChange={(e) => setInterval(e.target.value.replace(/\D/g, '').slice(0, 3))}
                 className="text-center tabular"
               />
-              <NativeSelect
+              <Select
                 aria-label="Repeats"
                 value={frequency}
-                onChange={(e) => setFrequency(e.target.value as Frequency)}
+                onValueChange={(v) => setFrequency(v as Frequency)}
               >
                 {(['daily', 'weekly', 'monthly', 'yearly'] as const).map((fr) => (
-                  <option key={fr} value={fr}>
+                  <SelectItem key={fr} value={fr}>
                     {UNIT[fr][interval === '1' ? 0 : 1]}
-                  </option>
+                  </SelectItem>
                 ))}
-              </NativeSelect>
+              </Select>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Next date" htmlFor="rec-next">
@@ -513,15 +514,11 @@ function RecurringEditor({ start, onDone }: { start?: RecurringStart; onDone: ()
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Ends" htmlFor="rec-ends">
-                <NativeSelect
-                  id="rec-ends"
-                  value={ends}
-                  onChange={(e) => setEnds(e.target.value as Ends)}
-                >
-                  <option value="never">Never</option>
-                  <option value="date">On a date</option>
-                  <option value="count">After a number of times</option>
-                </NativeSelect>
+                <Select id="rec-ends" value={ends} onValueChange={(v) => setEnds(v as Ends)}>
+                  <SelectItem value="never">Never</SelectItem>
+                  <SelectItem value="date">On a date</SelectItem>
+                  <SelectItem value="count">After a number of times</SelectItem>
+                </Select>
               </Field>
               {ends === 'date' && (
                 <Field label="Last date" htmlFor="rec-end">
@@ -560,16 +557,12 @@ function RecurringEditor({ start, onDone }: { start?: RecurringStart; onDone: ()
             )}
             {(variableAmount || mode === 'remind') && (
               <Field label="Remind me" htmlFor="rec-remind">
-                <NativeSelect
-                  id="rec-remind"
-                  value={remindDays}
-                  onChange={(e) => setRemindDays(e.target.value)}
-                >
-                  <option value="0">On the day</option>
-                  <option value="1">1 day before</option>
-                  <option value="3">3 days before</option>
-                  <option value="7">A week before</option>
-                </NativeSelect>
+                <Select id="rec-remind" value={remindDays} onValueChange={setRemindDays}>
+                  <SelectItem value="0">On the day</SelectItem>
+                  <SelectItem value="1">1 day before</SelectItem>
+                  <SelectItem value="3">3 days before</SelectItem>
+                  <SelectItem value="7">A week before</SelectItem>
+                </Select>
               </Field>
             )}
           </fieldset>

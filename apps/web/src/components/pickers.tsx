@@ -3,12 +3,13 @@ import {
   type Account,
   type CategoryKind,
   COLOR_SWATCHES,
+  type Currency,
   listCurrencies,
   parseAmountInput,
 } from '@et/shared';
 import { Command } from 'cmdk';
 import { Check, ChevronDown, Plus, Search, TagIcon } from 'lucide-react';
-import { type ComponentProps, useMemo, useState } from 'react';
+import { type ComponentProps, type KeyboardEvent, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
@@ -23,13 +24,20 @@ import {
 import { cn } from '@/lib/utils';
 import { CategoryIcon } from './icons';
 import { Button } from './ui/button';
-import { Input, NativeSelect } from './ui/input';
-import { Checkbox, Popover, PopoverContent, PopoverTrigger } from './ui/menu';
+import { Input } from './ui/input';
+import {
+  Checkbox,
+  commandGroups,
+  menuItem,
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverTrigger,
+} from './ui/menu';
+import { Select, SelectItem } from './ui/select';
 
-const commandList =
-  'max-h-72 overflow-y-auto overscroll-contain [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-muted-foreground';
-const commandItem =
-  'flex cursor-default items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm outline-none select-none data-[selected=true]:bg-muted';
+const commandList = cn('max-h-72 overflow-y-auto overscroll-contain p-1', commandGroups);
+const commandItem = cn(menuItem, 'gap-2.5');
 
 function CommandSearch({ placeholder }: { placeholder: string }) {
   return (
@@ -44,6 +52,39 @@ function CommandSearch({ placeholder }: { placeholder: string }) {
 }
 
 // Category ------------------------------------------------------------------------------------
+
+/** The category groups of a cmdk list, with a check on the chosen one. */
+function CategoryGroups({
+  value,
+  kind,
+  onPick,
+}: {
+  value: string | null | undefined;
+  kind?: CategoryKind;
+  onPick: (id: string) => void;
+}) {
+  const { data: groups = [] } = useCategories();
+  const visible = groups
+    .filter((g) => !kind || g.kind === kind || g.categories.some((c) => c.id === value))
+    .map((g) => ({ ...g, categories: g.categories.filter((c) => !c.archived || c.id === value) }))
+    .filter((g) => g.categories.length > 0);
+  return visible.map((g) => (
+    <Command.Group key={g.id} heading={g.name}>
+      {g.categories.map((c) => (
+        <Command.Item
+          key={c.id}
+          value={`${c.name} ${g.name} ${c.id}`}
+          onSelect={() => onPick(c.id)}
+          className={cn(commandItem, 'py-1.5')}
+        >
+          <CategoryIcon icon={c.icon} color={c.color} size="sm" />
+          <span className="truncate">{c.name}</span>
+          {c.id === value && <Check className="ml-auto text-primary" />}
+        </Command.Item>
+      ))}
+    </Command.Group>
+  ));
+}
 
 export function CategoryPicker({
   value,
@@ -63,13 +104,12 @@ export function CategoryPicker({
   allowNone?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const { data: groups = [] } = useCategories();
   const map = useCategoryMap();
   const selected = value ? map.get(value) : undefined;
-  const visible = groups
-    .filter((g) => !kind || g.kind === kind || g.categories.some((c) => c.id === value))
-    .map((g) => ({ ...g, categories: g.categories.filter((c) => !c.archived || c.id === value) }))
-    .filter((g) => g.categories.length > 0);
+  const pick = (next: string | null) => {
+    onChange(next);
+    setOpen(false);
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -77,7 +117,7 @@ export function CategoryPicker({
         <Button
           id={id}
           variant="outline"
-          className={cn('h-10 w-full justify-start gap-2 px-2.5 font-normal', className)}
+          className={cn('h-10 w-full justify-start gap-2 px-2.5 font-normal shadow-xs', className)}
           aria-label={selected ? `Category: ${selected.name}` : placeholder}
         >
           {selected ? (
@@ -94,43 +134,95 @@ export function CategoryPicker({
       <PopoverContent className="w-[min(20rem,calc(100vw-2rem))] p-0">
         <Command>
           <CommandSearch placeholder="Search categories" />
-          <Command.List className={cn(commandList, 'p-1')}>
+          <Command.List className={commandList}>
             <Command.Empty className="px-3 py-6 text-center text-sm text-muted-foreground">
               No category found
             </Command.Empty>
             {allowNone && (
               <Command.Item
                 value="uncategorized none"
-                onSelect={() => {
-                  onChange(null);
-                  setOpen(false);
-                }}
-                className={commandItem}
+                onSelect={() => pick(null)}
+                className={cn(commandItem, 'py-1.5')}
               >
                 <CategoryIcon size="sm" />
                 Uncategorized
-                {value === null && <Check className="ml-auto size-4 text-primary" />}
+                {value === null && <Check className="ml-auto text-primary" />}
               </Command.Item>
             )}
-            {visible.map((g) => (
-              <Command.Group key={g.id} heading={g.name}>
-                {g.categories.map((c) => (
-                  <Command.Item
-                    key={c.id}
-                    value={`${c.name} ${g.name} ${c.id}`}
-                    onSelect={() => {
-                      onChange(c.id);
-                      setOpen(false);
-                    }}
-                    className={commandItem}
-                  >
-                    <CategoryIcon icon={c.icon} color={c.color} size="sm" />
-                    <span className="truncate">{c.name}</span>
-                    {c.id === value && <Check className="ml-auto size-4 text-primary" />}
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            ))}
+            <CategoryGroups value={value} kind={kind} onPick={pick} />
+          </Command.List>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** Filters a list by category: any, uncategorized ('none'), or one category. */
+export function CategoryFilter({
+  value,
+  onChange,
+  className,
+}: {
+  value?: string;
+  onChange: (id: string | undefined) => void;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const map = useCategoryMap();
+  const label =
+    value === 'none'
+      ? 'Uncategorized'
+      : value
+        ? (map.get(value)?.name ?? 'Category')
+        : 'All categories';
+  const pick = (next: string | undefined) => {
+    onChange(next);
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          role="combobox"
+          aria-label="Category"
+          className={cn(
+            'justify-start px-3 font-normal shadow-xs',
+            value && 'border-primary',
+            className,
+          )}
+        >
+          <span className="truncate">{label}</span>
+          <ChevronDown className="-mr-1 ml-auto text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[min(20rem,calc(100vw-2rem))] p-0">
+        <Command>
+          <CommandSearch placeholder="Search categories" />
+          <Command.List className={commandList}>
+            <Command.Empty className="px-3 py-6 text-center text-sm text-muted-foreground">
+              No category found
+            </Command.Empty>
+            <Command.Item
+              value="all categories any"
+              onSelect={() => pick(undefined)}
+              className={commandItem}
+            >
+              All categories
+              {!value && <Check className="ml-auto text-primary" />}
+            </Command.Item>
+            <Command.Item
+              value="uncategorized none"
+              onSelect={() => pick('none')}
+              className={cn(commandItem, 'py-1.5')}
+            >
+              <CategoryIcon size="sm" />
+              Uncategorized
+              {value === 'none' && <Check className="ml-auto text-primary" />}
+            </Command.Item>
+            <CategoryGroups value={value} onPick={pick} />
           </Command.List>
         </Command>
       </PopoverContent>
@@ -148,7 +240,7 @@ export function AccountSelect({
   emptyLabel,
   currency,
   ...props
-}: Omit<ComponentProps<'select'>, 'onChange' | 'value' | 'children'> & {
+}: Omit<ComponentProps<typeof Select>, 'onValueChange' | 'value' | 'children'> & {
   value: string;
   onChange: (id: string) => void;
   includeArchived?: boolean;
@@ -167,19 +259,15 @@ export function AccountSelect({
       (!currency || a.currency === currency),
   );
   return (
-    <NativeSelect value={value} onChange={(e) => onChange(e.target.value)} {...props}>
-      {emptyLabel !== undefined ? (
-        <option value="">{emptyLabel}</option>
-      ) : (
-        !value && <option value="">Choose account</option>
-      )}
+    <Select value={value} onValueChange={onChange} placeholder="Choose account" {...props}>
+      {emptyLabel !== undefined && <SelectItem value="">{emptyLabel}</SelectItem>}
       {list.map((a) => (
-        <option key={a.id} value={a.id}>
+        <SelectItem key={a.id} value={a.id}>
           {a.name}
           {a.currency !== f.base ? ` (${a.currency})` : ''}
-        </option>
+        </SelectItem>
       ))}
-    </NativeSelect>
+    </Select>
   );
 }
 
@@ -190,38 +278,76 @@ export function accountLabel(account: Account | undefined) {
 
 const currencies = listCurrencies();
 
+/** Searchable: there are over 150 currencies. The most used in Nepal come first. */
 export function CurrencySelect({
   value,
   onChange,
-  ...props
-}: Omit<ComponentProps<'select'>, 'onChange' | 'value'> & {
+  id,
+  disabled,
+  className,
+}: {
   value: string;
   onChange: (code: string) => void;
+  id?: string;
+  disabled?: boolean;
+  className?: string;
 }) {
+  const [open, setOpen] = useState(false);
+  const selected = currencies.find((c) => c.code === value);
+  const row = (c: Currency) => (
+    <Command.Item
+      key={c.code}
+      value={`${c.code} ${c.name}`}
+      onSelect={() => {
+        onChange(c.code);
+        setOpen(false);
+      }}
+      className={commandItem}
+    >
+      <span className="w-9 shrink-0 font-medium">{c.code}</span>
+      <span className="truncate">{c.name}</span>
+      {c.code === value && <Check className="ml-auto text-primary" />}
+    </Command.Item>
+  );
+
   return (
-    <NativeSelect value={value} onChange={(e) => onChange(e.target.value)} {...props}>
-      <optgroup label="Common in Nepal">
-        {currencies.slice(0, 15).map((c) => (
-          <option key={c.code} value={c.code}>
-            {c.code} — {c.name}
-          </option>
-        ))}
-      </optgroup>
-      <optgroup label="All currencies">
-        {currencies.slice(15).map((c) => (
-          <option key={c.code} value={c.code}>
-            {c.code} — {c.name}
-          </option>
-        ))}
-      </optgroup>
-    </NativeSelect>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          id={id}
+          role="combobox"
+          variant="outline"
+          disabled={disabled}
+          className={cn('h-10 w-full justify-start px-3 font-normal shadow-xs', className)}
+        >
+          <span className="truncate">
+            {selected ? `${selected.code} — ${selected.name}` : value}
+          </span>
+          <ChevronDown className="-mr-1 ml-auto text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[min(22rem,calc(100vw-2rem))] p-0">
+        <Command>
+          <CommandSearch placeholder="Search currencies" />
+          <Command.List className={commandList}>
+            <Command.Empty className="px-3 py-6 text-center text-sm text-muted-foreground">
+              No currency found
+            </Command.Empty>
+            <Command.Group heading="Common in Nepal">
+              {currencies.slice(0, 15).map(row)}
+            </Command.Group>
+            <Command.Group heading="All currencies">{currencies.slice(15).map(row)}</Command.Group>
+          </Command.List>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
 // Payee ---------------------------------------------------------------------------------------
 
 /**
- * Free-text payee with suggestions from past payees (native datalist: works well on phones).
+ * Free-text payee with suggestions from past payees as you type (or press ↓).
  * `onMatch` fires when the text matches a known payee, so the form can suggest its category.
  */
 export function PayeeInput({
@@ -236,29 +362,104 @@ export function PayeeInput({
   onMatch?: (payee: { id: string; suggestedCategoryId: string | null }) => void;
 }) {
   const { data: payees = [] } = usePayees();
-  const listId = `${id ?? 'payee'}-options`;
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const listId = `${id ?? 'payee'}-suggestions`;
+  const query = value.trim().toLowerCase();
+  const matches = useMemo(() => {
+    if (!query) return payees.slice(0, 8);
+    const starts = payees.filter((p) => p.name.toLowerCase().startsWith(query));
+    const within = payees.filter(
+      (p) => !p.name.toLowerCase().startsWith(query) && p.name.toLowerCase().includes(query),
+    );
+    // Nothing to suggest once the text is exactly a known payee.
+    if (starts.length === 1 && starts[0]!.name.toLowerCase() === query && within.length === 0) {
+      return [];
+    }
+    return [...starts, ...within].slice(0, 8);
+  }, [payees, query]);
+  const shown = open && matches.length > 0;
+
+  function choose(payee: (typeof payees)[number]) {
+    onChange(payee.name);
+    onMatch?.(payee);
+    setOpen(false);
+  }
+
+  function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (matches.length === 0) return;
+      e.preventDefault();
+      if (!shown) {
+        setOpen(true);
+        setActive(e.key === 'ArrowDown' ? 0 : matches.length - 1);
+        return;
+      }
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      setActive((i) => (i + step + matches.length) % matches.length);
+    } else if (e.key === 'Enter' && shown && matches[active]) {
+      // Otherwise Enter submits the form as usual.
+      e.preventDefault();
+      choose(matches[active]!);
+    } else if (e.key === 'Tab') {
+      setOpen(false);
+    }
+  }
+
   return (
-    <>
-      <Input
-        id={id}
-        value={value}
-        list={listId}
-        autoComplete="off"
-        placeholder="Who did you pay?"
-        onChange={(e) => {
-          const next = e.target.value;
-          onChange(next);
-          const match = payees.find((p) => p.name.toLowerCase() === next.trim().toLowerCase());
-          if (match) onMatch?.(match);
-        }}
-        {...props}
-      />
-      <datalist id={listId}>
-        {payees.slice(0, 200).map((p) => (
-          <option key={p.id} value={p.name} />
+    <Popover open={shown} onOpenChange={(o) => !o && setOpen(false)}>
+      <PopoverAnchor asChild>
+        <Input
+          id={id}
+          value={value}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={shown}
+          aria-controls={shown ? listId : undefined}
+          aria-activedescendant={shown && active >= 0 ? `${listId}-${active}` : undefined}
+          autoComplete="off"
+          placeholder="Who did you pay?"
+          onChange={(e) => {
+            const next = e.target.value;
+            onChange(next);
+            setOpen(next.trim() !== '');
+            setActive(-1);
+            const match = payees.find((p) => p.name.toLowerCase() === next.trim().toLowerCase());
+            if (match) onMatch?.(match);
+          }}
+          onKeyDown={onKeyDown}
+          onBlur={() => setOpen(false)}
+          {...props}
+        />
+      </PopoverAnchor>
+      <PopoverContent
+        id={listId}
+        role="listbox"
+        aria-label="Past payees"
+        className="w-(--radix-popover-trigger-width) min-w-48 p-1"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
+        {matches.map((p, i) => (
+          // biome-ignore lint/a11y/useKeyWithClickEvents: the input handles the keyboard
+          <div
+            key={p.id}
+            id={`${listId}-${i}`}
+            role="option"
+            tabIndex={-1}
+            aria-selected={i === active}
+            data-selected={i === active}
+            // Keep focus (and the keyboard on phones) in the input.
+            onMouseDown={(e) => e.preventDefault()}
+            onMouseMove={() => setActive(i)}
+            onClick={() => choose(p)}
+            className={menuItem}
+          >
+            <span className="truncate">{p.name}</span>
+          </div>
         ))}
-      </datalist>
-    </>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -316,7 +517,7 @@ export function TagPicker({
               className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
           </div>
-          <Command.List className={cn(commandList, 'p-1')}>
+          <Command.List className={commandList}>
             {tags.map((t) => (
               <Command.Item
                 key={t.id}

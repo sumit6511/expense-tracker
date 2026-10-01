@@ -33,8 +33,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, Input, Label, NativeSelect } from '@/components/ui/input';
+import { Field, Input, Label } from '@/components/ui/input';
 import { Checkbox, Segmented, Switch } from '@/components/ui/menu';
+import { Select, SelectItem } from '@/components/ui/select';
 import { TransactionRow } from '@/features/transactions/transaction-row';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
@@ -632,32 +633,32 @@ function ConditionRow({
   return (
     <div className="flex items-start gap-2 rounded-xl bg-muted/50 p-2">
       <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-[11rem_9.5rem_1fr]">
-        <NativeSelect
+        <Select
           aria-label={`Condition ${n} field`}
           value={draft.field}
-          onChange={(e) => {
-            const field = e.target.value as FieldName;
+          onValueChange={(v) => {
+            const field = v as FieldName;
             onChange({ field, op: opsFor(field)[0]!.value });
           }}
         >
           {FIELDS.map((o) => (
-            <option key={o.value} value={o.value}>
+            <SelectItem key={o.value} value={o.value}>
               {o.label}
-            </option>
+            </SelectItem>
           ))}
-        </NativeSelect>
-        <NativeSelect
+        </Select>
+        <Select
           aria-label={`Condition ${n} test`}
           value={draft.op}
-          onChange={(e) => onChange({ op: e.target.value })}
+          onValueChange={(v) => onChange({ op: v })}
           disabled={draft.field === 'direction'}
         >
           {opsFor(draft.field).map((o) => (
-            <option key={o.value} value={o.value}>
+            <SelectItem key={o.value} value={o.value}>
               {o.label}
-            </option>
+            </SelectItem>
           ))}
-        </NativeSelect>
+        </Select>
         {draft.field === 'amount' ? (
           <div className={cn('grid gap-2', draft.op === 'between' && 'grid-cols-2')}>
             <AmountInput
@@ -683,14 +684,14 @@ function ConditionRow({
             includeArchived
           />
         ) : draft.field === 'direction' ? (
-          <NativeSelect
+          <Select
             aria-label={`Condition ${n} direction`}
             value={draft.direction}
-            onChange={(e) => onChange({ direction: e.target.value as 'out' | 'in' })}
+            onValueChange={(v) => onChange({ direction: v as 'out' | 'in' })}
           >
-            <option value="out">going out (spending)</option>
-            <option value="in">coming in (income)</option>
-          </NativeSelect>
+            <SelectItem value="out">going out (spending)</SelectItem>
+            <SelectItem value="in">coming in (income)</SelectItem>
+          </Select>
         ) : (
           <Input
             aria-label={`Condition ${n} text`}
@@ -722,17 +723,17 @@ function ActionRow({
   return (
     <div className="flex items-start gap-2 rounded-xl bg-muted/50 p-2">
       <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-[12rem_1fr]">
-        <NativeSelect
+        <Select
           aria-label={`Action ${n}`}
           value={draft.type}
-          onChange={(e) => onChange({ type: e.target.value as ActionType })}
+          onValueChange={(v) => onChange({ type: v as ActionType })}
         >
           {ACTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
+            <SelectItem key={o.value} value={o.value}>
               {o.label}
-            </option>
+            </SelectItem>
           ))}
-        </NativeSelect>
+        </Select>
         {draft.type === 'setCategory' && (
           <CategoryPicker
             value={draft.categoryId}

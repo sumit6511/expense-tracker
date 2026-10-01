@@ -33,7 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, Input, NativeSelect } from '@/components/ui/input';
+import { Field, Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +44,7 @@ import {
   Switch,
   Tooltip,
 } from '@/components/ui/menu';
+import { Select, SelectItem } from '@/components/ui/select';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
 import {
@@ -513,24 +514,24 @@ function MoveDialog({
             />
           </Field>
           <Field label="From" htmlFor="move-from">
-            <NativeSelect id="move-from" value={from} onChange={(e) => setFrom(e.target.value)}>
-              <option value="">{ready}</option>
+            <Select id="move-from" value={from} onValueChange={setFrom}>
+              <SelectItem value="">{ready}</SelectItem>
               {categories.map((c) => (
-                <option key={c.id} value={c.id}>
+                <SelectItem key={c.id} value={c.id}>
                   {label(c)}
-                </option>
+                </SelectItem>
               ))}
-            </NativeSelect>
+            </Select>
           </Field>
           <Field label="To" htmlFor="move-to">
-            <NativeSelect id="move-to" value={to} onChange={(e) => setTo(e.target.value)}>
-              <option value="">{ready}</option>
+            <Select id="move-to" value={to} onValueChange={setTo}>
+              <SelectItem value="">{ready}</SelectItem>
               {categories.map((c) => (
-                <option key={c.id} value={c.id}>
+                <SelectItem key={c.id} value={c.id}>
                   {label(c)}
-                </option>
+                </SelectItem>
               ))}
-            </NativeSelect>
+            </Select>
           </Field>
         </DialogBody>
         <DialogFooter>

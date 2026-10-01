@@ -19,21 +19,19 @@ import { toast } from 'sonner';
 import { DateRangePicker } from '@/components/date-range';
 import { Money } from '@/components/money';
 import { EmptyState, ErrorState, PageHeader } from '@/components/page';
-import { AccountSelect, CategoryPicker } from '@/components/pickers';
+import { AccountSelect, CategoryFilter, CategoryPicker } from '@/components/pickers';
 import { Button } from '@/components/ui/button';
 import { Card, Skeleton } from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/dialog';
-import { Input, NativeSelect } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
   Segmented,
 } from '@/components/ui/menu';
+import { Select, SelectItem } from '@/components/ui/select';
 import { errorMessage, toQueryString } from '@/lib/api';
 import { useFormat } from '@/lib/format';
 import {
@@ -45,7 +43,6 @@ import {
   useTransactions,
 } from '@/lib/queries';
 import { useCanWrite, useWorkspace } from '@/lib/session';
-import { cn } from '@/lib/utils';
 import type { TransactionsSearch } from '@/router';
 import { useTransactionDialog } from './transaction-dialog';
 import { TransactionRow } from './transaction-row';
@@ -220,39 +217,40 @@ export function TransactionsPage() {
               aria-label="Account"
             />
           </div>
-          <FilterCategory
+          <CategoryFilter
             value={categoryFilter}
             onChange={(id) => setSearch({ categoryIds: id })}
+            className="w-44"
           />
           {tags.length > 0 && (
-            <NativeSelect
+            <Select
               value={search.tagIds ?? ''}
-              onChange={(e) => setSearch({ tagIds: e.target.value || undefined })}
+              onValueChange={(v) => setSearch({ tagIds: v || undefined })}
               className="h-8 w-36 text-[13px]"
               aria-label="Tag"
             >
-              <option value="">All tags</option>
+              <SelectItem value="">All tags</SelectItem>
               {tags.map((t) => (
-                <option key={t.id} value={t.id}>
+                <SelectItem key={t.id} value={t.id}>
                   #{t.name}
-                </option>
+                </SelectItem>
               ))}
-            </NativeSelect>
+            </Select>
           )}
           {people && (
-            <NativeSelect
+            <Select
               value={search.createdBy ?? ''}
-              onChange={(e) => setSearch({ createdBy: e.target.value || undefined })}
+              onValueChange={(v) => setSearch({ createdBy: v || undefined })}
               className="h-8 w-36 text-[13px]"
               aria-label="Added by"
             >
-              <option value="">Anyone</option>
+              <SelectItem value="">Anyone</SelectItem>
               {[...people].map(([id, name]) => (
-                <option key={id} value={id}>
+                <SelectItem key={id} value={id}>
                   Added by {name}
-                </option>
+                </SelectItem>
               ))}
-            </NativeSelect>
+            </Select>
           )}
           <Button
             variant={search.needsReview === 'true' ? 'secondary' : 'ghost'}
@@ -559,68 +557,6 @@ function clean<T extends Record<string, unknown>>(obj: T): T {
   return Object.fromEntries(
     Object.entries(obj).filter(([, v]) => v !== undefined && v !== ''),
   ) as T;
-}
-
-function FilterCategory({
-  value,
-  onChange,
-}: {
-  value?: string;
-  onChange: (id: string | undefined) => void;
-}) {
-  const categories = useCategoryMap();
-  const [open, setOpen] = useState(false);
-  const label =
-    value === 'none'
-      ? 'Uncategorized'
-      : value
-        ? (categories.get(value)?.name ?? 'Category')
-        : 'All categories';
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className={cn('font-normal', value && 'border-primary')}
-        >
-          {label}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-72">
-        <CategoryPicker
-          value={value && value !== 'none' ? value : null}
-          onChange={(id) => {
-            onChange(id ?? 'none');
-            setOpen(false);
-          }}
-          placeholder="Pick a category"
-        />
-        <div className="mt-2 flex justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              onChange('none');
-              setOpen(false);
-            }}
-          >
-            Uncategorized
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              onChange(undefined);
-              setOpen(false);
-            }}
-          >
-            Any category
-          </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
 }
 
 function BulkCategorize({ onPick }: { onPick: (categoryId: string | null) => void }) {

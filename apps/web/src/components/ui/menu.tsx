@@ -10,8 +10,24 @@ import {
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-const floating =
+/** Every surface that floats over the page: menus, selects, pickers, popovers. */
+export const floating =
   'z-50 rounded-xl border bg-popover text-popover-foreground shadow-lg outline-none data-[state=open]:animate-in';
+
+/**
+ * A row in any floating list: dropdown menus, selects and the searchable pickers (cmdk). The row
+ * under the pointer or keyboard gets the same teal tint as the active page in the sidebar.
+ */
+export const menuItem =
+  'flex cursor-default items-center gap-2 rounded-lg px-2.5 py-2 text-sm outline-none select-none aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground [&>svg]:size-4 [&>svg]:shrink-0';
+
+/** A group heading inside a floating list. */
+export const menuLabel =
+  'px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase';
+
+/** For cmdk lists: styles its group headings like `menuLabel`. */
+export const commandGroups =
+  '[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:uppercase';
 
 // Dropdown menu -------------------------------------------------------------------------------
 
@@ -44,8 +60,10 @@ export function DropdownMenuItem({
   return (
     <MenuPrimitive.Item
       className={cn(
-        'flex cursor-default items-center gap-2 rounded-lg px-2.5 py-2 text-sm outline-none select-none data-[disabled]:opacity-50 data-[highlighted]:bg-muted [&_svg]:size-4 [&_svg]:text-muted-foreground',
-        destructive && 'text-destructive [&_svg]:text-destructive',
+        menuItem,
+        '[&_svg]:size-4 [&_svg]:text-muted-foreground data-[highlighted]:[&_svg]:text-accent-foreground',
+        destructive &&
+          'text-destructive data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive [&_svg]:text-destructive data-[highlighted]:[&_svg]:text-destructive',
         className,
       )}
       {...props}

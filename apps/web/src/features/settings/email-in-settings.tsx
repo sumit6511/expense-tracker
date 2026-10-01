@@ -5,7 +5,8 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/dialog';
-import { Input, NativeSelect } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
+import { Select, SelectItem } from '@/components/ui/select';
 import { useTransactionDialog } from '@/features/transactions/transaction-dialog';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
@@ -151,20 +152,23 @@ function Routing() {
 
   return (
     <div className="grid grid-cols-1 gap-3">
-      <label className="grid grid-cols-1 gap-1.5 text-sm sm:grid-cols-[12rem_1fr] sm:items-center">
-        <span className="font-medium">Receipts go to</span>
-        <NativeSelect
+      <div className="grid grid-cols-1 gap-1.5 text-sm sm:grid-cols-[12rem_1fr] sm:items-center">
+        <label htmlFor="email-in-account" className="font-medium">
+          Receipts go to
+        </label>
+        <Select
+          id="email-in-account"
           value={data?.defaultAccountId ?? ''}
-          onChange={(e) => update.mutate({ defaultAccountId: e.target.value || null }, { onError })}
+          onValueChange={(v) => update.mutate({ defaultAccountId: v || null }, { onError })}
         >
-          <option value="">The first cash or bank account</option>
+          <SelectItem value="">The first cash or bank account</SelectItem>
           {open.map((a) => (
-            <option key={a.id} value={a.id}>
+            <SelectItem key={a.id} value={a.id}>
               {a.name}
-            </option>
+            </SelectItem>
           ))}
-        </NativeSelect>
-      </label>
+        </Select>
+      </div>
       <div>
         <p className="mb-1 text-sm font-medium">Trusted senders</p>
         <p className="mb-2 text-xs text-muted-foreground">
@@ -200,19 +204,19 @@ function Routing() {
             className="min-w-48 flex-1"
             required
           />
-          <NativeSelect
+          <Select
             value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
+            onValueChange={setAccountId}
             aria-label="Account for this sender"
             className="w-auto"
           >
-            <option value="">Default account</option>
+            <SelectItem value="">Default account</SelectItem>
             {open.map((a) => (
-              <option key={a.id} value={a.id}>
+              <SelectItem key={a.id} value={a.id}>
                 {a.name}
-              </option>
+              </SelectItem>
             ))}
-          </NativeSelect>
+          </Select>
           <Button type="submit" variant="outline" disabled={add.isPending || !sender.trim()}>
             Trust
           </Button>

@@ -1,5 +1,11 @@
 import { createHmac } from 'node:crypto';
-import { type APIRequestContext, test as base, expect, type Page } from '@playwright/test';
+import {
+  type APIRequestContext,
+  test as base,
+  expect,
+  type Locator,
+  type Page,
+} from '@playwright/test';
 
 let counter = 0;
 
@@ -76,4 +82,14 @@ export function totp(base32Key: string, at = Date.now()) {
   const mac = createHmac('sha1', key).update(counter).digest();
   const offset = mac[mac.length - 1]! & 0xf;
   return String((mac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0');
+}
+
+/** Picks an option in one of the app's dropdowns (themed, so not native <select>s). */
+export async function choose(select: Locator, option: string | RegExp) {
+  await select.click();
+  await select
+    .page()
+    .getByRole('option', { name: option, exact: typeof option === 'string' })
+    .click();
+  await expect(select).toHaveAttribute('aria-expanded', 'false');
 }

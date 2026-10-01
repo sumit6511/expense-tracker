@@ -41,7 +41,7 @@ import {
   DialogTitle,
   useConfirm,
 } from '@/components/ui/dialog';
-import { Field, Input, NativeSelect } from '@/components/ui/input';
+import { Field, Input } from '@/components/ui/input';
 import {
   Checkbox,
   DropdownMenu,
@@ -52,6 +52,7 @@ import {
   Segmented,
   Switch,
 } from '@/components/ui/menu';
+import { Select, SelectItem } from '@/components/ui/select';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
 import {
@@ -656,17 +657,13 @@ function ExpenseDialog({
             </Field>
           </div>
           <Field label="Paid by" htmlFor="split-paid-by">
-            <NativeSelect
-              id="split-paid-by"
-              value={paidBy}
-              onChange={(e) => setPaidBy(e.target.value)}
-            >
+            <Select id="split-paid-by" value={paidBy} onValueChange={setPaidBy}>
               {g.members.map((m) => (
-                <option key={m.id} value={m.id}>
+                <SelectItem key={m.id} value={m.id}>
                   {m.you ? `${m.name} (you)` : m.name}
-                </option>
+                </SelectItem>
               ))}
-            </NativeSelect>
+            </Select>
           </Field>
           <div className="grid grid-cols-1 gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -873,24 +870,24 @@ function SettleDialog({
         <DialogBody className="grid grid-cols-1 gap-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Who paid" htmlFor="settle-from">
-              <NativeSelect id="settle-from" value={from} onChange={(e) => setFrom(e.target.value)}>
+              <Select id="settle-from" value={from} onValueChange={setFrom}>
                 {g.members.map((m) => (
-                  <option key={m.id} value={m.id}>
+                  <SelectItem key={m.id} value={m.id}>
                     {option(m.id)}
-                  </option>
+                  </SelectItem>
                 ))}
-              </NativeSelect>
+              </Select>
             </Field>
             <Field label="Paid to" htmlFor="settle-to">
-              <NativeSelect id="settle-to" value={to} onChange={(e) => setTo(e.target.value)}>
+              <Select id="settle-to" value={to} onValueChange={setTo}>
                 {g.members
                   .filter((m) => m.id !== from)
                   .map((m) => (
-                    <option key={m.id} value={m.id}>
+                    <SelectItem key={m.id} value={m.id}>
                       {option(m.id)}
-                    </option>
+                    </SelectItem>
                   ))}
-              </NativeSelect>
+              </Select>
             </Field>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

@@ -15,7 +15,13 @@ import { useWorkspace } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { CalendarGrid } from './date-picker';
 import { Button } from './ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/menu';
+import { menuItem, Popover, PopoverContent, PopoverTrigger } from './ui/menu';
+
+/** Buttons styled like the rows of a menu. */
+const presetItem = cn(
+  menuItem,
+  'h-9 w-full py-0 text-left hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground',
+);
 
 export interface DateRangeValue {
   from?: IsoDate;
@@ -157,18 +163,14 @@ export function DateRangePicker({
                   onChange(p.range(f.today) as DateRangeValue);
                   setOpen(false);
                 }}
-                className="flex h-9 items-center justify-between rounded-lg px-2.5 text-left text-sm hover:bg-muted"
+                className={cn(presetItem, 'justify-between')}
               >
                 {p.label}
-                {active?.id === p.id && <Check className="size-4 text-primary" strokeWidth={3} />}
+                {active?.id === p.id && <Check className="text-primary" />}
               </button>
             ))}
             <div className="mt-1 border-t pt-1">
-              <button
-                type="button"
-                onClick={() => setCustom('from')}
-                className="flex h-9 w-full items-center rounded-lg px-2.5 text-left text-sm hover:bg-muted"
-              >
+              <button type="button" onClick={() => setCustom('from')} className={presetItem}>
                 Custom range…
               </button>
             </div>
