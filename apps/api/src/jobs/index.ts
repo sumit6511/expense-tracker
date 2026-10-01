@@ -2,12 +2,14 @@ import { addDays, todayIn } from '@et/shared';
 import pg from 'pg';
 import { PgBoss } from 'pg-boss';
 import type { AiProvider } from '../ai/provider';
+import type { BankProvider } from '../bank/provider';
 import type { Db } from '../db/client';
 import type { Env } from '../env';
 import type { WebhookSender } from '../lib/webhook-http';
 import type { Logger } from '../logger';
 import type { Mailer } from '../mailer';
 import type { Pusher } from '../push';
+import { syncAllBanks } from '../services/bank';
 import { pruneInboundEmails } from '../services/email-in';
 import { runHeadsUp } from '../services/insights';
 import { pollMailbox } from '../services/mailbox';
@@ -26,6 +28,7 @@ export const QUEUES = {
   headsUp: 'heads-up',
   push: 'push',
   mailbox: 'email-in-mailbox',
+  bankSync: 'bank-sync',
 } as const;
 
 /** Fetches the last `days` days of NRB rates and stores them. */
@@ -55,6 +58,7 @@ export async function startJobs(
   pusher: Pusher | null,
   webhookSender: WebhookSender,
   ai: AiProvider | null,
+  bank: Partial<Record<string, BankProvider>>,
 ) {
   const boss = new PgBoss({ connectionString: env.DATABASE_URL, schema: 'pgboss' });
   boss.on('error', (err) => logger.error({ err }, 'job runner error'));
@@ -136,6 +140,15 @@ export async function startJobs(
       } catch (err) {
         logger.warn({ err }, 'could not check the email-in mailbox');
       }
+    });
+  }
+
+  // Bank sync, four times a day (SimpleFIN allows about 24 requests a day per connection).
+  if (env.BANK_SYNC) {
+    await boss.createQueue(QUEUES.bankSync);
+    await boss.schedule(QUEUES.bankSync, '23 */6 * * *');
+    await boss.work(QUEUES.bankSync, async () => {
+      await syncAllBanks({ db, env, bank, logger });
     });
   }
 

@@ -354,6 +354,7 @@ export const importSourceEnum = pgEnum('import_source', [
   'sms',
   'pdf',
   'email',
+  'bank',
 ]);
 
 export const importBatches = pgTable(
@@ -1122,4 +1123,50 @@ export const inboundEmailFiles = pgTable(
     data: bytea().notNull(),
   },
   (t) => [index().on(t.inboundEmailId)],
+);
+
+// ---------------------------------------------------------------------------------------------
+// Integrations: bank sync
+// ---------------------------------------------------------------------------------------------
+
+/** A connection to a bank sync provider; its credential is kept sealed (lib/secrets.ts). */
+export const bankConnections = pgTable(
+  'bank_connections',
+  {
+    id: uuid().primaryKey(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    provider: text().notNull(),
+    label: text().notNull().default(''),
+    credentialSealed: text().notNull(),
+    /** ok | error */
+    status: text().notNull().default('ok'),
+    lastError: text(),
+    lastSyncedAt: timestamp({ withTimezone: true }),
+    createdBy: text().references(() => user.id, { onDelete: 'set null' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.workspaceId)],
+);
+
+/** An account at the bank, and which of our accounts (if any) it fills. */
+export const bankAccountLinks = pgTable(
+  'bank_account_links',
+  {
+    id: uuid().primaryKey(),
+    connectionId: uuid()
+      .notNull()
+      .references(() => bankConnections.id, { onDelete: 'cascade' }),
+    providerAccountId: text().notNull(),
+    name: text().notNull(),
+    institution: text().notNull().default(''),
+    currency: text().notNull(),
+    accountId: uuid().references(() => accounts.id, { onDelete: 'set null' }),
+    syncFrom: date({ mode: 'string' }).notNull(),
+    balanceMinor: bigint({ mode: 'number' }),
+    balanceAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex().on(t.connectionId, t.providerAccountId), index().on(t.accountId)],
 );

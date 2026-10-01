@@ -16,6 +16,7 @@ import { loadSession } from './middleware/session';
 import { loadWorkspace } from './middleware/workspace';
 import { accountsRouter } from './routes/accounts';
 import { aiRouter } from './routes/ai';
+import { bankRouter } from './routes/bank';
 import { budgetsRouter } from './routes/budgets';
 import { labelsRouter } from './routes/categories';
 import { emailInRouter, mountInboundEmail } from './routes/email-in';
@@ -132,6 +133,7 @@ export function createApp(deps: Deps) {
     tokensRouter,
     webhooksRouter,
     emailInRouter,
+    bankRouter,
   ]) {
     api.route('/', router);
   }

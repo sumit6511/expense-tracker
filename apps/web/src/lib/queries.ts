@@ -4,6 +4,8 @@ import type {
   ApiToken,
   AskAnswer,
   Attachment,
+  BankSync,
+  BankSyncResult,
   BudgetMonth,
   BudgetVsActual,
   BulkTransactionAction,
@@ -14,6 +16,7 @@ import type {
   CategoryTrends,
   CommitImportInput,
   Comparison,
+  ConnectBank,
   CreateAccountInput,
   CreateApiToken,
   CreateCategoryInput,
@@ -78,6 +81,7 @@ import type {
   TransactionPage,
   UpcomingItem,
   UpdateAccountInput,
+  UpdateBankLink,
   UpdateCategoryInput,
   UpdateMeInput,
   UpdateNotificationPrefs,
@@ -1192,4 +1196,30 @@ export const useLinkEmail = () =>
       method: 'POST',
       body: { transactionId },
     }),
+  );
+
+// Bank sync ------------------------------------------------------------------------------------
+
+export function useBankSync() {
+  const { wid, base } = useWs();
+  return useQuery({
+    queryKey: [...wsKey(wid), 'bank'],
+    queryFn: () => api<BankSync>(`${base}/bank`),
+  });
+}
+export const useConnectBank = () =>
+  useWsMutation((base, input: ConnectBank) =>
+    api<BankSync>(`${base}/bank/connections`, { method: 'POST', body: input }),
+  );
+export const useUpdateBankLink = () =>
+  useWsMutation((base, { id, ...body }: UpdateBankLink & { id: string }) =>
+    api<BankSync>(`${base}/bank/accounts/${id}`, { method: 'PATCH', body }),
+  );
+export const useSyncBank = () =>
+  useWsMutation((base, id: string) =>
+    api<BankSyncResult>(`${base}/bank/connections/${id}/sync`, { method: 'POST' }),
+  );
+export const useRemoveBankConnection = () =>
+  useWsMutation((base, id: string) =>
+    api<BankSync>(`${base}/bank/connections/${id}`, { method: 'DELETE' }),
   );

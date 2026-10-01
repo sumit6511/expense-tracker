@@ -54,7 +54,7 @@ export function writeRateLimit(maxPerMinute: number): MiddlewareHandler<AppEnv> 
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Workspace endpoints that stay with the app: who's in it, its tokens and integrations. */
-const APP_ONLY = /^\/(invitations|tokens|webhooks|email-in|transfer-ownership)(\/|$)/;
+const APP_ONLY = /^\/(invitations|tokens|webhooks|email-in|bank|transfer-ownership)(\/|$)/;
 
 /**
  * What an access token may reach: `GET /me`, `GET /workspaces` and its own workspace's

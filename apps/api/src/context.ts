@@ -1,6 +1,7 @@
 import type { BudgetMode, CalendarSystem, Role } from '@et/shared';
 import type { AiProvider } from './ai/provider';
 import type { Auth } from './auth';
+import type { BankProvider } from './bank/provider';
 import type { Db } from './db/client';
 import type { Env } from './env';
 import type { WebhookSender } from './lib/webhook-http';
@@ -22,6 +23,8 @@ export interface Deps {
   ai: AiProvider | null;
   /** Sends webhook requests (a fake in tests). */
   webhookSender: WebhookSender;
+  /** Bank sync providers by id (empty when bank sync is off). */
+  bank: Partial<Record<string, BankProvider>>;
 }
 
 export interface SessionUser {

@@ -49,6 +49,7 @@ services:
       EMAIL_IN_IMAP_URL: ${EMAIL_IN_IMAP_URL:-}
       EMAIL_IN_IMAP_FOLDER: ${EMAIL_IN_IMAP_FOLDER:-INBOX}
       EMAIL_IN_SECRET: ${EMAIL_IN_SECRET:-}
+      BANK_SYNC: ${BANK_SYNC:-true}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       - "${PORT:-3000}:3000"

@@ -108,6 +108,11 @@ const EnvSchema = z.object({
     z.url({ protocol: /^imaps?$/ }).optional(),
   ),
   EMAIL_IN_IMAP_FOLDER: z.string().default('INBOX'),
+  /** Let owners and admins connect bank sync providers (SimpleFIN). */
+  BANK_SYNC: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
   /** Allow new sign-ups. Set to false on a personal server once your account exists. */
   ALLOW_SIGNUP: z
     .enum(['true', 'false'])

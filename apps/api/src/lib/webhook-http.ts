@@ -92,6 +92,74 @@ export type WebhookSender = (
   headers: Record<string, string>,
 ) => Promise<SendResult>;
 
+export interface SafeResponse {
+  status: number;
+  body: string;
+}
+
+/**
+ * An HTTP request to an address someone gave us: private addresses refused (unless allowed),
+ * no redirects, a timeout, and at most `maxBytes` of response kept.
+ */
+export function safeRequest(
+  url: string,
+  {
+    method = 'GET',
+    headers = {},
+    body,
+    allowPrivate,
+    timeoutMs = 10_000,
+    maxBytes = 0,
+  }: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+    allowPrivate: boolean;
+    timeoutMs?: number;
+    /** Response bytes to keep (0 = drain and ignore the body). */
+    maxBytes?: number;
+  },
+): Promise<SafeResponse> {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    const host = target.hostname.replace(/^\[|\]$/g, '');
+    // Literal addresses skip DNS, so check them here.
+    if (!allowPrivate && isIP(host) && !isPublicAddress(host)) return reject(blocked(host));
+    const client = target.protocol === 'https:' ? https : http;
+    const req = client.request(
+      target,
+      {
+        method,
+        headers: { ...headers, 'content-length': Buffer.byteLength(body ?? '') },
+        timeout: timeoutMs,
+        ...(allowPrivate ? {} : { lookup: guardedLookup as never }),
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        let size = 0;
+        res.on('data', (chunk: Buffer) => {
+          if (maxBytes <= 0) return;
+          size += chunk.length;
+          if (size > maxBytes) {
+            req.destroy(new WebhookSendError('The response was too large'));
+            return;
+          }
+          chunks.push(chunk);
+        });
+        res.on('end', () =>
+          resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') }),
+        );
+        res.on('error', reject);
+      },
+    );
+    req.on('timeout', () =>
+      req.destroy(new WebhookSendError(`No answer within ${timeoutMs / 1000} seconds`)),
+    );
+    req.on('error', reject);
+    req.end(body ?? '');
+  });
+}
+
 /** POSTs `body` and resolves with the response status (any status; network errors reject). */
 export function httpSender({
   allowPrivate,
@@ -100,33 +168,16 @@ export function httpSender({
   allowPrivate: boolean;
   timeoutMs?: number;
 }): WebhookSender {
-  return (url, body, headers) =>
-    new Promise((resolve, reject) => {
-      const target = new URL(url);
-      const host = target.hostname.replace(/^\[|\]$/g, '');
-      // Literal addresses skip DNS, so check them here.
-      if (!allowPrivate && isIP(host) && !isPublicAddress(host)) return reject(blocked(host));
-      const client = target.protocol === 'https:' ? https : http;
-      const req = client.request(
-        target,
-        {
-          method: 'POST',
-          headers: { ...headers, 'content-length': Buffer.byteLength(body) },
-          timeout: timeoutMs,
-          ...(allowPrivate ? {} : { lookup: guardedLookup as never }),
-        },
-        (res) => {
-          res.resume(); // the body doesn't matter
-          res.on('end', () => resolve({ status: res.statusCode ?? 0 }));
-          res.on('error', reject);
-        },
-      );
-      req.on('timeout', () =>
-        req.destroy(new WebhookSendError(`No answer within ${timeoutMs / 1000} seconds`)),
-      );
-      req.on('error', reject);
-      req.end(body);
+  return async (url, body, headers) => {
+    const { status } = await safeRequest(url, {
+      method: 'POST',
+      headers,
+      body,
+      allowPrivate,
+      timeoutMs,
     });
+    return { status };
+  };
 }
 
 /** A new signing secret in the Standard Webhooks format. */

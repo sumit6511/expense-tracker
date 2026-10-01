@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Id } from './schemas';
+import { Id, IsoDateSchema } from './schemas';
 
 /**
  * Personal access tokens let your own scripts and tools use the API (`Authorization: Bearer
@@ -226,3 +226,78 @@ export const EmailInSchema = z.object({
 export type EmailIn = z.infer<typeof EmailInSchema>;
 
 export const UpdateEmailInSchema = z.object({ defaultAccountId: Id.nullable() });
+
+/**
+ * Bank sync, through providers that read your bank accounts for you (read-only). No provider
+ * covers Nepal yet (there's no open-banking API), so this is for accounts abroad; in Nepal,
+ * email in, SMS alerts and statement import fill the gap.
+ */
+export const BANK_PROVIDERS = ['simplefin'] as const;
+export type BankProviderId = (typeof BANK_PROVIDERS)[number];
+
+export const BankProviderInfoSchema = z.object({
+  id: z.enum(BANK_PROVIDERS),
+  label: z.string(),
+  /** Where its banks are. */
+  coverage: z.string(),
+  /** Where to get the setup token. */
+  signupUrl: z.string(),
+});
+export type BankProviderInfo = z.infer<typeof BankProviderInfoSchema>;
+
+export const BankAccountLinkSchema = z.object({
+  id: Id,
+  name: z.string(),
+  institution: z.string(),
+  currency: z.string(),
+  /** Our account it fills; null = not synced. */
+  accountId: Id.nullable(),
+  /** Transactions on or after this date are brought in. */
+  syncFrom: IsoDateSchema,
+  /** The balance the bank reported last. */
+  balanceMinor: z.number().int().nullable(),
+  balanceAt: z.string().nullable(),
+});
+export type BankAccountLink = z.infer<typeof BankAccountLinkSchema>;
+
+export const BankConnectionSchema = z.object({
+  id: Id,
+  provider: z.enum(BANK_PROVIDERS),
+  label: z.string(),
+  status: z.enum(['ok', 'error']),
+  lastSyncedAt: z.string().nullable(),
+  lastError: z.string().nullable(),
+  createdAt: z.string(),
+  accounts: z.array(BankAccountLinkSchema),
+});
+export type BankConnection = z.infer<typeof BankConnectionSchema>;
+
+export const BankSyncSchema = z.object({
+  /** Whether this server allows bank sync. */
+  available: z.boolean(),
+  providers: z.array(BankProviderInfoSchema),
+  connections: z.array(BankConnectionSchema),
+});
+export type BankSync = z.infer<typeof BankSyncSchema>;
+
+export const ConnectBankSchema = z.object({
+  provider: z.enum(BANK_PROVIDERS),
+  /** What the provider gave you to connect with (SimpleFIN: the setup token). */
+  setupToken: z.string().trim().min(10).max(4000),
+});
+export type ConnectBank = z.infer<typeof ConnectBankSchema>;
+
+export const UpdateBankLinkSchema = z.object({
+  accountId: Id.nullable().optional(),
+  syncFrom: IsoDateSchema.optional(),
+});
+export type UpdateBankLink = z.infer<typeof UpdateBankLinkSchema>;
+
+export const BankSyncResultSchema = z.object({
+  /** New transactions added (waiting in review). */
+  created: z.number().int(),
+  /** Bank transactions that matched ones you'd already entered. */
+  matched: z.number().int(),
+  errors: z.array(z.string()),
+});
+export type BankSyncResult = z.infer<typeof BankSyncResultSchema>;

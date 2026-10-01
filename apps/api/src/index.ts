@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server';
 import { createAiProvider } from './ai/claude';
 import { createApp } from './app';
 import { createAuth } from './auth';
+import { simplefin } from './bank/simplefin';
 import { createDb } from './db/client';
 import { runMigrations } from './db/migrate';
 import { loadEnv } from './env';
@@ -21,9 +22,10 @@ const mailer = createMailer(env, logger);
 const pusher = await createPusher(db, env, logger);
 const ai = createAiProvider(env, logger);
 const webhookSender = httpSender({ allowPrivate: env.WEBHOOK_ALLOW_PRIVATE });
-const app = createApp({ db, env, auth, logger, mailer, pusher, ai, webhookSender });
+const bank = env.BANK_SYNC ? { simplefin: simplefin() } : {};
+const app = createApp({ db, env, auth, logger, mailer, pusher, ai, webhookSender, bank });
 const jobs = env.RUN_WORKER
-  ? await startJobs(db, env, logger, mailer, pusher, webhookSender, ai)
+  ? await startJobs(db, env, logger, mailer, pusher, webhookSender, ai, bank)
   : null;
 
 const server = serve({ fetch: app.fetch, port: env.PORT, hostname: env.HOST }, (info) => {

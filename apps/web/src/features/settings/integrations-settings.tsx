@@ -52,6 +52,7 @@ import {
   useWebhooks,
 } from '@/lib/queries';
 import { useCanWrite, useWorkspace } from '@/lib/session';
+import { BankSyncCard } from './bank-settings';
 import { EmailInCard } from './email-in-settings';
 
 export function IntegrationsSettings() {
@@ -59,6 +60,7 @@ export function IntegrationsSettings() {
   return (
     <div className="grid grid-cols-1 gap-5">
       <EmailInCard />
+      <BankSyncCard />
       <TokensCard />
       {(role === 'owner' || role === 'admin') && <WebhooksCard />}
     </div>

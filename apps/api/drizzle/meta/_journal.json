@@ -148,6 +148,13 @@
       "when": 1790833273902,
       "tag": "0020_email_in",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790834156196,
+      "tag": "0021_bank_sync",
+      "breakpoints": true
     }
   ]
 }

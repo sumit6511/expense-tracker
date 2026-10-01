@@ -8,6 +8,7 @@ import { createLogger } from '../src/logger';
 import type { Mail, Mailer } from '../src/mailer';
 import type { Pusher, PushMessage, PushTarget } from '../src/push';
 import { FakeAi } from './fake-ai';
+import { FakeBank } from './fake-bank';
 import { FakeReceiver } from './fake-receiver';
 
 export const ORIGIN = 'http://localhost:5173';
@@ -49,6 +50,7 @@ function build() {
   };
   const ai = new FakeAi();
   const receiver = new FakeReceiver();
+  const bank = new FakeBank();
   const app = createApp({
     db,
     env,
@@ -58,8 +60,9 @@ function build() {
     pusher,
     ai,
     webhookSender: receiver.send,
+    bank: { simplefin: bank },
   });
-  return { app, db, pool, env, logger, mailer, outbox, pusher, pushed, ai, receiver };
+  return { app, db, pool, env, logger, mailer, outbox, pusher, pushed, ai, receiver, bank };
 }
 
 /** One app + pool per test file. */

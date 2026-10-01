@@ -1,4 +1,5 @@
 import { createAiProvider } from './ai/claude';
+import { simplefin } from './bank/simplefin';
 import { createDb } from './db/client';
 import { runMigrations } from './db/migrate';
 import { loadEnv } from './env';
@@ -21,6 +22,7 @@ const jobs = await startJobs(
   await createPusher(db, env, logger),
   httpSender({ allowPrivate: env.WEBHOOK_ALLOW_PRIVATE }),
   createAiProvider(env, logger),
+  env.BANK_SYNC ? { simplefin: simplefin() } : {},
 );
 logger.info('worker started');
 
