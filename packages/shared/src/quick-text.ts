@@ -175,9 +175,16 @@ export function parseQuickText(text: string, ctx: QuickTextContext): QuickTextRe
   let plus = false;
   const amount = take(AMOUNT_RE);
   if (amount) {
-    const base = parseDecimal(amount[2]!.replace(/,/g, ''), ctx.digits);
+    let base: number | null = null;
+    try {
+      base = parseDecimal(amount[2]!.replace(/,/g, ''), ctx.digits);
+    } catch {
+      // Too large to be an amount: leave it out rather than fail.
+    }
     const multiplier = amount[3] ? (MULTIPLIERS[amount[3].toLowerCase()] ?? 1) : 1;
-    if (base !== null && base > 0) amountMinor = base * multiplier;
+    if (base !== null && base > 0 && Number.isSafeInteger(base * multiplier)) {
+      amountMinor = base * multiplier;
+    }
     plus = !!amount[1];
   }
 

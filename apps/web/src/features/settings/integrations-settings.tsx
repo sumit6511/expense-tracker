@@ -413,6 +413,7 @@ function NewWebhookForm({
       >
         <Input
           id="webhook-url"
+          maxLength={2000}
           type="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}

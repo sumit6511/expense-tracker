@@ -4,6 +4,7 @@ import {
   type CategoryKind,
   COLOR_SWATCHES,
   type Currency,
+  filterAmountInput,
   listCurrencies,
   parseAmountInput,
 } from '@et/shared';
@@ -24,7 +25,7 @@ import {
 import { cn } from '@/lib/utils';
 import { CategoryIcon } from './icons';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
+import { FilteredInput, Input } from './ui/input';
 import {
   Checkbox,
   commandGroups,
@@ -575,12 +576,15 @@ export function AmountInput({
   currency,
   className,
   large,
+  negative,
   ...props
 }: Omit<ComponentProps<'input'>, 'onChange' | 'value'> & {
   value: string;
   onChange: (value: string) => void;
   currency: string;
   large?: boolean;
+  /** Allows a minus sign at the start (balances); otherwise amounts are positive. */
+  negative?: boolean;
 }) {
   const f = useFormat();
   const digits = f.digits(currency);
@@ -588,7 +592,7 @@ export function AmountInput({
     () => (value.trim() ? parseAmountInput(value, digits) : null),
     [value, digits],
   );
-  const isExpression = /[+\-*/×x÷]/.test(value.replace(/^-/, ''));
+  const isExpression = /[+\-*/×÷]/.test(value.replace(/^-/, ''));
   return (
     <div className={cn('relative', className)}>
       <span
@@ -599,11 +603,12 @@ export function AmountInput({
       >
         {currency === 'NPR' ? (f.locale === 'ne' ? 'रु.' : 'Rs.') : currency}
       </span>
-      <Input
+      <FilteredInput
         inputMode="decimal"
         autoComplete="off"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        filter={(text) => filterAmountInput(text, { negative })}
+        onValueChange={onChange}
         aria-invalid={value.trim() !== '' && parsed === null}
         className={cn(
           'tabular',

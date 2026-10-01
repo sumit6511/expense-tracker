@@ -1,5 +1,8 @@
 import {
+  amountInputError,
   computeShares,
+  filterAmountInput,
+  filterDecimalInput,
   parseAmountInput,
   type SplitExpense,
   type SplitGroup,
@@ -41,7 +44,7 @@ import {
   DialogTitle,
   useConfirm,
 } from '@/components/ui/dialog';
-import { Field, Input } from '@/components/ui/input';
+import { Field, FilteredInput, Input } from '@/components/ui/input';
 import {
   Checkbox,
   DropdownMenu,
@@ -578,7 +581,9 @@ function ExpenseDialog({
       if (method === 'exact') value = raw ? parseAmountInput(raw, digits) : 0;
       else if (method === 'percent') value = raw ? Math.round(Number(raw) * 100) : 0;
       else if (method === 'shares') value = raw ? Number(raw) : 0;
-      return { memberId: m.id, value };
+      // Text left over from another method (e.g. "1,500" when switching to percent).
+      if (value !== null && !Number.isFinite(value)) value = null;
+      return { memberId: m.id, name: m.name, value };
     });
   const preview = useMemo(
     () => (total && total > 0 ? computeShares(total, method, inputs) : null),
@@ -600,7 +605,14 @@ function ExpenseDialog({
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!total || total <= 0) return setError('Enter an amount');
+    const amountError = amountInputError(amount, digits);
+    if (amountError || !total) return setError(amountError ?? 'Enter an amount');
+    const unclear = method === 'equal' ? undefined : inputs.find((i) => i.value === null);
+    if (unclear) {
+      return setError(
+        `Check the ${method === 'exact' ? 'amount' : method === 'percent' ? 'percent' : 'shares'} for ${unclear.name}`,
+      );
+    }
     if (preview && !preview.ok) return setError(preview.error);
     if (record && youPay && !accountId) return setError('Choose the account you paid from');
     try {
@@ -694,11 +706,17 @@ function ExpenseDialog({
                       {m.you && <span className="text-muted-foreground"> (you)</span>}
                     </span>
                     {method !== 'equal' && row.on && (
-                      <Input
+                      <FilteredInput
                         value={row.value}
-                        onChange={(e) =>
-                          setRows((r) => ({ ...r, [m.id]: { ...row, value: e.target.value } }))
+                        filter={(text) =>
+                          method === 'exact'
+                            ? filterAmountInput(text)
+                            : filterDecimalInput(text, { maxDecimals: 2 })
                         }
+                        onValueChange={(value) =>
+                          setRows((r) => ({ ...r, [m.id]: { ...row, value } }))
+                        }
+                        autoComplete="off"
                         inputMode="decimal"
                         aria-label={`${method === 'exact' ? 'Amount' : method === 'percent' ? 'Percent' : 'Shares'} for ${m.name}`}
                         placeholder={method === 'exact' ? '0' : method === 'percent' ? '%' : '1'}
@@ -836,7 +854,8 @@ function SettleDialog({
     e.preventDefault();
     setError(null);
     const value = amount.trim() ? parseAmountInput(amount, digits) : null;
-    if (!value || value <= 0) return setError('Enter an amount');
+    const amountError = amountInputError(amount, digits);
+    if (amountError || !value) return setError(amountError ?? 'Enter an amount');
     if (record && involvesYou && !accountId) return setError('Choose the account');
     try {
       await create.mutateAsync({

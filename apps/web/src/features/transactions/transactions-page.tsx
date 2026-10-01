@@ -188,6 +188,7 @@ export function TransactionsPage() {
             placeholder="Search payee, notes or bank description  ( / )"
             className="pl-9"
             aria-label="Search transactions"
+            maxLength={100}
           />
         </div>
         {/* One row that scrolls sideways on phones; wraps on wider screens. */}

@@ -8,8 +8,9 @@ import { sql } from 'drizzle-orm';
 import { bodyLimit } from 'hono/body-limit';
 import { HTTPException } from 'hono/http-exception';
 import { secureHeaders } from 'hono/secure-headers';
+import { ZodError } from 'zod';
 import type { AppEnv, Deps } from './context';
-import { ApiError, mapDatabaseError } from './lib/errors';
+import { ApiError, mapDatabaseError, validationError } from './lib/errors';
 import { createRouter } from './lib/openapi';
 import { originCheck, tokenAccess, tokenRateLimit, writeRateLimit } from './middleware/security';
 import { loadSession } from './middleware/session';
@@ -183,7 +184,9 @@ export function createApp(deps: Deps) {
               'http_error',
               err.message || 'Request failed',
             )
-          : mapDatabaseError(err);
+          : err instanceof ZodError
+            ? validationError(err.issues)
+            : mapDatabaseError(err);
     if (apiError) {
       return c.json(
         { error: { code: apiError.code, message: apiError.message, details: apiError.details } },

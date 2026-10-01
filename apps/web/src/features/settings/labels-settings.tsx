@@ -178,6 +178,7 @@ function PayeeDialog({ payee, onDone }: { payee: Payee; onDone: () => void }) {
           >
             <Input
               id="payee-name"
+              maxLength={120}
               value={name}
               onChange={(e) => setName(e.target.value)}
               required

@@ -9,6 +9,7 @@ export * from './holdings';
 export * from './ids';
 export * from './import';
 export * from './import-presets';
+export * from './input-filters';
 export * from './insights';
 export * from './integrations';
 export * from './ledger';

@@ -54,6 +54,12 @@ describe('parseQuickText', () => {
     expect(parse('$12.50 coffee')).toMatchObject({ amountMinor: 1_250 });
   });
 
+  it('leaves out a number too large to be an amount instead of failing', () => {
+    expect(() => parse('lunch 99999999999999999999 at Bhojan Griha')).not.toThrow();
+    expect(parse('lunch 99999999999999999999 at Bhojan Griha').amountMinor).toBeNull();
+    expect(parse('car 99999999999999 lakh').amountMinor).toBeNull();
+  });
+
   it('takes the leftover words as the payee', () => {
     expect(parse('2300 Bhat Bhateni 2026-09-12')).toMatchObject({
       amountMinor: 230_000,

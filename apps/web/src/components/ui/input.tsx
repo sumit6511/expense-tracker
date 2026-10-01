@@ -10,6 +10,43 @@ export function Input({ className, ...props }: ComponentProps<'input'>) {
   return <input className={cn(fieldBase, 'h-10', className)} {...props} />;
 }
 
+/**
+ * A text field that only takes what `filter` lets through (see the filters in @et/shared).
+ * A keystroke the filter would drop never appears and the caret stays where it was; pasted or
+ * autofilled text is cleaned.
+ */
+export function FilteredInput({
+  filter,
+  onValueChange,
+  ...props
+}: Omit<ComponentProps<'input'>, 'onChange' | 'value'> & {
+  value: string;
+  filter: (text: string) => string;
+  onValueChange: (value: string) => void;
+}) {
+  return (
+    <Input
+      {...props}
+      onBeforeInput={(e) => {
+        const data = (e.nativeEvent as InputEvent).data;
+        const input = e.currentTarget;
+        if (!data || input.selectionStart === null || input.selectionEnd === null) return;
+        const before = input.value.slice(0, input.selectionStart) + data;
+        const next = before + input.value.slice(input.selectionEnd);
+        const filtered = filter(next);
+        if (filtered === next) return;
+        // Typed something the field can't take (or that it writes differently, like x → ×).
+        e.preventDefault();
+        if (filtered === input.value) return;
+        onValueChange(filtered);
+        const caret = Math.min(filter(before).length, filtered.length);
+        requestAnimationFrame(() => input.setSelectionRange(caret, caret));
+      }}
+      onChange={(e) => onValueChange(filter(e.target.value))}
+    />
+  );
+}
+
 export function Textarea({ className, ...props }: ComponentProps<'textarea'>) {
   return <textarea className={cn(fieldBase, 'min-h-20 py-2', className)} {...props} />;
 }

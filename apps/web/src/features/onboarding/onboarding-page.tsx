@@ -1,6 +1,8 @@
 import {
   ACCOUNT_PRESETS,
+  amountInputError,
   type CalendarSystem,
+  filterAmountInput,
   formatAdDate,
   formatBsDate,
   formatMoney,
@@ -17,7 +19,7 @@ import { FullPageSpinner } from '@/app/app-layout';
 import { CategoryIcon } from '@/components/icons';
 import { CurrencySelect } from '@/components/pickers';
 import { Button } from '@/components/ui/button';
-import { Field, Input } from '@/components/ui/input';
+import { Field, FilteredInput, Input } from '@/components/ui/input';
 import { Checkbox, Segmented, Switch } from '@/components/ui/menu';
 import { ApiError, errorMessage } from '@/lib/api';
 import { useCreateWorkspace, useMeQuery, useUpdateMe } from '@/lib/queries';
@@ -57,7 +59,22 @@ export function OnboardingPage() {
     return <Navigate to="/login" search={{}} />;
   const isFirst = (me.data?.workspaces.length ?? 0) === 0;
 
+  /** Each balance typed in is a number (a blank one counts as zero). */
+  function balancesOk() {
+    const digits = getCurrency(currency).digits;
+    for (const a of accounts) {
+      if (!a.enabled || a.balance.trim() === '') continue;
+      const problem = amountInputError(a.balance, digits, { allowNegative: true, allowZero: true });
+      if (problem) {
+        toast.error(`${a.name.trim() || 'Account'} balance: ${problem}`);
+        return false;
+      }
+    }
+    return true;
+  }
+
   async function finish() {
+    if (!balancesOk()) return;
     try {
       if (me.data && me.data.user.numberGrouping !== grouping)
         await updateMe.mutateAsync({ numberGrouping: grouping });
@@ -232,12 +249,22 @@ export function OnboardingPage() {
                         onChange={(e) => update({ name: e.target.value, enabled: true })}
                         className="h-9 min-w-0 flex-1"
                         aria-label="Account name"
+                        maxLength={80}
                       />
-                      <Input
+                      <FilteredInput
                         value={a.balance}
                         inputMode="decimal"
+                        autoComplete="off"
                         placeholder="Balance"
-                        onChange={(e) => update({ balance: e.target.value, enabled: true })}
+                        filter={(text) => filterAmountInput(text, { negative: true })}
+                        aria-invalid={
+                          a.balance.trim() !== '' &&
+                          amountInputError(a.balance, getCurrency(currency).digits, {
+                            allowNegative: true,
+                            allowZero: true,
+                          }) !== null
+                        }
+                        onValueChange={(balance) => update({ balance, enabled: true })}
                         className="h-9 w-28 tabular"
                         aria-label={`${a.name} balance`}
                       />
@@ -296,7 +323,12 @@ export function OnboardingPage() {
               <span />
             )}
             {step < steps.length - 1 ? (
-              <Button onClick={() => setStep((s) => s + 1)}>
+              <Button
+                onClick={() => {
+                  if (step === 1 && !balancesOk()) return;
+                  setStep((s) => s + 1);
+                }}
+              >
                 Continue <ArrowRight />
               </Button>
             ) : (

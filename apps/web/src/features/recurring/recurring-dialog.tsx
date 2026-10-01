@@ -1,9 +1,11 @@
 import {
   AD_MONTH_NAMES,
   adToBs,
+  amountInputError,
   BS_MONTH_NAMES,
   diffDays,
   type Frequency,
+  filterIntegerInput,
   type IsoDate,
   isBsSupported,
   occurrenceAt,
@@ -25,7 +27,9 @@ import {
   type ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { toast } from 'sonner';
@@ -47,7 +51,7 @@ import {
   DialogTitle,
   useConfirm,
 } from '@/components/ui/dialog';
-import { Field, Input } from '@/components/ui/input';
+import { Field, FilteredInput, Input } from '@/components/ui/input';
 import { Checkbox, Segmented } from '@/components/ui/menu';
 import { Select, SelectItem } from '@/components/ui/select';
 import { errorMessage } from '@/lib/api';
@@ -283,6 +287,10 @@ function RecurringEditor({ start, onDone }: { start?: RecurringStart; onDone: ()
   const [mode, setMode] = useState<'auto' | 'remind'>(start?.mode ?? 'remind');
   const [remindDays, setRemindDays] = useState(String(start?.remindDaysBefore ?? 3));
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [error]);
 
   const crossCurrency = kind === 'transfer' && toAccount && toAccount.currency !== currency;
   const monthlyish = frequency === 'monthly' || frequency === 'yearly';
@@ -291,9 +299,23 @@ function RecurringEditor({ start, onDone }: { start?: RecurringStart; onDone: ()
   async function submit(e: FormEvent) {
     e.preventDefault();
     const parsed = parseAmountInput(amount, f.digits(currency));
-    if (!parsed) {
-      setError(variableAmount ? 'Enter a usual (estimated) amount' : 'Enter the amount');
+    const problem = amountInputError(amount, f.digits(currency));
+    if (problem || !parsed) {
+      setError(
+        problem === 'Enter an amount' || !problem
+          ? variableAmount
+            ? 'Enter a usual (estimated) amount'
+            : 'Enter the amount'
+          : problem,
+      );
       return;
+    }
+    if (crossCurrency && toAmount.trim()) {
+      const toProblem = amountInputError(toAmount, f.digits(toAccount!.currency));
+      if (toProblem) {
+        setError(`Amount received: ${toProblem}`);
+        return;
+      }
     }
     const parsedTo = crossCurrency
       ? parseAmountInput(toAmount, f.digits(toAccount!.currency))
@@ -427,6 +449,7 @@ function RecurringEditor({ start, onDone }: { start?: RecurringStart; onDone: ()
               <Field label="Payee" htmlFor="rec-payee">
                 <PayeeInput
                   id="rec-payee"
+                  maxLength={120}
                   value={payee}
                   onChange={setPayee}
                   placeholder={kind === 'income' ? 'Who pays you?' : 'e.g. WorldLink'}
@@ -458,11 +481,13 @@ function RecurringEditor({ start, onDone }: { start?: RecurringStart; onDone: ()
             <legend className="px-1 text-sm font-semibold">Schedule</legend>
             <div className="grid grid-cols-[auto_5rem_1fr] items-center gap-2 text-sm">
               <span>Every</span>
-              <Input
+              <FilteredInput
                 aria-label="Interval"
                 inputMode="numeric"
+                autoComplete="off"
                 value={interval}
-                onChange={(e) => setInterval(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                filter={(text) => filterIntegerInput(text, 3)}
+                onValueChange={setInterval}
                 className="text-center tabular"
               />
               <Select
@@ -527,11 +552,13 @@ function RecurringEditor({ start, onDone }: { start?: RecurringStart; onDone: ()
               )}
               {ends === 'count' && (
                 <Field label="Times left" htmlFor="rec-count" hint="e.g. EMIs remaining">
-                  <Input
+                  <FilteredInput
                     id="rec-count"
                     inputMode="numeric"
+                    autoComplete="off"
                     value={remaining}
-                    onChange={(e) => setRemaining(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    filter={(text) => filterIntegerInput(text, 4)}
+                    onValueChange={setRemaining}
                   />
                 </Field>
               )}
@@ -583,7 +610,7 @@ function RecurringEditor({ start, onDone }: { start?: RecurringStart; onDone: ()
             )}
           </div>
           {error && (
-            <p role="alert" className="text-sm text-destructive">
+            <p ref={errorRef} role="alert" className="text-sm text-destructive">
               {error}
             </p>
           )}
@@ -628,8 +655,9 @@ function RecordDialog({ recurring: r, onDone }: { recurring: Recurring; onDone: 
   async function submit(e: FormEvent) {
     e.preventDefault();
     const parsed = parseAmountInput(amount, f.digits(currency));
-    if (!parsed) {
-      setError('Enter the amount');
+    const problem = amountInputError(amount, f.digits(currency));
+    if (problem || !parsed) {
+      setError(problem ?? 'Enter the amount');
       return;
     }
     try {

@@ -97,6 +97,21 @@ describe('authentication and tenancy', () => {
     expect(res.body.error.details.map((d: { path: string }) => d.path)).toEqual(
       expect.arrayContaining(['name', 'type', 'currency']),
     );
+    // The message names the field and the problem in plain words.
+    expect(res.body.error.message).toBe('Name is required');
+    const long = await a.client.post(`${a.base}/accounts`, {
+      name: 'x'.repeat(81),
+      type: 'cash',
+      currency: 'NPR',
+    });
+    expect(long.body.error.message).toBe('Name is too long (at most 80 characters)');
+    const fractional = await a.client.post(`${a.base}/transactions`, {
+      accountId: (await a.client.get(`${a.base}/accounts`)).body[0].id,
+      date: '2026-10-01',
+      amountMinor: 1.5,
+    });
+    expect(fractional.status).toBe(400);
+    expect(fractional.body.error.message).toMatch(/^Amount/);
   });
 
   it('serves the OpenAPI document', async () => {

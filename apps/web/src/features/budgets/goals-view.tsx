@@ -1,4 +1,5 @@
 import {
+  amountInputError,
   COLOR_SWATCHES,
   type Goal,
   type GoalInput,
@@ -276,7 +277,8 @@ function AddMoneyDialog({ goal, onDone }: { goal: Goal; onDone: () => void }) {
   async function submit(e: FormEvent) {
     e.preventDefault();
     const parsed = parseAmountInput(amount, f.digits());
-    if (!parsed) return;
+    const problem = amountInputError(amount, f.digits());
+    if (problem || !parsed) return toast.error(problem ?? 'Enter an amount');
     try {
       const next = await contribute.mutateAsync({
         id: goal.id,
@@ -362,7 +364,18 @@ function GoalDialog({ goal, onDone }: { goal?: Goal; onDone: () => void }) {
     e.preventDefault();
     const targetMinor = parseAmountInput(target, digits);
     if (!name.trim()) return setError('Give the goal a name');
-    if (!targetMinor || targetMinor <= 0) return setError('Enter the amount you want to reach');
+    const targetProblem = amountInputError(target, digits);
+    if (targetProblem || !targetMinor) {
+      return setError(
+        targetProblem === 'Enter an amount' || !targetProblem
+          ? 'Enter the amount you want to reach'
+          : `Target: ${targetProblem}`,
+      );
+    }
+    if (!goal && kind === 'manual' && saved.trim()) {
+      const savedProblem = amountInputError(saved, digits, { allowZero: true });
+      if (savedProblem) return setError(`Saved so far: ${savedProblem}`);
+    }
     if (kind === 'account' && !accountId) return setError('Choose the account');
     if (kind === 'category' && !categoryId) return setError('Choose the category');
     const body: GoalInput = {

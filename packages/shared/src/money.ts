@@ -111,6 +111,29 @@ export function normalizeDigits(input: string): string {
  * Returns null when the input can't be understood. The sign of the result is kept.
  */
 export function parseAmountInput(input: string, digits: number): Minor | null {
+  const result = readAmountInput(input, digits);
+  return result === 'too-large' ? null : result;
+}
+
+/**
+ * Why an amount someone typed can't be used, or null when it can: nothing typed, not a number
+ * or sum the app understands, too large, or zero/negative where those make no sense.
+ */
+export function amountInputError(
+  input: string,
+  digits: number,
+  options: { allowZero?: boolean; allowNegative?: boolean } = {},
+): string | null {
+  if (input.trim() === '') return 'Enter an amount';
+  const result = readAmountInput(input, digits);
+  if (result === 'too-large') return 'That amount is too large';
+  if (result === null) return 'Enter a valid amount, like 1,500 or 120+45';
+  if (result < 0 && !options.allowNegative) return 'Enter an amount greater than zero';
+  if (result === 0 && !options.allowZero) return 'Enter an amount greater than zero';
+  return null;
+}
+
+function readAmountInput(input: string, digits: number): Minor | 'too-large' | null {
   const cleaned = normalizeDigits(input)
     .replace(/(rs\.?|npr|inr|usd|रु\.?|रू\.?|[₹$€£¥₩])/gi, '')
     .replace(/[,\s_']/g, '')
@@ -119,7 +142,12 @@ export function parseAmountInput(input: string, digits: number): Minor | null {
     .replace(/[−–]/g, '-');
   if (cleaned === '') return null;
   const value = evaluateExpression(cleaned);
-  return value ? rationalToMinor(value, digits) : null;
+  if (!value) return null;
+  try {
+    return rationalToMinor(value, digits);
+  } catch {
+    return 'too-large';
+  }
 }
 
 /** Tiny recursive-descent evaluator for + - * / and parentheses over exact rationals. */

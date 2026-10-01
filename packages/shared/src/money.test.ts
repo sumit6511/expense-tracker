@@ -2,6 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
   allocate,
+  amountInputError,
   averageDecimals,
   convertBetween,
   convertMinor,
@@ -211,5 +212,22 @@ describe('rate arithmetic', () => {
   it('averages buy/sell rates per unit', () => {
     expect(averageDecimals('160.00', '160.15', 100)).toBe('1.60075');
     expect(averageDecimals('133.10', '133.70')).toBe('133.4');
+  });
+});
+
+describe('amountInputError', () => {
+  it('says what is wrong with an amount, in words', () => {
+    expect(amountInputError('', 2)).toBe('Enter an amount');
+    expect(amountInputError('12+', 2)).toBe('Enter a valid amount, like 1,500 or 120+45');
+    expect(amountInputError('0', 2)).toBe('Enter an amount greater than zero');
+    expect(amountInputError('0', 2, { allowZero: true })).toBeNull();
+    expect(amountInputError('50-80', 2)).toBe('Enter an amount greater than zero');
+    expect(amountInputError('-5000', 2, { allowNegative: true })).toBeNull();
+    expect(amountInputError('1,500', 2)).toBeNull();
+  });
+
+  it('turns away amounts too large to count instead of failing', () => {
+    expect(parseAmountInput('9999999999999999999', 2)).toBeNull();
+    expect(amountInputError('9999999999999999999', 2)).toBe('That amount is too large');
   });
 });

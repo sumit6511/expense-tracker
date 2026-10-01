@@ -2,28 +2,16 @@ import { ApiErrorSchema, Id } from '@et/shared';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { z } from 'zod';
 import type { AppEnv, SessionUser } from '../context';
-import { unauthorized } from './errors';
+import { unauthorized, validationError } from './errors';
 
 /** A router whose request validation failures use the API's error envelope. */
 export function createRouter() {
   return new OpenAPIHono<AppEnv>({
     defaultHook: (result, c) => {
       if (!result.success) {
-        const issues = result.error.issues.map((i) => ({
-          path: i.path.join('.'),
-          message: i.message,
-        }));
-        const first = issues[0];
+        const error = validationError(result.error.issues);
         return c.json(
-          {
-            error: {
-              code: 'validation_error',
-              message: first
-                ? `${first.path ? `${first.path}: ` : ''}${first.message}`
-                : 'Invalid request',
-              details: issues,
-            },
-          },
+          { error: { code: error.code, message: error.message, details: error.details } },
           400,
         );
       }

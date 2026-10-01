@@ -1,5 +1,7 @@
 import {
   type Account,
+  amountInputError,
+  filterDecimalInput,
   type Holding,
   parseAmountInput,
   parsePriceList,
@@ -22,7 +24,7 @@ import {
   DialogTitle,
   useConfirm,
 } from '@/components/ui/dialog';
-import { Field, Input, Textarea } from '@/components/ui/input';
+import { Field, FilteredInput, Input, Textarea } from '@/components/ui/input';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
 import {
@@ -223,7 +225,11 @@ function HoldingDialog({
     const costMinor = cost.trim() ? parseAmountInput(cost, digits) : 0;
     if (!qty) return setError('Enter the quantity as a number, like 10 or 2.5');
     if (price.trim() && !unitPrice) return setError('Enter the price as a number, like 512.30');
-    if (costMinor === null || costMinor < 0) return setError('Enter what it cost in total');
+    if (costMinor === null || costMinor < 0) {
+      return setError(
+        `Total cost: ${amountInputError(cost, digits, { allowZero: true }) ?? 'Enter what it cost in total'}`,
+      );
+    }
     const body = { symbol, name, quantity: qty, costMinor, price: unitPrice };
     const done = {
       onSuccess: () => {
@@ -258,11 +264,13 @@ function HoldingDialog({
             />
           </Field>
           <Field label="Quantity" htmlFor="h-quantity">
-            <Input
+            <FilteredInput
               id="h-quantity"
               inputMode="decimal"
+              autoComplete="off"
               value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
+              filter={(text) => filterDecimalInput(text)}
+              onValueChange={setQuantity}
               placeholder="10"
               required
             />
@@ -280,11 +288,13 @@ function HoldingDialog({
             <AmountInput id="h-cost" value={cost} onChange={setCost} currency={account.currency} />
           </Field>
           <Field label="Price now" htmlFor="h-price" hint="Per share or unit.">
-            <Input
+            <FilteredInput
               id="h-price"
               inputMode="decimal"
+              autoComplete="off"
               value={price}
-              onChange={(e) => setPrice(e.target.value)}
+              filter={(text) => filterDecimalInput(text)}
+              onValueChange={setPrice}
               placeholder="512.30"
             />
           </Field>
@@ -393,16 +403,18 @@ function PricesDialog({
           />
           <div className="grid grid-cols-[1fr_8rem] items-center gap-2">
             {holdings.map((h) => (
-              <label key={h.id} className="contents text-sm">
+              <div key={h.id} className="contents text-sm">
                 <span className="font-medium">{h.symbol}</span>
-                <Input
+                <FilteredInput
                   inputMode="decimal"
+                  autoComplete="off"
                   aria-label={`Price of ${h.symbol}`}
                   value={prices[h.id] ?? ''}
-                  onChange={(e) => setPrices((p) => ({ ...p, [h.id]: e.target.value }))}
+                  filter={(text) => filterDecimalInput(text)}
+                  onValueChange={(value) => setPrices((p) => ({ ...p, [h.id]: value }))}
                   className="h-9 text-right"
                 />
-              </label>
+              </div>
             ))}
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}

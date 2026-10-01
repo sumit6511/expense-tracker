@@ -1,5 +1,7 @@
 import {
+  amountInputError,
   type CategoryKind,
+  filterAmountInput,
   type IsoDate,
   parseAmountInput,
   type Transaction,
@@ -40,7 +42,7 @@ import {
   DialogTitle,
   useConfirm,
 } from '@/components/ui/dialog';
-import { Field, Input, Textarea } from '@/components/ui/input';
+import { Field, FilteredInput, Input, Textarea } from '@/components/ui/input';
 import { Checkbox, Segmented } from '@/components/ui/menu';
 import {
   recurringFromTransaction,
@@ -299,6 +301,12 @@ function EditorForm({
       : [],
   );
   const [error, setError] = useState<string | null>(null);
+  // The amount's problem shows under the field once they've left it or tried to save.
+  const [amountShown, setAmountShown] = useState(false);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [error]);
 
   const createTx = useCreateTransaction();
   const updateTx = useUpdateTransaction();
@@ -375,8 +383,9 @@ function EditorForm({
     event.preventDefault();
     setError(null);
     if (!editable) return;
-    if (parsed === null || parsed <= 0) {
-      setError('Enter an amount greater than zero');
+    if (amountInputError(amount, digits) || parsed === null) {
+      setAmountShown(true);
+      document.getElementById('tx-amount')?.focus();
       return;
     }
     if (!accountId) {
@@ -393,8 +402,15 @@ function EditorForm({
         const toParsed = crossCurrency
           ? parseAmountInput(toAmount, f.digits(toAccount.currency))
           : null;
-        if (crossCurrency && (toParsed === null || toParsed <= 0)) {
-          setError(`Enter the amount received in ${toAccount.currency}`);
+        const toError = crossCurrency
+          ? amountInputError(toAmount, f.digits(toAccount.currency))
+          : null;
+        if (toError || (crossCurrency && toParsed === null)) {
+          setError(
+            toError === 'Enter an amount' || !toError
+              ? `Enter the amount received in ${toAccount!.currency}`
+              : `Amount received: ${toError}`,
+          );
           return;
         }
         const body = {
@@ -417,6 +433,13 @@ function EditorForm({
           const valid = lines.filter((l) => l.amount.trim() !== '');
           if (valid.length < 2) {
             setError('A split needs at least two lines');
+            return;
+          }
+          const badLine = lines.findIndex(
+            (l) => l.amount.trim() !== '' && amountInputError(l.amount, digits) !== null,
+          );
+          if (badLine !== -1) {
+            setError(`Line ${badLine + 1}: ${amountInputError(lines[badLine]!.amount, digits)}`);
             return;
           }
           if (remaining !== 0) {
@@ -595,11 +618,16 @@ function EditorForm({
             />
           )}
 
-          <Field label={mode === 'transfer' ? t('Amount sent') : t('Amount')} htmlFor="tx-amount">
+          <Field
+            label={mode === 'transfer' ? t('Amount sent') : t('Amount')}
+            htmlFor="tx-amount"
+            error={(amountShown && amountInputError(amount, digits)) || undefined}
+          >
             <AmountInput
               id="tx-amount"
               value={amount}
               onChange={setAmount}
+              onBlur={() => amount.trim() && setAmountShown(true)}
               currency={currency}
               large
               autoFocus={!isEdit}
@@ -738,17 +766,21 @@ function EditorForm({
                           )
                         }
                       />
-                      <Input
+                      <FilteredInput
                         inputMode="decimal"
+                        autoComplete="off"
                         className="tabular"
                         aria-label={`Amount for line ${i + 1}`}
                         value={line.amount}
                         placeholder="0"
-                        onChange={(e) =>
+                        filter={(text) => filterAmountInput(text)}
+                        aria-invalid={
+                          line.amount.trim() !== '' &&
+                          amountInputError(line.amount, digits) !== null
+                        }
+                        onValueChange={(value) =>
                           setLines((ls) =>
-                            ls.map((l) =>
-                              l.key === line.key ? { ...l, amount: e.target.value } : l,
-                            ),
+                            ls.map((l) => (l.key === line.key ? { ...l, amount: value } : l)),
                           )
                         }
                       />
@@ -804,6 +836,7 @@ function EditorForm({
                 >
                   <PayeeInput
                     id="tx-payee"
+                    maxLength={120}
                     value={payee}
                     onChange={setPayee}
                     placeholder={mode === 'income' ? t('Who paid you?') : t('Who did you pay?')}
@@ -841,6 +874,7 @@ function EditorForm({
           <Field label={t('Notes')} htmlFor="tx-notes">
             <Textarea
               id="tx-notes"
+              maxLength={1000}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder={t('Optional')}
@@ -885,6 +919,7 @@ function EditorForm({
 
           {error && (
             <p
+              ref={errorRef}
               className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive"
               role="alert"
             >

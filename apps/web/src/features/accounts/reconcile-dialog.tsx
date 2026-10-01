@@ -1,5 +1,6 @@
 import {
   type Account,
+  amountInputError,
   type IsoDate,
   parseAmountInput,
   type Transaction,
@@ -73,6 +74,11 @@ export function ReconcileDialog({ account, onDone }: { account: Account; onDone:
             <Field
               label="Closing balance on the statement"
               htmlFor="rec-balance"
+              error={
+                balance.trim() && statementBalance === null
+                  ? amountInputError(balance, digits, { allowNegative: true, allowZero: true })
+                  : undefined
+              }
               hint={
                 account.type === 'credit_card' || account.type === 'loan'
                   ? 'Enter what you owe as a negative number, e.g. -12,500.'
@@ -84,6 +90,7 @@ export function ReconcileDialog({ account, onDone }: { account: Account; onDone:
                 currency={account.currency}
                 value={balance}
                 onChange={setBalance}
+                negative
                 large
               />
             </Field>

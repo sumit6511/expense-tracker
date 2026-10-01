@@ -1,3 +1,4 @@
+import { filterIntegerInput } from '@et/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Copy,
@@ -24,7 +25,7 @@ import {
   DialogTitle,
   useConfirm,
 } from '@/components/ui/dialog';
-import { Field, Input } from '@/components/ui/input';
+import { Field, FilteredInput, Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -251,15 +252,16 @@ function SetupDialog({
                 </p>
               </div>
               <Field label="6-digit code" htmlFor="tfa-code">
-                <Input
+                <FilteredInput
                   id="tfa-code"
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  pattern="[0-9 ]{6,7}"
-                  maxLength={7}
+                  pattern="[0-9]{6}"
+                  maxLength={6}
                   required
                   value={code}
-                  onChange={(e) => setCode(e.target.value)}
+                  filter={(text) => filterIntegerInput(text, 6)}
+                  onValueChange={setCode}
                   className="text-center text-lg tracking-[0.3em] tabular"
                 />
               </Field>

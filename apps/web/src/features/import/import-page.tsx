@@ -848,6 +848,7 @@ export function ImportPage() {
                 placeholder="Name this format (e.g. Nabil Bank)"
                 className="h-9 w-56"
                 aria-label="Mapping name"
+                maxLength={80}
               />
               <Button
                 variant="outline"

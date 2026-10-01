@@ -1,5 +1,7 @@
 import {
+  amountInputError,
   type BudgetMonth,
+  filterAmountInput,
   getMonthPeriod,
   parseAmountInput,
   type RolloverMode,
@@ -33,7 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, Input } from '@/components/ui/input';
+import { Field, FilteredInput } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -480,7 +482,8 @@ function MoveDialog({
   async function submit(e: FormEvent) {
     e.preventDefault();
     const value = parseAmountInput(amount, f.digits());
-    if (!value || value <= 0) return toast.error('Enter an amount');
+    const problem = amountInputError(amount, f.digits());
+    if (problem || !value) return toast.error(problem ?? 'Enter an amount');
     if (from === to) return toast.error('Choose two different places');
     try {
       await move.mutateAsync({
@@ -597,7 +600,9 @@ function BudgetRow({
     setEditing(false);
     const parsed = text.trim() === '' ? 0 : parseAmountInput(text, digits);
     if (parsed === null || parsed < 0) {
-      toast.error('Enter a positive amount');
+      toast.error(
+        `${category.name}: ${amountInputError(text, digits, { allowZero: true }) ?? 'Enter a positive amount'}`,
+      );
       setValue(initial);
       return;
     }
@@ -649,7 +654,7 @@ function BudgetRow({
               periodStart={periodStart}
             />
           )}
-          <Input
+          <FilteredInput
             value={
               editing
                 ? value
@@ -661,7 +666,8 @@ function BudgetRow({
                   : ''
             }
             onFocus={() => setEditing(true)}
-            onChange={(e) => setValue(e.target.value)}
+            filter={(text) => filterAmountInput(text)}
+            onValueChange={setValue}
             onBlur={(e) => save(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
@@ -842,7 +848,9 @@ function MonthlyLimit({ data }: { data: BudgetMonth }) {
   async function save() {
     const parsed = value.trim() === '' ? 0 : parseAmountInput(value, digits);
     if (parsed === null || parsed < 0) {
-      toast.error('Enter a positive amount');
+      toast.error(
+        amountInputError(value, digits, { allowZero: true }) ?? 'Enter a positive amount',
+      );
       return;
     }
     try {

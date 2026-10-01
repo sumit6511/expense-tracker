@@ -3,6 +3,7 @@ import {
   ACCOUNT_TYPE_LABELS,
   type Account,
   type AccountType,
+  amountInputError,
   COLOR_SWATCHES,
   parseAmountInput,
   toDecimalString,
@@ -88,9 +89,15 @@ export function AccountFormDialog({
     e.preventDefault();
     setError(null);
     const openingMinor = opening.trim() ? parseAmountInput(opening, digits) : 0;
-    if (openingMinor === null) return setError('Opening balance is not a number');
+    if (openingMinor === null) {
+      return setError(
+        `Opening balance: ${amountInputError(opening, digits, { allowNegative: true, allowZero: true })}`,
+      );
+    }
     const limitMinor = creditLimit.trim() ? parseAmountInput(creditLimit, digits) : null;
-    if (creditLimit.trim() && limitMinor === null) return setError('Credit limit is not a number');
+    const limitProblem =
+      type === 'credit_card' && creditLimit.trim() ? amountInputError(creditLimit, digits) : null;
+    if (limitProblem) return setError(`Credit limit: ${limitProblem}`);
     const body = {
       name: name.trim(),
       type,
@@ -126,6 +133,7 @@ export function AccountFormDialog({
           <Field label="Name" htmlFor="acct-name">
             <Input
               id="acct-name"
+              maxLength={80}
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
@@ -182,6 +190,7 @@ export function AccountFormDialog({
                 value={opening}
                 onChange={setOpening}
                 currency={currency}
+                negative
                 placeholder="0"
               />
             </Field>
@@ -203,6 +212,7 @@ export function AccountFormDialog({
           <Field label="Bank or provider" htmlFor="acct-institution">
             <Input
               id="acct-institution"
+              maxLength={80}
               value={institution}
               onChange={(e) => setInstitution(e.target.value)}
               placeholder="Optional"

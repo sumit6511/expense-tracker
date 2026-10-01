@@ -350,6 +350,29 @@ test.describe('everyday use', () => {
     await expect(page.getByRole('button', { name: /Bhat-Bhateni/ })).toBeVisible();
   });
 
+  test('amount fields take numbers only, and say what is wrong', async ({ signedIn: page }) => {
+    await page.keyboard.press('n');
+    const dialog = page.getByRole('dialog');
+    const amount = dialog.getByLabel('Amount');
+    // Letters never appear; sums and pasted amounts still work.
+    await amount.pressSequentially('abc12x3');
+    await expect(amount).toHaveValue('12×3');
+    await expect(dialog.getByText('= 36.00')).toBeVisible();
+    await amount.fill('Rs. 1,500');
+    await expect(amount).toHaveValue('1,500');
+    // A sum that doesn't add up is explained under the field.
+    await amount.fill('12+');
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(dialog.getByText('Enter a valid amount, like 1,500 or 120+45')).toBeVisible();
+    await expect(amount).toBeFocused();
+    await amount.pressSequentially('8');
+    await expect(dialog.getByText('Enter a valid amount, like 1,500 or 120+45')).toBeHidden();
+    await dialog.getByLabel('Payee').fill('Bus');
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Expense added')).toBeVisible();
+    await expect(page.getByText('Rs. 20').first()).toBeVisible();
+  });
+
   test('describe a transaction in words (no AI needed)', async ({ signedIn: page }) => {
     await page.keyboard.press('n');
     const dialog = page.getByRole('dialog');

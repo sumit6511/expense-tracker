@@ -1,6 +1,8 @@
 import {
+  amountInputError,
   describeCondition,
   descriptionKeyword,
+  filterDecimalInput,
   parseAmountInput,
   type Rule,
   type RuleAction,
@@ -33,7 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, Input, Label } from '@/components/ui/input';
+import { Field, FilteredInput, Input, Label } from '@/components/ui/input';
 import { Checkbox, Segmented, Switch } from '@/components/ui/menu';
 import { Select, SelectItem } from '@/components/ui/select';
 import { TransactionRow } from '@/features/transactions/transaction-row';
@@ -315,7 +317,16 @@ function build(
     if (c.field === 'amount') {
       const value = c.amount.trim() ? parseAmountInput(c.amount, digits) : null;
       const value2 = c.amount2.trim() ? parseAmountInput(c.amount2, digits) : null;
-      if (value === null) return { rule: null, error: 'Enter an amount in each amount condition' };
+      if (value === null) {
+        const problem = amountInputError(c.amount, digits, { allowZero: true });
+        return {
+          rule: null,
+          error:
+            problem && problem !== 'Enter an amount'
+              ? `Amount condition: ${problem}`
+              : 'Enter an amount in each amount condition',
+        };
+      }
       if (c.op === 'between' && value2 === null)
         return { rule: null, error: 'Enter both amounts for “is between”' };
       conds.push({
@@ -782,15 +793,15 @@ function ActionRow({
                   }
                 />
                 <div className="relative w-24 shrink-0">
-                  <Input
+                  <FilteredInput
                     aria-label={`Split line ${i + 1} percent`}
                     inputMode="decimal"
+                    autoComplete="off"
                     value={line.percent}
-                    onChange={(e) =>
+                    filter={(text) => filterDecimalInput(text, { maxDecimals: 2 })}
+                    onValueChange={(percent) =>
                       onChange({
-                        lines: draft.lines.map((l) =>
-                          l.key === line.key ? { ...l, percent: e.target.value } : l,
-                        ),
+                        lines: draft.lines.map((l) => (l.key === line.key ? { ...l, percent } : l)),
                       })
                     }
                     className="pr-7 text-right tabular"

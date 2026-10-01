@@ -201,6 +201,7 @@ function Routing() {
             onChange={(e) => setSender(e.target.value)}
             placeholder="alerts@yourbank.com"
             aria-label="Sender address or @domain"
+            maxLength={254}
             className="min-w-48 flex-1"
             required
           />

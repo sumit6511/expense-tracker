@@ -1,4 +1,4 @@
-import { FEATURED_CURRENCIES, RateStringSchema } from '@et/shared';
+import { FEATURED_CURRENCIES, filterDecimalInput, RateStringSchema } from '@et/shared';
 import { Trash2 } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { toast } from 'sonner';
@@ -6,7 +6,7 @@ import { DatePicker } from '@/components/date-picker';
 import { CurrencySelect } from '@/components/pickers';
 import { Button } from '@/components/ui/button';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/components/ui/card';
-import { Field, Input } from '@/components/ui/input';
+import { Field, FilteredInput } from '@/components/ui/input';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
 import { useDeleteManualRate, useRates, useSetManualRate } from '@/lib/queries';
@@ -139,11 +139,13 @@ export function RatesSettings() {
                 </Field>
               </div>
               <Field label="Rate" htmlFor="rate-value">
-                <Input
+                <FilteredInput
                   id="rate-value"
                   inputMode="decimal"
+                  autoComplete="off"
                   value={rate}
-                  onChange={(e) => setRateValue(e.target.value)}
+                  filter={(text) => filterDecimalInput(text, { maxDecimals: 10 })}
+                  onValueChange={setRateValue}
                   placeholder="e.g. 133.25"
                 />
               </Field>

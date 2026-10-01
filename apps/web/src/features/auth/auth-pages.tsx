@@ -1,9 +1,10 @@
+import { filterIntegerInput } from '@et/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { KeyRound, Loader2 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Field, Input } from '@/components/ui/input';
+import { Field, FilteredInput, Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/menu';
 import { ApiError, authApi, errorMessage } from '@/lib/api';
 import { isCancelled, passkeysSupported, signInWithPasskey } from '@/lib/passkeys';
@@ -229,15 +230,16 @@ function CodeForm({ onDone }: { onDone: () => Promise<void> }) {
           htmlFor="code"
           hint="Open the app (Google Authenticator, Microsoft Authenticator, 1Password…) and enter the 6-digit code."
         >
-          <Input
+          <FilteredInput
             id="code"
             inputMode="numeric"
             autoComplete="one-time-code"
-            pattern="[0-9 ]{6,7}"
-            maxLength={7}
+            pattern="[0-9]{6}"
+            maxLength={6}
             required
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            filter={(text) => filterIntegerInput(text, 6)}
+            onValueChange={setCode}
             className="text-center text-lg tracking-[0.3em] tabular"
             autoFocus
           />
@@ -321,6 +323,7 @@ export function SignupPage() {
         <Field label="Your name" htmlFor="name">
           <Input
             id="name"
+            maxLength={80}
             autoComplete="name"
             required
             value={name}
