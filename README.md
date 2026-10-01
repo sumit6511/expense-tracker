@@ -7,8 +7,8 @@ Bank exchange rates.** Works on phones and desktops and installs like an app (PW
 ![Dashboard](docs/screenshots/dashboard.png)
 
 The research and design behind it are in [`docs/PLAN.md`](docs/PLAN.md). This repository contains
-**Phase 0 (foundations), Phase 1 (MVP), Phase 2 (automation & depth) and Phase 3 (collaboration &
-intelligence)** of that plan.
+**all four phases** of that plan: foundations and the MVP, automation and depth, collaboration and
+intelligence, and integrations.
 
 ## What it does
 
@@ -92,6 +92,31 @@ intelligence)** of that plan.
 |---|---|---|---|
 | ![Insights](docs/screenshots/insights.png) | ![Split group](docs/screenshots/split-group.png) | ![Monthly report](docs/screenshots/monthly-report.png) | ![Nepali on a phone](docs/screenshots/mobile-nepali.png) |
 
+**Integrations and phones (Phase 4):**
+
+- **Email in:** each workspace gets a private address. Forward a receipt (with "lunch 450 eSewa" as
+  the subject if you like), or have your bank's alert emails sent there, and they become
+  transactions waiting in Review. Only mail from members, and from senders you trust (your bank's
+  alert address), is read; the rest is listed so you can trust it with one click.
+- **Android app** (optional, [`apps/mobile`](apps/mobile/README.md)): the same app in a native shell
+  that can **read bank and wallet alert SMS** on the phone, so they're imported without copying.
+- **Share receipts to the app:** on Android, share a photo or PDF from the gallery, WhatsApp or a
+  banking app to the installed app and it opens a new expense with the receipt attached.
+- **Investments:** shares (NEPSE or elsewhere), fund units and gold held in an account, valued at
+  the latest prices (paste them from a market website), with gains on cost. Their value counts in
+  the account and in net worth.
+- **Bank sync** through [SimpleFIN Bridge](https://www.simplefin.org) for accounts at US banks:
+  new transactions arrive in Review and ones you already entered are matched. No provider covers
+  banks in Nepal yet, which is why email in and SMS reading exist.
+- **Access tokens and a public API** for your own scripts and spreadsheets (read-only or
+  read-write, one workspace each), documented at `/api/docs`.
+- **Webhooks:** each new, changed or deleted transaction is sent to your URL as it happens,
+  signed the [Standard Webhooks](https://www.standardwebhooks.com) way, with retries and a log.
+
+| Integrations | Investments |
+|---|---|
+| ![Email in, bank sync, tokens and webhooks](docs/screenshots/integrations.png) | ![An investment account with holdings](docs/screenshots/investments.png) |
+
 ## Run it yourself (Docker)
 
 ```bash
@@ -117,11 +142,52 @@ Useful settings (environment variables, see [`.env.example`](.env.example)):
 | `ANTHROPIC_API_KEY` | Optional. Enables the AI helpers; each workspace's owner or admin still has to turn them on. |
 | `AI_MODEL` | The Claude model the helpers use (default `claude-opus-5-5`; `claude-haiku-4-5` costs less). |
 | `AI_DAILY_LIMIT` | AI requests allowed per workspace per day (default `200`). |
+| `EMAIL_IN_ADDRESS` | Turns on email in: the address pattern with `{token}` for each workspace's secret, e.g. `money+{token}@gmail.com`. See below. |
+| `EMAIL_IN_IMAP_URL` | A mailbox to read email in from, e.g. `imaps://money%40gmail.com:app-password@imap.gmail.com:993`. |
+| `EMAIL_IN_SECRET` | Or: the secret a mail service uses to post raw messages to `/api/inbound/email`. |
+| `BANK_SYNC` | Let owners and admins connect SimpleFIN bank sync (default `true`). |
+| `WEBHOOK_ALLOW_PRIVATE` | Let webhooks reach your own network, e.g. Home Assistant on `192.168.x.x` (default `false`). |
+| `ENCRYPTION_KEY` | Key for stored secrets (webhook keys, bank connections). Defaults to one derived from `AUTH_SECRET`; set it if you might change `AUTH_SECRET`. |
 | `POSTGRES_PASSWORD` | Database password used by compose. |
 
 Put a TLS-terminating reverse proxy (Caddy, nginx, Cloudflare Tunnel) in front for internet
 access. Passkeys are tied to the host name in `PUBLIC_URL`, so set it before people add them, and
 browsers only allow push notifications on https (or `localhost`).
+
+### Email in
+
+Each workspace's address is `EMAIL_IN_ADDRESS` with its secret token in place of `{token}`. The
+simplest setup is one mailbox you make for this, read over IMAP:
+
+1. Create a mailbox, e.g. a new Gmail account `money@gmail.com`, turn on two-step verification and
+   make an *app password* for it.
+2. Set `EMAIL_IN_ADDRESS=money+{token}@gmail.com` and
+   `EMAIL_IN_IMAP_URL=imaps://money%40gmail.com:<app password>@imap.gmail.com:993`.
+3. Settings → Integrations shows each workspace its address (`money+et…@gmail.com`; Gmail delivers
+   anything after the `+` to the same mailbox). The server checks the mailbox every minute.
+
+To have bank alerts arrive by themselves, add a filter in your own email that forwards your
+bank's alert emails to that address, and add the bank's sender under *Trusted senders* with the
+account its alerts are for. (Gmail first sends a confirmation to the address; its code is in the
+subject, which shows under *Recent emails*.)
+
+If you have a domain, a mail service can instead post each raw message to
+`POST /api/inbound/email` with `Authorization: Bearer <EMAIL_IN_SECRET>` (and `?to=` the
+recipient). With Cloudflare Email Routing, a catch-all rule to this Email Worker does it:
+
+```js
+export default {
+  async email(message, env) {
+    await fetch(`${env.URL}/api/inbound/email?to=${encodeURIComponent(message.to)}`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${env.SECRET}`, 'content-type': 'message/rfc822' },
+      body: message.raw,
+    });
+  },
+};
+```
+
+with `EMAIL_IN_ADDRESS={token}@in.example.com`.
 
 ## Develop
 
@@ -157,6 +223,7 @@ API documentation (OpenAPI 3.1) is served at `/api/docs` when the app is running
 ```
 apps/api         Hono API on Node.js · Drizzle ORM · PostgreSQL · Better Auth · pg-boss jobs
 apps/web         React 19 PWA · Vite · TanStack Router & Query · Tailwind CSS v4 · Radix UI · Recharts
+apps/mobile      Android app: Capacitor shell around the web app, plus an SMS-reading plugin
 packages/shared  Money, currencies, Bikram Sambat calendar, budget periods, import parsing, Zod schemas
 ```
 
@@ -180,13 +247,20 @@ A few decisions worth knowing:
   rhythms), not AI, so they're predictable, private and free. The AI helpers sit behind an
   interface with a scripted fake for tests; only what a helper needs is sent, and questions are
   answered through read-only report tools limited to what the asker can see.
-- **Push subscriptions** are only accepted for the major browsers' push services, so the server
-  can't be made to send requests to arbitrary addresses.
+- **Push subscriptions** are only accepted for the major browsers' push services, and webhook and
+  bank-sync addresses are checked after DNS at connect time, so the server can't be made to send
+  requests into its own network.
+- **Webhooks come from the database:** triggers on transactions, their splits and tags fill an
+  outbox, so every way of changing a transaction (the app, the API, imports, rules, recurring
+  items) is covered, and only committed changes are sent.
+- **Secrets the server must read back** (webhook signing keys, bank connections) are encrypted with
+  AES-256-GCM; access tokens and invitation links are stored only as hashes.
 - Reports convert each day's totals at that day's exchange rate, and tell you when a rate is missing
   instead of silently guessing.
 
 ## What's next
 
-Phase 4 of the plan: bank sync where a provider exists, email-in for receipts and alerts, a public
-API with personal access tokens and webhooks, and a native mobile wrapper. See
-[`docs/PLAN.md`](docs/PLAN.md#12-roadmap--milestones).
+All four phases of the plan are built. Natural next steps: a bank-sync provider for Nepal if one
+appears, a NEPSE price feed for investments, more of the interface in Nepali, and an iOS build of
+the native app. See [`docs/PLAN.md`](docs/PLAN.md#124-implementation-notes-phase-4) for what each
+phase includes and its known limits.

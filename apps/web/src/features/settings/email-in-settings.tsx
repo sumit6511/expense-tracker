@@ -82,7 +82,7 @@ export function EmailInCard() {
                 value={data.data.address ?? ''}
                 aria-label="Email-in address"
                 onFocus={(e) => e.target.select()}
-                className="min-w-0 basis-full font-mono text-xs sm:flex-1 sm:basis-auto"
+                className="min-w-0 basis-full font-mono text-xs sm:flex-1 sm:basis-0"
               />
               <Button
                 variant="outline"

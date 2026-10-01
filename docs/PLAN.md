@@ -1,6 +1,6 @@
 # Expense Tracker: Research & Product/Technical Plan
 
-> Status: **Approved on 30 Sep 2026** with the decisions in [§0.1](#01-decisions-approved-30-sep-2026). **Phases 0 to 3 are implemented** (see [§12.1](#121-implementation-notes-phase-0--1), [§12.2](#122-implementation-notes-phase-2) and [§12.3](#123-implementation-notes-phase-3)); Phase 4 is next.
+> Status: **Approved on 30 Sep 2026** with the decisions in [§0.1](#01-decisions-approved-30-sep-2026). **All four phases are implemented** (see [§12.1](#121-implementation-notes-phase-0--1), [§12.2](#122-implementation-notes-phase-2), [§12.3](#123-implementation-notes-phase-3) and [§12.4](#124-implementation-notes-phase-4)).
 > Research date: September 2026.
 
 ---
@@ -706,6 +706,50 @@ plan, and known limits:
   notifications and emails are still English. Untranslated text falls back to English, and the
   catalogue (`apps/web/src/lib/locales/ne.ts`) is keyed by the English text so it can grow page by
   page.
+
+### 12.4 Implementation notes (Phase 4)
+
+Built in six slices, each with unit, API integration and end-to-end tests. Differences from the
+plan, and known limits:
+
+- **Public API.** Personal access tokens (`et_…`, stored as SHA-256 hashes) belong to one person in
+  one workspace and can be read-only. They never do more than their person may, are tied to the
+  membership (they go when the person leaves), expire after 30/90/365 days or never, and are
+  limited to 300 requests a minute. Managing members, tokens, webhooks, email in, bank sync and
+  workspace settings stays in the app. There are no OAuth apps or per-endpoint scopes.
+- **Webhooks** carry transaction events only (created, updated, deleted; restoring from the trash
+  counts as created). Database triggers on transactions, splits and tags fill an outbox, and a
+  NOTIFY wakes the dispatcher, so deliveries leave within a second or two. Quick runs of changes are
+  added up per transaction. Delivery is at least once and may be out of order (the `webhook-id`
+  header lets receivers skip repeats). Only shared accounts are sent. Receivers on private
+  networks need `WEBHOOK_ALLOW_PRIVATE`. There are no events for budgets, accounts or categories.
+- **Email in** reads one transaction per email: a member's own words in the subject, then a bank
+  or wallet alert (the SMS parser), then (with AI helpers on) the receipt or text. The From address
+  decides whether mail is read, but it can be forged, so the secret token in the address is the
+  real protection (it can be replaced). An alert forwarded by a member goes to the default account
+  unless its words name one. Mail arrives over IMAP (plus-addressing) or posted by a mail service.
+  The plan's "unique address per workspace" is done; replies to the sender are not.
+- **Bank sync** ships with SimpleFIN Bridge only (US banks; the person pays SimpleFIN). Enable
+  Banking and Plaid need an application, keys and agreements per deployment, so they're left for
+  whoever needs them (the SimpleFIN adapter is about 120 lines behind a small interface). Pending
+  transactions are skipped until they post. One that looks like a transaction entered by hand
+  (same account, amount and nearby date) is matched to it rather than copied, which can rarely
+  pair the wrong two.
+- **Native app.** Android only, as a Capacitor shell that loads the person's own server (set when
+  building), so the web app updates without a new APK. Its one native addition reads the SMS inbox
+  on request; there's no background capture (Android restricts it, and Google Play only allows
+  default SMS apps to read SMS, so the APK is installed directly). Push notifications don't work
+  inside Android's WebView. iOS was left out because iPhones don't let apps read SMS and the web
+  app covers the rest. The APK hasn't been built in this repository's environment, whose network
+  can't reach the Android SDK; the plugin was compiled against Capacitor's API, and the end-to-end
+  tests stand in for the native bridge. The installed web app also became a **share target** for
+  receipt photos and PDFs.
+- **Investments** (optional in the plan) are holdings with a quantity, total cost and latest
+  price, entered or pasted by hand: there's no free, official NEPSE price feed, and scripts can
+  update prices through the API. Net worth over time uses daily snapshots of holdings value, so
+  history starts when holdings are first recorded. Cost is one total per holding: there are no tax
+  lots or realized gains, and dividends are recorded as income.
+- **Translations:** the new Phase 4 screens are in English only, like the deeper settings pages.
 
 ### Phase 0: Foundations
 - Monorepo, TypeScript config, Biome, Vitest, Playwright, CI
