@@ -1,5 +1,6 @@
 import { Label as LabelPrimitive } from 'radix-ui';
 import type { ComponentProps, ReactNode } from 'react';
+import { useTr } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 const fieldBase =
@@ -54,16 +55,17 @@ export function Field({
   children: ReactNode;
   className?: string;
 }) {
+  const tr = useTr();
   return (
     <div className={cn('grid grid-cols-1 gap-1.5', className)}>
-      <Label htmlFor={htmlFor}>{label}</Label>
+      <Label htmlFor={htmlFor}>{tr(label)}</Label>
       {children}
       {error ? (
         <p className="text-xs text-destructive" role="alert">
           {error}
         </p>
       ) : hint ? (
-        <p className="text-xs text-muted-foreground">{hint}</p>
+        <p className="text-xs text-muted-foreground">{tr(hint)}</p>
       ) : null}
     </div>
   );

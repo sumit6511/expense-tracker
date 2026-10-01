@@ -40,6 +40,7 @@ const money = (name?: string) =>
 // ---------------------------------------------------------------------------------------------
 
 export const numberGroupingEnum = pgEnum('number_grouping', ['lakh', 'international']);
+export const localeEnum = pgEnum('locale', ['en', 'ne']);
 
 export const user = pgTable('user', {
   id: text().primaryKey(),
@@ -48,6 +49,7 @@ export const user = pgTable('user', {
   emailVerified: boolean().notNull().default(false),
   image: text(),
   numberGrouping: numberGroupingEnum().notNull().default('lakh'),
+  locale: localeEnum().notNull().default('en'),
   defaultWorkspaceId: uuid(),
   twoFactorEnabled: boolean().notNull().default(false),
   ...timestamps,

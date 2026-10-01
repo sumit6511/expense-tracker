@@ -396,7 +396,7 @@ export function AmountInput({
           large ? 'text-lg font-medium' : 'text-sm',
         )}
       >
-        {currency === 'NPR' ? 'Rs.' : currency}
+        {currency === 'NPR' ? (f.locale === 'ne' ? 'रु.' : 'Rs.') : currency}
       </span>
       <Input
         inputMode="decimal"

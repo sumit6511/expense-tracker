@@ -144,7 +144,7 @@ export function BudgetsPage() {
             >
               <ChevronLeft />
             </Button>
-            <span>{month.data?.period.label ?? '…'}</span>
+            <span>{month.data ? f.month(month.data.period) : '…'}</span>
             <Button variant="ghost" size="icon-sm" onClick={() => go(1)} aria-label="Next month">
               <ChevronRight />
             </Button>
@@ -848,7 +848,7 @@ function MonthlyLimit({ data }: { data: BudgetMonth }) {
     try {
       await setCap.mutateAsync({ periodStart: data.period.start, amountMinor: parsed });
       toast.success(parsed ? 'Monthly limit set' : 'Monthly limit removed', {
-        description: parsed ? `From ${data.period.label} on` : undefined,
+        description: parsed ? `From ${f.month(data.period)} on` : undefined,
       });
       setEditing(false);
     } catch (err) {
@@ -874,7 +874,7 @@ function MonthlyLimit({ data }: { data: BudgetMonth }) {
               onKeyDown={(e) => e.key === 'Enter' && save()}
             />
             <p className="text-xs text-muted-foreground">
-              Applies from {data.period.label} until you change it. Leave empty for no limit.
+              Applies from {f.month(data.period)} until you change it. Leave empty for no limit.
             </p>
           </div>
           <div className="flex gap-2">

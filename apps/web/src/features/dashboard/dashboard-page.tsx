@@ -31,6 +31,7 @@ import { dueLabel } from '@/features/recurring/recurring-dialog';
 import { useTransactionDialog } from '@/features/transactions/transaction-dialog';
 import { TransactionRow } from '@/features/transactions/transaction-row';
 import { useFormat } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import {
   useAccounts,
   useCategoryMap,
@@ -44,6 +45,7 @@ import { useCanWrite, useWorkspace } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
 export function DashboardPage() {
+  const t = useT();
   const search = useSearch({ from: '/app/' });
   const navigate = useNavigate();
   const ws = useWorkspace();
@@ -64,23 +66,30 @@ export function DashboardPage() {
     <div className="grid grid-cols-1 gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon-sm" onClick={() => go(-1)} aria-label="Previous month">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => go(-1)}
+            aria-label={t('Previous month')}
+          >
             <ChevronLeft />
           </Button>
           <div className="px-1">
             <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-              {dashboard.data?.period.label ?? '…'}
+              {dashboard.data ? f.month(dashboard.data.period) : '…'}
             </h1>
             <p className="text-xs text-muted-foreground">
               {f.date(current.start, 'short')} – {f.date(current.end, 'medium')}
-              {isCurrent && dashboard.data ? ` · ${dashboard.data.daysLeft} days left` : ''}
+              {isCurrent && dashboard.data
+                ? ` · ${t('{days} days left', { days: dashboard.data.daysLeft })}`
+                : ''}
             </p>
           </div>
           <Button
             variant="ghost"
             size="icon-sm"
             onClick={() => go(1)}
-            aria-label="Next month"
+            aria-label={t('Next month')}
             disabled={isCurrent}
           >
             <ChevronRight />
@@ -88,7 +97,7 @@ export function DashboardPage() {
         </div>
         {!isCurrent && (
           <Button variant="outline" size="sm" onClick={() => navigate({ to: '/', search: {} })}>
-            Back to this month
+            {t('Back to this month')}
           </Button>
         )}
       </div>
@@ -122,6 +131,7 @@ function DashboardSkeleton() {
 }
 
 function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolean }) {
+  const t = useT();
   const f = useFormat();
   const { openNew } = useTransactionDialog();
   const canWrite = useCanWrite();
@@ -162,18 +172,20 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
       <Card>
         <EmptyState
           icon={Wallet}
-          title="Let’s record your first expense"
-          description="Add what you spent today, or import a bank or wallet statement to fill in the past."
+          title={t('Let’s record your first expense')}
+          description={t(
+            'Add what you spent today, or import a bank or wallet statement to fill in the past.',
+          )}
           action={
             <div className="flex flex-wrap justify-center gap-2">
               {canWrite && (
                 <Button onClick={() => openNew()}>
-                  <Plus /> Add expense
+                  <Plus /> {t('Add expense')}
                 </Button>
               )}
               <Button variant="outline" asChild>
                 <Link to="/import">
-                  <Upload /> Import statement
+                  <Upload /> {t('Import statement')}
                 </Link>
               </Button>
             </div>
@@ -208,7 +220,7 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-sm text-muted-foreground">
-                {hasBudget ? 'Left to spend' : 'Spent this month'}
+                {hasBudget ? t('Left to spend') : t('Spent this month')}
               </p>
               <p
                 className={cn(
@@ -227,16 +239,36 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
               {hasBudget && (
                 <p className="mt-1 text-sm text-muted-foreground">
                   {data.budget.remainingMinor < 0
-                    ? `Over budget by ${f.money(-data.budget.remainingMinor, undefined, { trimZeroFraction: true })}`
+                    ? t('Over budget by {amount}', {
+                        amount: f.money(-data.budget.remainingMinor, undefined, {
+                          trimZeroFraction: true,
+                        }),
+                      })
                     : isCurrent && data.budget.safePerDayMinor !== null
-                      ? `About ${f.money(wholeUnits(data.budget.safePerDayMinor, f.digits()), undefined, { trimZeroFraction: true })} a day for the next ${data.daysLeft} days`
-                      : `of ${f.money(data.budget.budgetedMinor, undefined, { trimZeroFraction: true })} ${data.budget.source === 'cap' ? 'monthly limit' : 'budgeted'}`}
+                      ? t('About {amount} a day for the next {days} days', {
+                          amount: f.money(
+                            wholeUnits(data.budget.safePerDayMinor, f.digits()),
+                            undefined,
+                            { trimZeroFraction: true },
+                          ),
+                          days: data.daysLeft,
+                        })
+                      : t(
+                          data.budget.source === 'cap'
+                            ? 'of {amount} monthly limit'
+                            : 'of {amount} budgeted',
+                          {
+                            amount: f.money(data.budget.budgetedMinor, undefined, {
+                              trimZeroFraction: true,
+                            }),
+                          },
+                        )}
                 </p>
               )}
             </div>
             {!hasBudget && (
               <Button variant="outline" size="sm" asChild>
-                <Link to="/budgets">Set a budget</Link>
+                <Link to="/budgets">{t('Set a budget')}</Link>
               </Button>
             )}
             {data.budget.readyToAssignMinor !== null && data.budget.readyToAssignMinor !== 0 && (
@@ -250,20 +282,30 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
                 )}
               >
                 {data.budget.readyToAssignMinor > 0
-                  ? `${f.money(data.budget.readyToAssignMinor, undefined, { trimZeroFraction: true })} ready to assign`
-                  : `${f.money(-data.budget.readyToAssignMinor, undefined, { trimZeroFraction: true })} more assigned than you have`}
+                  ? t('{amount} ready to assign', {
+                      amount: f.money(data.budget.readyToAssignMinor, undefined, {
+                        trimZeroFraction: true,
+                      }),
+                    })
+                  : t('{amount} more assigned than you have', {
+                      amount: f.money(-data.budget.readyToAssignMinor, undefined, {
+                        trimZeroFraction: true,
+                      }),
+                    })}
               </Link>
             )}
           </div>
           {hasBudget && (
             <div className="grid grid-cols-1 gap-1.5">
-              <Progress value={spentRatio} tone={tone} label="Share of budget spent" />
+              <Progress value={spentRatio} tone={tone} label={t('Share of budget spent')} />
               <div className="flex justify-between text-xs text-muted-foreground tabular">
                 <span>
-                  Spent {f.money(data.budget.spentMinor, undefined, { trimZeroFraction: true })}
+                  {t('Spent {amount}', {
+                    amount: f.money(data.budget.spentMinor, undefined, { trimZeroFraction: true }),
+                  })}
                 </span>
                 <span>
-                  {data.budget.source === 'cap' ? 'Limit' : 'Budget'}{' '}
+                  {data.budget.source === 'cap' ? t('Limit') : t('Budget')}{' '}
                   {f.money(data.budget.budgetedMinor, undefined, { trimZeroFraction: true })}
                 </span>
               </div>
@@ -274,12 +316,16 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
               <ChartLegend
                 className="mb-1"
                 items={[
-                  { label: 'Spent so far', color: 'var(--series-1)' },
-                  { label: 'Even pace to budget', color: 'var(--chart-reference)', kind: 'line' },
+                  { label: t('Spent so far'), color: 'var(--series-1)' },
+                  {
+                    label: t('Even pace to budget'),
+                    color: 'var(--chart-reference)',
+                    kind: 'line',
+                  },
                 ]}
               />
             )}
-            <PaceChart data={pace} paceLabel="Even pace" />
+            <PaceChart data={pace} paceLabel={t('Even pace')} />
           </div>
         </CardContent>
       </Card>
@@ -288,21 +334,24 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
       <div className="grid grid-cols-1 content-start gap-4">
         <Card>
           <CardContent className="grid grid-cols-1 gap-3 pt-5">
-            <Stat label="Income" value={<Money minor={data.cashFlow.incomeMinor} trimZero />} />
             <Stat
-              label="Spending"
+              label={t('Income')}
+              value={<Money minor={data.cashFlow.incomeMinor} trimZero />}
+            />
+            <Stat
+              label={t('Spending')}
               value={<Money minor={data.cashFlow.expenseMinor} trimZero />}
               note={
                 change === null ? undefined : (
                   <span className={cn(change <= 0 ? 'text-positive' : 'text-muted-foreground')}>
-                    {change <= 0 ? '▼' : '▲'} {Math.abs(Math.round(change))}% vs last month at this
-                    point
+                    {change <= 0 ? '▼' : '▲'}{' '}
+                    {t('{pct}% vs last month at this point', { pct: Math.abs(Math.round(change)) })}
                   </span>
                 )
               }
             />
             <Stat
-              label="Net"
+              label={t('Net')}
               value={<Money minor={data.cashFlow.netMinor} signed colored trimZero />}
             />
           </CardContent>
@@ -314,15 +363,15 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
       {/* Top categories */}
       <Card className="self-start">
         <CardHeader>
-          <CardTitle>Where it went</CardTitle>
+          <CardTitle>{t('Where it went')}</CardTitle>
           <Link to="/reports" className="text-xs font-medium text-primary hover:underline">
-            Reports
+            {t('Reports')}
           </Link>
         </CardHeader>
         <CardContent>
           {data.topCategories.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              No spending yet this month.
+              {t('No spending yet this month.')}
             </p>
           ) : (
             <ul className="grid grid-cols-1 gap-3">
@@ -346,7 +395,7 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
                       <div className="flex items-center gap-2.5">
                         <CategoryIcon icon={cat?.icon} color={cat?.color} size="sm" />
                         <span className="min-w-0 flex-1 truncate text-sm">
-                          {cat?.name ?? 'Uncategorized'}
+                          {cat?.name ?? t('Uncategorized')}
                         </span>
                         <Money minor={c.amountMinor} className="text-sm font-medium" trimZero />
                       </div>
@@ -368,9 +417,9 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
       <div className="grid grid-cols-1 content-start gap-4">
         <Card>
           <CardHeader>
-            <CardTitle>Accounts</CardTitle>
+            <CardTitle>{t('Accounts')}</CardTitle>
             <Link to="/accounts" className="text-xs font-medium text-primary hover:underline">
-              Manage
+              {t('Manage')}
             </Link>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-1">
@@ -413,14 +462,14 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
         {isCurrent && <UpcomingCard />}
         <Card>
           <CardHeader>
-            <CardTitle>Recent</CardTitle>
+            <CardTitle>{t('Recent')}</CardTitle>
             <Link to="/transactions" className="text-xs font-medium text-primary hover:underline">
-              See all
+              {t('See all')}
             </Link>
           </CardHeader>
           <div className="-mt-1 divide-y pb-2">
             {recentItems.length === 0 && (
-              <p className="px-5 py-6 text-sm text-muted-foreground">Nothing yet.</p>
+              <p className="px-5 py-6 text-sm text-muted-foreground">{t('Nothing yet.')}</p>
             )}
             {recentItems.map((tx) => (
               <RecentRow key={tx.id} tx={tx} />
@@ -459,19 +508,20 @@ function Stat({
 
 /** Progress on the nearest goals. */
 function GoalsCard() {
+  const t = useT();
   const { data: goals = [] } = useGoals();
   const active = goals.filter((g) => !g.archived).slice(0, 3);
   if (active.length === 0) return null;
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Goals</CardTitle>
+        <CardTitle>{t('Goals')}</CardTitle>
         <Link
           to="/budgets"
           search={{ view: 'goals' }}
           className="text-xs font-medium text-primary hover:underline"
         >
-          All goals
+          {t('All goals')}
         </Link>
       </CardHeader>
       <CardContent className="grid grid-cols-1 gap-3">
@@ -498,15 +548,16 @@ function GoalsCard() {
 
 /** Bills and income due in the next three weeks, overdue reminders first. */
 function InsightsCard() {
+  const t = useT();
   const { data } = useInsights();
   const items = data?.items ?? [];
   if (items.length === 0) return null;
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Worth knowing</CardTitle>
+        <CardTitle>{t('Worth knowing')}</CardTitle>
         <Link to="/insights" className="text-xs font-medium text-primary hover:underline">
-          {items.length > 2 ? `See all ${items.length}` : 'Insights'}
+          {items.length > 2 ? t('See all {count}', { count: items.length }) : t('Insights')}
         </Link>
       </CardHeader>
       <InsightList items={items.slice(0, 2)} className="-mt-1 border-t" />
@@ -515,6 +566,7 @@ function InsightsCard() {
 }
 
 function UpcomingCard() {
+  const t = useT();
   const f = useFormat();
   const { data: items = [] } = useUpcoming(21);
   const next = items.filter((i) => i.isNext || i.date >= f.today).slice(0, 5);
@@ -522,9 +574,9 @@ function UpcomingCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Coming up</CardTitle>
+        <CardTitle>{t('Coming up')}</CardTitle>
         <Link to="/recurring" className="text-xs font-medium text-primary hover:underline">
-          Recurring
+          {t('Recurring')}
         </Link>
       </CardHeader>
       <CardContent className="grid grid-cols-1 gap-1">
@@ -561,6 +613,7 @@ function UpcomingCard() {
 }
 
 function AttentionCard({ data }: { data: Dashboard }) {
+  const t = useT();
   const items: Array<{
     icon: typeof Inbox;
     label: string;
@@ -570,16 +623,16 @@ function AttentionCard({ data }: { data: Dashboard }) {
   if (data.needsReviewCount > 0) {
     items.push({
       icon: Inbox,
-      label: `${data.needsReviewCount} to review`,
-      hint: 'Imported transactions waiting for a quick check',
+      label: t('{count} to review', { count: data.needsReviewCount }),
+      hint: t('Imported transactions waiting for a quick check'),
       search: { tab: 'review' },
     });
   }
   if (data.uncategorizedCount > 0) {
     items.push({
       icon: Tags,
-      label: `${data.uncategorizedCount} uncategorized`,
-      hint: 'Give them a category for accurate reports',
+      label: t('{count} uncategorized', { count: data.uncategorizedCount }),
+      hint: t('Give them a category for accurate reports'),
       search: { tab: 'uncategorized' },
     });
   }
@@ -589,7 +642,7 @@ function AttentionCard({ data }: { data: Dashboard }) {
       <CardContent className="grid grid-cols-1 gap-2 pt-4">
         {items.length === 0 ? (
           <p className="flex items-center gap-2 py-1 text-sm text-muted-foreground">
-            <CircleCheck className="size-4 text-positive" /> All caught up
+            <CircleCheck className="size-4 text-positive" /> {t('All caught up')}
           </p>
         ) : (
           items.map((item) => (

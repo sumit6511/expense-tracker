@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useTr } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 export function PageHeader({
@@ -13,11 +14,12 @@ export function PageHeader({
   actions?: ReactNode;
   className?: string;
 }) {
+  const tr = useTr();
   return (
     <header className={cn('mb-5 flex flex-wrap items-end justify-between gap-3', className)}>
       <div className="min-w-0">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
-        {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}
+        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{tr(title)}</h1>
+        {description && <p className="mt-0.5 text-sm text-muted-foreground">{tr(description)}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>
@@ -37,13 +39,16 @@ export function EmptyState({
   action?: ReactNode;
   className?: string;
 }) {
+  const tr = useTr();
   return (
     <div className={cn('flex flex-col items-center px-6 py-12 text-center', className)}>
       <span className="mb-3 grid grid-cols-1 size-12 place-items-center rounded-full bg-accent text-accent-foreground">
         <Icon className="size-6" />
       </span>
-      <h3 className="font-medium">{title}</h3>
-      {description && <p className="mt-1 max-w-sm text-sm text-muted-foreground">{description}</p>}
+      <h3 className="font-medium">{tr(title)}</h3>
+      {description && (
+        <p className="mt-1 max-w-sm text-sm text-muted-foreground">{tr(description)}</p>
+      )}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );

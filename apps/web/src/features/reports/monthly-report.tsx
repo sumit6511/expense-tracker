@@ -1,9 +1,9 @@
 import {
-  formatMonthPeriod,
   getMonthPeriod,
   type MonthPeriod,
   shiftMonthPeriod,
   type Transaction,
+  toDevanagariDigits,
 } from '@et/shared';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { ArrowLeft, ChevronLeft, ChevronRight, Download } from 'lucide-react';
@@ -13,6 +13,7 @@ import { ErrorState } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/card';
 import { useFormat } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import {
   useBudgetMonth,
   useCashFlow,
@@ -28,6 +29,7 @@ import { cn } from '@/lib/utils';
  * budget, and the largest expenses. "Download PDF" prints it; the browser saves it as a PDF.
  */
 export function MonthlyReport() {
+  const t = useT();
   const search = useSearch({ from: '/app/reports/monthly' });
   const navigate = useNavigate({ from: '/reports/monthly' });
   const f = useFormat();
@@ -35,7 +37,7 @@ export function MonthlyReport() {
   const settings = { calendar: ws.calendar, monthStartDay: ws.monthStartDay };
   const period = getMonthPeriod(search.date ?? f.today, settings);
   const previous = shiftMonthPeriod(period, -1, settings);
-  const title = formatMonthPeriod(period);
+  const title = f.month(period);
 
   // The file name browsers suggest when saving as PDF.
   useEffect(() => {
@@ -57,11 +59,16 @@ export function MonthlyReport() {
       <div className="mb-4 flex flex-wrap items-center gap-2 print:hidden">
         <Button variant="ghost" size="sm" asChild>
           <Link to="/reports">
-            <ArrowLeft /> Reports
+            <ArrowLeft /> {t('Reports')}
           </Link>
         </Button>
         <div className="ml-auto flex items-center gap-1">
-          <Button variant="ghost" size="icon-sm" onClick={() => go(-1)} aria-label="Previous month">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => go(-1)}
+            aria-label={t('Previous month')}
+          >
             <ChevronLeft />
           </Button>
           <span className="min-w-28 text-center text-sm font-medium">{title}</span>
@@ -69,21 +76,21 @@ export function MonthlyReport() {
             variant="ghost"
             size="icon-sm"
             onClick={() => go(1)}
-            aria-label="Next month"
+            aria-label={t('Next month')}
             disabled={period.start > f.today}
           >
             <ChevronRight />
           </Button>
         </div>
         <Button onClick={() => window.print()}>
-          <Download /> Download PDF
+          <Download /> {t('Download PDF')}
         </Button>
       </div>
       <article className="rounded-2xl border bg-card p-6 shadow-xs sm:p-10 print:rounded-none print:border-0 print:p-0 print:shadow-none">
         <ReportBody period={period} previous={previous} />
       </article>
       <p className="mt-3 text-center text-xs text-muted-foreground print:hidden">
-        “Download PDF” opens your browser’s print window: choose “Save as PDF”.
+        {t('“Download PDF” opens your browser’s print window: choose “Save as PDF”.')}
       </p>
     </div>
   );
@@ -91,6 +98,11 @@ export function MonthlyReport() {
 
 function ReportBody({ period, previous }: { period: MonthPeriod; previous: MonthPeriod }) {
   const f = useFormat();
+  const t = useT();
+  const pct = (n: number, signed = false) => {
+    const text = `${signed && n > 0 ? '+' : ''}${n}%`;
+    return f.locale === 'ne' ? toDevanagariDigits(text) : text;
+  };
   const ws = useWorkspace();
   const categories = useCategoryMap();
   const range = { from: period.start, to: period.end };
@@ -114,7 +126,8 @@ function ReportBody({ period, previous }: { period: MonthPeriod; previous: Month
     before && before.expenseMinor > 0 && now
       ? Math.round((now.expenseMinor / before.expenseMinor - 1) * 100)
       : null;
-  const nameOf = (id: string | null) => (id ? categories.get(id)?.name : null) ?? 'Uncategorized';
+  const nameOf = (id: string | null) =>
+    (id ? categories.get(id)?.name : null) ?? t('Uncategorized');
   const budgetOf = new Map(budget.data.lines.map((l) => [l.categoryId, l]));
   const top = s.expense.slice(0, 12);
   const rest = s.expense.slice(12).reduce((sum, e) => sum + e.amountMinor, 0);
@@ -131,50 +144,53 @@ function ReportBody({ period, previous }: { period: MonthPeriod; previous: Month
       <header className="flex flex-wrap items-end justify-between gap-2 border-b pb-5">
         <div>
           <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            Monthly report · {ws.name}
+            {t('Monthly report')} · {ws.name}
           </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-            {formatMonthPeriod(period)}
-          </h1>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">{f.month(period)}</h1>
           <p className="mt-1 text-muted-foreground">
-            {f.date(period.start, 'long')} – {f.date(period.end, 'long')} · amounts in {f.base}
+            {f.date(period.start, 'long')} – {f.date(period.end, 'long')} ·{' '}
+            {t('amounts in {currency}', { currency: f.base })}
           </p>
         </div>
-        <p className="text-xs text-muted-foreground">Prepared {f.date(f.today, 'medium')}</p>
+        <p className="text-xs text-muted-foreground">
+          {t('Prepared {date}', { date: f.date(f.today, 'medium') })}
+        </p>
       </header>
 
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-4 print:grid-cols-4">
-        <Tile label="Money in" value={money(income)} />
-        <Tile label="Spent" value={money(spent)} />
+        <Tile label={t('Money in')} value={money(income)} />
+        <Tile label={t('Spent')} value={money(spent)} />
         <Tile
-          label={net >= 0 ? 'Kept' : 'Overspent'}
+          label={net >= 0 ? t('Kept') : t('Overspent')}
           value={money(Math.abs(net))}
-          note={savedRate !== null && net > 0 ? `${savedRate}% of income` : undefined}
+          note={
+            savedRate !== null && net > 0 ? t('{pct}% of income', { pct: savedRate }) : undefined
+          }
           tone={net >= 0 ? 'positive' : 'negative'}
         />
         <Tile
-          label={`Spending vs ${formatMonthPeriod(previous, 'short')}`}
-          value={change === null ? '–' : `${change > 0 ? '+' : ''}${change}%`}
+          label={t('Spending vs {month}', { month: f.month(previous, 'short') })}
+          value={change === null ? '–' : pct(change, true)}
           note={before ? money(before.expenseMinor) : undefined}
         />
       </section>
 
-      <Section title="Where the money went">
+      <Section title={t('Where the money went')}>
         {top.length === 0 ? (
-          <p className="text-muted-foreground">No spending this month.</p>
+          <p className="text-muted-foreground">{t('No spending this month.')}</p>
         ) : (
           <table className="w-full">
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b">
-                <th className="py-2 text-left font-medium">Category</th>
-                <th className="py-2 text-right font-medium">Spent</th>
+                <th className="py-2 text-left font-medium">{t('Category')}</th>
+                <th className="py-2 text-right font-medium">{t('Spent')}</th>
                 <th className="hidden py-2 text-right font-medium sm:table-cell print:table-cell">
-                  Share
+                  {t('Share')}
                 </th>
                 <th className="hidden py-2 text-right font-medium sm:table-cell print:table-cell">
-                  Budget
+                  {t('Budget')}
                 </th>
-                <th className="py-2 text-right font-medium">Left</th>
+                <th className="py-2 text-right font-medium">{t('Left')}</th>
               </tr>
             </thead>
             <tbody>
@@ -205,7 +221,7 @@ function ReportBody({ period, previous }: { period: MonthPeriod; previous: Month
                       {money(e.amountMinor)}
                     </td>
                     <td className="hidden py-2 text-right text-muted-foreground tabular sm:table-cell print:table-cell">
-                      {Math.round(share * 100)}%
+                      {pct(Math.round(share * 100))}
                     </td>
                     <td className="hidden py-2 text-right whitespace-nowrap text-muted-foreground tabular sm:table-cell print:table-cell">
                       {line && line.budgetedMinor > 0 ? money(line.budgetedMinor) : '–'}
@@ -224,7 +240,7 @@ function ReportBody({ period, previous }: { period: MonthPeriod; previous: Month
               {rest > 0 && (
                 <tr className="border-b last:border-0">
                   <td className="py-2 text-muted-foreground">
-                    {s.expense.length - 12} more categories
+                    {t('{count} more categories', { count: s.expense.length - 12 })}
                   </td>
                   <td className="py-2 text-right tabular">{money(rest)}</td>
                   <td colSpan={3} />
@@ -236,16 +252,22 @@ function ReportBody({ period, previous }: { period: MonthPeriod; previous: Month
         {budgeted.length > 0 && (
           <p className="mt-3 text-muted-foreground">
             {over.length === 0
-              ? `Every budgeted category stayed within its budget (${budgeted.length}).`
-              : `${budgeted.length - over.length} of ${budgeted.length} budgeted categories stayed within budget; over: ${over
-                  .map((l) => `${nameOf(l.categoryId)} (${money(-l.remainingMinor)})`)
-                  .join(', ')}.`}
+              ? t('Every budgeted category stayed within its budget ({count}).', {
+                  count: budgeted.length,
+                })
+              : t('{kept} of {count} budgeted categories stayed within budget; over: {over}.', {
+                  kept: budgeted.length - over.length,
+                  count: budgeted.length,
+                  over: over
+                    .map((l) => `${nameOf(l.categoryId)} (${money(-l.remainingMinor)})`)
+                    .join(', '),
+                })}
           </p>
         )}
       </Section>
 
       {s.income.length > 0 && (
-        <Section title="Money in">
+        <Section title={t('Money in')}>
           <table className="w-full">
             <tbody>
               {s.income.slice(0, 8).map((e) => (
@@ -260,7 +282,7 @@ function ReportBody({ period, previous }: { period: MonthPeriod; previous: Month
       )}
 
       {largest.length > 0 && (
-        <Section title="Largest expenses">
+        <Section title={t('Largest expenses')}>
           <table className="w-full">
             <tbody>
               {largest.map((t) => (
@@ -272,11 +294,11 @@ function ReportBody({ period, previous }: { period: MonthPeriod; previous: Month
       )}
 
       <footer className="border-t pt-4 text-xs text-muted-foreground">
-        Transfers between your own accounts aren’t counted as spending or income
-        {s.missingRates.length > 0
-          ? `. Amounts in ${s.missingRates.join(', ')} are left out: there’s no exchange rate for them yet`
-          : ''}
-        .
+        {t('Transfers between your own accounts aren’t counted as spending or income.')}
+        {s.missingRates.length > 0 &&
+          ` ${t('Amounts in {currencies} are left out: there’s no exchange rate for them yet.', {
+            currencies: s.missingRates.join(', '),
+          })}`}
       </footer>
     </div>
   );
@@ -284,11 +306,14 @@ function ReportBody({ period, previous }: { period: MonthPeriod; previous: Month
 
 function LargestRow({ tx, category }: { tx: Transaction; category: string }) {
   const f = useFormat();
+  const t = useT();
   return (
     <tr className="border-b last:border-0">
       <td className="py-2 whitespace-nowrap text-muted-foreground">{f.date(tx.date, 'short')}</td>
       <td className="px-3 py-2">
-        <span className="block truncate">{tx.payeeName ?? (tx.rawDescription || 'No payee')}</span>
+        <span className="block truncate">
+          {tx.payeeName ?? (tx.rawDescription || t('No payee'))}
+        </span>
         <span className="text-xs text-muted-foreground">{category}</span>
       </td>
       <td className="py-2 text-right whitespace-nowrap tabular">

@@ -58,6 +58,9 @@ export type CategoryKind = z.infer<typeof CategoryKindSchema>;
 
 export const CalendarSchema = z.enum(['bs', 'ad']);
 export const NumberGroupingSchema = z.enum(['lakh', 'international']);
+/** The language the app speaks to this person in. */
+export const LocaleSchema = z.enum(['en', 'ne']);
+export type Locale = z.infer<typeof LocaleSchema>;
 export const RoleSchema = z.enum(['owner', 'admin', 'editor', 'viewer']);
 export type Role = z.infer<typeof RoleSchema>;
 export const TransactionStatusSchema = z.enum(['pending', 'cleared', 'reconciled']);
@@ -124,6 +127,7 @@ export const MeSchema = z.object({
     name: z.string(),
     email: z.string(),
     numberGrouping: NumberGroupingSchema,
+    locale: LocaleSchema,
     /** Signing in also needs a code from an authenticator app. */
     twoFactorEnabled: z.boolean(),
   }),
@@ -135,6 +139,7 @@ export type Me = z.infer<typeof MeSchema>;
 export const UpdateMeSchema = z.object({
   name: Name(80).optional(),
   numberGrouping: NumberGroupingSchema.optional(),
+  locale: LocaleSchema.optional(),
   defaultWorkspaceId: Id.optional(),
 });
 export type UpdateMeInput = z.infer<typeof UpdateMeSchema>;

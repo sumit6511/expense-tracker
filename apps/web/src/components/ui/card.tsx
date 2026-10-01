@@ -1,4 +1,5 @@
 import type { ComponentProps } from 'react';
+import { useTr } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 export function Card({ className, ...props }: ComponentProps<'section'>) {
@@ -19,8 +20,13 @@ export function CardHeader({ className, ...props }: ComponentProps<'div'>) {
   );
 }
 
-export function CardTitle({ className, ...props }: ComponentProps<'h2'>) {
-  return <h2 className={cn('text-sm font-semibold', className)} {...props} />;
+export function CardTitle({ className, children, ...props }: ComponentProps<'h2'>) {
+  const tr = useTr();
+  return (
+    <h2 className={cn('text-sm font-semibold', className)} {...props}>
+      {tr(children)}
+    </h2>
+  );
 }
 
 export function CardContent({ className, ...props }: ComponentProps<'div'>) {

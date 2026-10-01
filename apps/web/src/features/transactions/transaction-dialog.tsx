@@ -49,6 +49,7 @@ import {
 import { canMakeRule, ruleFromTransaction, useRuleDialog } from '@/features/rules/rule-dialog';
 import { ApiError, errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import { isOffline, outbox } from '@/lib/outbox';
 import {
   useAccountMap,
@@ -193,6 +194,7 @@ function EditorForm({
   onAnother: (defaults: NewTransactionDefaults) => void;
 }) {
   const f = useFormat();
+  const t = useT();
   const canWrite = useCanWrite();
   const confirm = useConfirm();
   const { data: accounts = [] } = useAccounts();
@@ -445,12 +447,12 @@ function EditorForm({
             !splits &&
             categoryId !== null &&
             (existing.splits.length !== 1 || existing.splits[0]!.categoryId !== categoryId);
-          toast.success('Saved', {
+          toast.success(t('Saved'), {
             ...(recategorized &&
               canMakeRule(saved) && {
-                description: 'Categorize similar transactions like this automatically?',
+                description: t('Categorize similar transactions like this automatically?'),
                 action: {
-                  label: 'Always do this',
+                  label: t('Always do this'),
                   onClick: () => openRule(ruleFromTransaction(saved, categoryId)),
                 },
               }),
@@ -467,18 +469,18 @@ function EditorForm({
           if (created) {
             const id = created.id;
             if (queuedFiles.length) await uploadAll(upload, id, queuedFiles);
-            toast.success(mode === 'expense' ? 'Expense added' : 'Income added', {
+            toast.success(mode === 'expense' ? t('Expense added') : t('Income added'), {
               description: summary,
-              action: { label: 'Undo', onClick: () => deleteTx.mutate(id) },
+              action: { label: t('Undo'), onClick: () => deleteTx.mutate(id) },
             });
           } else {
             // Offline: keep it on this device and send it when the connection is back.
             outbox.add({ id: body.id, workspaceId: ws.id, body });
-            toast.success('Saved on this device', {
-              description: `${summary} · it syncs when you’re back online`,
+            toast.success(t('Saved on this device'), {
+              description: `${summary} · ${t('it syncs when you’re back online')}`,
             });
             if (queuedFiles.length)
-              toast.warning('Receipts need a connection. Add them once it has synced.');
+              toast.warning(t('Receipts need a connection. Add them once it has synced.'));
           }
         }
       }
@@ -506,18 +508,18 @@ function EditorForm({
   async function remove() {
     if (!existing) return;
     const ok = await confirm({
-      title: isTransfer ? 'Delete this transfer?' : 'Delete this transaction?',
+      title: isTransfer ? t('Delete this transfer?') : t('Delete this transaction?'),
       description: isTransfer
-        ? 'Both sides of the transfer will be moved to the trash.'
-        : 'You can undo this for 30 days.',
-      confirmLabel: 'Delete',
+        ? t('Both sides of the transfer will be moved to the trash.')
+        : t('You can undo this for 30 days.'),
+      confirmLabel: t('Delete'),
       destructive: true,
     });
     if (!ok) return;
     try {
       await deleteTx.mutateAsync(existing.id);
-      toast('Moved to trash', {
-        action: { label: 'Undo', onClick: () => restoreTx.mutate(existing.id) },
+      toast(t('Moved to trash'), {
+        action: { label: t('Undo'), onClick: () => restoreTx.mutate(existing.id) },
       });
       onDone();
     } catch (err) {
@@ -525,17 +527,19 @@ function EditorForm({
     }
   }
 
-  const title = isEdit
-    ? isTransfer
-      ? lockedTransfer
-        ? 'Transfer'
-        : 'Edit transfer'
-      : 'Edit transaction'
-    : mode === 'transfer'
-      ? 'New transfer'
-      : mode === 'income'
-        ? 'New income'
-        : 'New expense';
+  const title = t(
+    isEdit
+      ? isTransfer
+        ? lockedTransfer
+          ? 'Transfer'
+          : 'Edit transfer'
+        : 'Edit transaction'
+      : mode === 'transfer'
+        ? 'New transfer'
+        : mode === 'income'
+          ? 'New income'
+          : 'New expense',
+  );
 
   return (
     <DialogContent variant={isEdit ? 'sheet' : 'modal'} aria-describedby={undefined}>
@@ -565,7 +569,7 @@ function EditorForm({
           )}
           {!isEdit && (
             <Segmented
-              label="Transaction type"
+              label={t('Transaction type')}
               value={mode}
               onChange={(m) => {
                 setMode(m);
@@ -573,14 +577,14 @@ function EditorForm({
               }}
               className="w-full"
               options={[
-                { value: 'expense', label: 'Expense' },
-                { value: 'income', label: 'Income' },
-                { value: 'transfer', label: 'Transfer' },
+                { value: 'expense', label: t('Expense') },
+                { value: 'income', label: t('Income') },
+                { value: 'transfer', label: t('Transfer') },
               ]}
             />
           )}
 
-          <Field label={mode === 'transfer' ? 'Amount sent' : 'Amount'} htmlFor="tx-amount">
+          <Field label={mode === 'transfer' ? t('Amount sent') : t('Amount')} htmlFor="tx-amount">
             <AmountInput
               id="tx-amount"
               value={amount}
@@ -596,7 +600,7 @@ function EditorForm({
           {mode === 'transfer' ? (
             <>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="From" htmlFor="tx-from">
+                <Field label={t('From')} htmlFor="tx-from">
                   {lockedTransfer && accountId === existing?.transfer?.peerAccountId ? (
                     <Input id="tx-from" value="Someone’s private account" disabled />
                   ) : (
@@ -608,7 +612,7 @@ function EditorForm({
                     />
                   )}
                 </Field>
-                <Field label="To" htmlFor="tx-to">
+                <Field label={t('To')} htmlFor="tx-to">
                   {lockedTransfer && toAccountId === existing?.transfer?.peerAccountId ? (
                     <Input id="tx-to" value="Someone’s private account" disabled />
                   ) : (
@@ -642,14 +646,14 @@ function EditorForm({
               {!splitMode && (
                 <div className="grid grid-cols-1 gap-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-medium">Category</span>
+                    <span className="text-[13px] font-medium">{t('Category')}</span>
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                       onClick={() => setSplitMode(true)}
                       disabled={!editable}
                     >
-                      <Split className="size-3.5" /> Split
+                      <Split className="size-3.5" /> {t('Split')}
                     </button>
                   </div>
                   {frequent.length > 0 && (
@@ -682,12 +686,13 @@ function EditorForm({
                     }}
                     // Money in can also be a refund, which goes back to a spending category.
                     kind={mode === 'expense' ? 'expense' : undefined}
-                    placeholder="All categories…"
+                    placeholder={t('All categories…')}
                   />
                   {mode === 'income' && (
                     <p className="text-xs text-muted-foreground">
-                      Got a refund? Choose the spending category it belongs to, and it reduces that
-                      category’s spending.
+                      {t(
+                        'Got a refund? Choose the spending category it belongs to, and it reduces that category’s spending.',
+                      )}
                     </p>
                   )}
                 </div>
@@ -782,12 +787,15 @@ function EditorForm({
               )}
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label={mode === 'income' ? 'From (payer)' : 'Payee'} htmlFor="tx-payee">
+                <Field
+                  label={mode === 'income' ? t('From (payer)') : t('Payee')}
+                  htmlFor="tx-payee"
+                >
                   <PayeeInput
                     id="tx-payee"
                     value={payee}
                     onChange={setPayee}
-                    placeholder={mode === 'income' ? 'Who paid you?' : 'Who did you pay?'}
+                    placeholder={mode === 'income' ? t('Who paid you?') : t('Who did you pay?')}
                     onMatch={(p) => {
                       if (!categoryTouched.current && p.suggestedCategoryId) {
                         const suggestion = categoryMap.get(p.suggestedCategoryId);
@@ -797,7 +805,7 @@ function EditorForm({
                     disabled={!editable}
                   />
                 </Field>
-                <Field label="Account" htmlFor="tx-account">
+                <Field label={t('Account')} htmlFor="tx-account">
                   <AccountSelect
                     id="tx-account"
                     value={accountId}
@@ -809,22 +817,22 @@ function EditorForm({
             </>
           )}
 
-          <Field label="Date" htmlFor="tx-date">
+          <Field label={t('Date')} htmlFor="tx-date">
             <DatePicker id="tx-date" value={date} onChange={setDate} />
           </Field>
 
           {mode !== 'transfer' && (
-            <Field label="Tags">
+            <Field label={t('Tags')}>
               <TagPicker value={tagIds} onChange={setTagIds} />
             </Field>
           )}
 
-          <Field label="Notes" htmlFor="tx-notes">
+          <Field label={t('Notes')} htmlFor="tx-notes">
             <Textarea
               id="tx-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optional"
+              placeholder={t('Optional')}
               rows={2}
               className="min-h-0"
               disabled={!editable}
@@ -844,8 +852,11 @@ function EditorForm({
                   disabled={!editable}
                 />
                 <span>
-                  Pending
-                  <span className="text-muted-foreground"> · not on the bank statement yet</span>
+                  {t('Pending')}
+                  <span className="text-muted-foreground">
+                    {' '}
+                    · {t('not on the bank statement yet')}
+                  </span>
                 </span>
               </label>
             ))}
@@ -874,7 +885,7 @@ function EditorForm({
           <DialogFooter>
             {isEdit && (
               <Button variant="ghost" className="text-destructive sm:mr-auto" onClick={remove}>
-                <Trash2 /> Delete
+                <Trash2 /> {t('Delete')}
               </Button>
             )}
             {existing && !existing.recurringId && (
@@ -891,7 +902,7 @@ function EditorForm({
                   );
                 }}
               >
-                <Repeat /> Make recurring
+                <Repeat /> {t('Make recurring')}
               </Button>
             )}
             {!isEdit && (
@@ -900,12 +911,12 @@ function EditorForm({
                 onClick={(e) => submit(e as unknown as FormEvent, true)}
                 disabled={saving}
               >
-                Save & add another
+                {t('Save & add another')}
               </Button>
             )}
             <Button type="submit" disabled={saving}>
               {saving && <Loader2 className="animate-spin" />}
-              {isEdit ? 'Save changes' : 'Save'}
+              {isEdit ? t('Save changes') : t('Save')}
             </Button>
           </DialogFooter>
         )}

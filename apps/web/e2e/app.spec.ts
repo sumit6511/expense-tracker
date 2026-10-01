@@ -760,6 +760,33 @@ test.describe('everyday use', () => {
     expect(pdf.length).toBeGreaterThan(10_000);
   });
 
+  test('switch the app to Nepali', async ({ signedIn: page }) => {
+    await page.goto('/settings');
+    await page.getByRole('button', { name: 'नेपाली' }).click();
+    await expect(page.getByRole('heading', { name: 'सेटिङ' })).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'ne');
+
+    // Quick add understands Nepali too, and amounts come back in Devanagari digits.
+    await page.goto('/');
+    await expect(page.getByText('पहिलो खर्च लेखौँ')).toBeVisible();
+    await page.keyboard.press('n');
+    const dialog = page.getByRole('dialog', { name: 'नयाँ खर्च' });
+    const describe = dialog.getByLabel('कारोबार लेख्नुहोस्');
+    await describe.fill('खाना ४५० हिजो');
+    await describe.press('Enter');
+    await expect(dialog.getByLabel('रकम')).toHaveValue(/^450/);
+    await expect(dialog.getByRole('button', { name: 'Dining Out', pressed: true })).toBeVisible();
+    await dialog.getByRole('button', { name: 'सुरक्षित गर्नुहोस्', exact: true }).click();
+    await expect(page.getByText('खर्च थपियो')).toBeVisible();
+    await expect(page.getByText('यो महिनाको खर्च')).toBeVisible();
+    await expect(page.getByText('रु. ४५०').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'कारोबार', exact: true })).toBeVisible();
+
+    await page.goto('/settings');
+    await page.getByRole('button', { name: 'English' }).click();
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  });
+
   test('reports and settings pages load', async ({ signedIn: page }) => {
     await page.goto('/reports?tab=cashflow');
     await expect(page.getByText('Income and spending per month')).toBeVisible();

@@ -114,6 +114,31 @@ export const AD_MONTH_NAMES = [
   'December',
 ] as const;
 
+export const AD_MONTH_NAMES_NE = [
+  'जनवरी',
+  'फेब्रुअरी',
+  'मार्च',
+  'अप्रिल',
+  'मे',
+  'जुन',
+  'जुलाई',
+  'अगस्ट',
+  'सेप्टेम्बर',
+  'अक्टोबर',
+  'नोभेम्बर',
+  'डिसेम्बर',
+] as const;
+
+export const WEEKDAY_NAMES_NE = [
+  'आइतबार',
+  'सोमबार',
+  'मंगलबार',
+  'बुधबार',
+  'बिहीबार',
+  'शुक्रबार',
+  'शनिबार',
+] as const;
+
 export const WEEKDAY_NAMES = [
   'Sunday',
   'Monday',

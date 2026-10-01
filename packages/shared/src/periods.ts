@@ -1,5 +1,20 @@
-import { adToBs, BS_MONTH_NAMES, bsDaysInMonth, bsToAd } from './bs';
-import { AD_MONTH_NAMES, addDays, dayOfWeek, type IsoDate, parseIsoDate, toIsoDate } from './dates';
+import {
+  adToBs,
+  BS_MONTH_NAMES,
+  BS_MONTH_NAMES_NE,
+  bsDaysInMonth,
+  bsToAd,
+  toDevanagariDigits,
+} from './bs';
+import {
+  AD_MONTH_NAMES,
+  AD_MONTH_NAMES_NE,
+  addDays,
+  dayOfWeek,
+  type IsoDate,
+  parseIsoDate,
+  toIsoDate,
+} from './dates';
 
 export type CalendarSystem = 'bs' | 'ad';
 
@@ -87,21 +102,32 @@ function clampStartDay(day: number): number {
   return Math.min(Math.max(Math.trunc(day) || 1, 1), 28);
 }
 
-/** "Asoj 2083", "September 2026", or "25 Sep – 24 Oct 2026" for a custom AD start day. */
-export function formatMonthPeriod(period: MonthPeriod, style: 'long' | 'short' = 'long'): string {
+/**
+ * "Asoj 2083", "September 2026", or "25 Sep – 24 Oct 2026" for a custom AD start day; in Nepali,
+ * "असोज २०८३".
+ */
+export function formatMonthPeriod(
+  period: MonthPeriod,
+  style: 'long' | 'short' = 'long',
+  lang: 'en' | 'ne' = 'en',
+): string {
+  const ne = lang === 'ne';
+  const out = (text: string) => (ne ? toDevanagariDigits(text) : text);
   if (period.calendar === 'bs') {
-    const name = BS_MONTH_NAMES[period.month - 1]!;
-    return style === 'short' ? name : `${name} ${period.year}`;
+    const name = (ne ? BS_MONTH_NAMES_NE : BS_MONTH_NAMES)[period.month - 1]!;
+    return out(style === 'short' ? name : `${name} ${period.year}`);
   }
+  const months = ne ? AD_MONTH_NAMES_NE : AD_MONTH_NAMES;
+  const abbr = (m: number) => (ne ? months[m - 1]! : months[m - 1]!.slice(0, 3));
   const start = parseIsoDate(period.start);
   const end = parseIsoDate(period.end);
   if (start.day === 1) {
-    const name = AD_MONTH_NAMES[start.month - 1]!;
-    return style === 'short' ? name.slice(0, 3) : `${name} ${start.year}`;
+    const name = months[start.month - 1]!;
+    return out(style === 'short' ? abbr(start.month) : `${name} ${start.year}`);
   }
-  const s = `${start.day} ${AD_MONTH_NAMES[start.month - 1]!.slice(0, 3)}`;
-  const e = `${end.day} ${AD_MONTH_NAMES[end.month - 1]!.slice(0, 3)}`;
-  return style === 'short' ? s : `${s} – ${e} ${end.year}`;
+  const s = `${start.day} ${abbr(start.month)}`;
+  const e = `${end.day} ${abbr(end.month)}`;
+  return out(style === 'short' ? s : `${s} – ${e} ${end.year}`);
 }
 
 export interface FiscalYear extends DateRange {

@@ -85,6 +85,7 @@ export async function getMe(db: Db, userId: string): Promise<Me> {
       name: u.name,
       email: u.email,
       numberGrouping: u.numberGrouping,
+      locale: u.locale,
       twoFactorEnabled: u.twoFactorEnabled,
     },
     workspaces: list,
@@ -109,6 +110,7 @@ export async function updateMe(db: Db, userId: string, input: UpdateMeInput): Pr
   const patch: Partial<typeof user.$inferInsert> = {};
   if (input.name !== undefined) patch.name = input.name;
   if (input.numberGrouping !== undefined) patch.numberGrouping = input.numberGrouping;
+  if (input.locale !== undefined) patch.locale = input.locale;
   if (input.defaultWorkspaceId !== undefined) patch.defaultWorkspaceId = input.defaultWorkspaceId;
   if (Object.keys(patch).length > 0) await db.update(user).set(patch).where(eq(user.id, userId));
   return getMe(db, userId);

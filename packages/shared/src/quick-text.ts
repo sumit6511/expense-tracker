@@ -63,6 +63,10 @@ const INCOME_WORDS = new RegExp(
  */
 const KEYWORDS: Record<string, string[]> = {
   'Dining Out': [
+    'खाना',
+    'खाजा',
+    'चिया',
+    'मम',
     'lunch',
     'dinner',
     'breakfast',
@@ -74,13 +78,38 @@ const KEYWORDS: Record<string, string[]> = {
     'cafe',
     'khaja',
   ],
-  'Food & Groceries': ['groceries', 'grocery', 'vegetables', 'veggies', 'fruits', 'milk', 'eggs'],
-  Transport: ['taxi', 'bus', 'pathao', 'indrive', 'fuel', 'petrol', 'diesel', 'parking', 'uber'],
+  'Food & Groceries': [
+    'groceries',
+    'grocery',
+    'vegetables',
+    'veggies',
+    'fruits',
+    'milk',
+    'eggs',
+    'तरकारी',
+    'फलफूल',
+    'दूध',
+    'किराना',
+  ],
+  Transport: [
+    'taxi',
+    'bus',
+    'pathao',
+    'indrive',
+    'fuel',
+    'petrol',
+    'diesel',
+    'parking',
+    'uber',
+    'ट्याक्सी',
+    'बस',
+    'पेट्रोल',
+  ],
   Shopping: ['clothes', 'shoes', 'shopping'],
   Utilities: ['electricity', 'water bill', 'gas', 'internet'],
   'Mobile & Data': ['recharge', 'topup', 'top-up', 'top up', 'data pack'],
-  Rent: ['rent'],
-  Health: ['medicine', 'pharmacy', 'doctor', 'hospital', 'clinic'],
+  Rent: ['rent', 'भाडा'],
+  Health: ['medicine', 'pharmacy', 'doctor', 'hospital', 'clinic', 'औषधि'],
   Education: ['tuition', 'school fees', 'books'],
   Entertainment: ['movie', 'cinema', 'concert'],
 };
@@ -121,11 +150,14 @@ export function parseQuickText(text: string, ctx: QuickTextContext): QuickTextRe
     const ago = take(new RegExp(`${WORD_START}(\\d{1,3})\\s+days?\\s+ago${WORD_END}`, 'iu'));
     if (ago) date = addDays(ctx.today, -Number(ago[1]));
   }
-  if (!date && take(new RegExp(phrase('day before yesterday'), 'iu')))
+  if (
+    !date &&
+    take(new RegExp(`${WORD_START}(?:day\\s+before\\s+yesterday|asti|अस्ति)${WORD_END}`, 'iu'))
+  )
     date = addDays(ctx.today, -2);
-  if (!date && take(new RegExp(`${WORD_START}(?:yesterday|hijo)${WORD_END}`, 'iu')))
+  if (!date && take(new RegExp(`${WORD_START}(?:yesterday|hijo|हिजो)${WORD_END}`, 'iu')))
     date = addDays(ctx.today, -1);
-  if (!date && take(new RegExp(`${WORD_START}(?:today|aaja|aja)${WORD_END}`, 'iu')))
+  if (!date && take(new RegExp(`${WORD_START}(?:today|aaja|aja|आज)${WORD_END}`, 'iu')))
     date = ctx.today;
   if (!date) {
     const names = WEEKDAYS.map((d) => `${d}|${d.slice(0, 3)}`).join('|');
@@ -155,7 +187,7 @@ export function parseQuickText(text: string, ctx: QuickTextContext): QuickTextRe
     if (!a.name.trim()) continue;
     const m = take(
       new RegExp(
-        `(?:${WORD_START}(?:on|from|via|with|by|using|through|in|to|into|paid\\s+with)\\s+)?${phrase(a.name)}`,
+        `(?:${WORD_START}(?:on|from|via|with|by|using|through|in|to|into|paid\\s+with)\\s+)?${phrase(a.name)}(?:\\s+(?:बाट|मा|ले)${WORD_END})?`,
         'iu',
       ),
     );

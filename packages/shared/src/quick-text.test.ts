@@ -77,6 +77,24 @@ describe('parseQuickText', () => {
     expect(parse('100').date).toBeNull();
   });
 
+  it('understands a little Nepali', () => {
+    expect(parse('खाना ४५० हिजो, eSewa बाट')).toEqual({
+      amountMinor: 45_000,
+      direction: 'expense',
+      date: '2026-09-29',
+      accountId: 'esewa',
+      categoryId: 'dining',
+      payee: null,
+      notes: 'खाना',
+    });
+    expect(parse('तरकारी ३२० आज')).toMatchObject({
+      amountMinor: 32_000,
+      date: '2026-09-30',
+      categoryId: 'food',
+    });
+    expect(parse('ट्याक्सी ५०० अस्ति').date).toBe('2026-09-28');
+  });
+
   it('leaves the amount empty when there is none', () => {
     expect(parse('coffee with Sita')).toMatchObject({ amountMinor: null, categoryId: 'dining' });
   });

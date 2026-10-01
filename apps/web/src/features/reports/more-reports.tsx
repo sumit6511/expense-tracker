@@ -7,7 +7,6 @@ import {
   bsDaysInMonth,
   bsToAd,
   diffDays,
-  formatMonthPeriod,
   type IsoDate,
   isBsSupported,
   listMonthPeriods,
@@ -65,8 +64,8 @@ export function NetWorthReport({ range }: { range: ReportRange }) {
   const first = points[0]!;
   const last = points.at(-1)!;
   const data = points.map((p) => ({
-    label: `${p.label} (${f.date(p.date, 'short')})`,
-    shortLabel: formatMonthPeriod(p, 'short'),
+    label: `${f.month(p)} (${f.date(p.date, 'short')})`,
+    shortLabel: f.month(p, 'short'),
     assets: p.assetsMinor,
     liabilities: p.liabilitiesMinor,
     net: p.netMinor,
@@ -116,7 +115,7 @@ export function NetWorthReport({ range }: { range: ReportRange }) {
           <tbody className="divide-y">
             {[...points].reverse().map((p) => (
               <tr key={p.start}>
-                <td className="px-4 py-2">{p.label}</td>
+                <td className="px-4 py-2">{f.month(p)}</td>
                 <td className="px-4 py-2 text-right">
                   {f.money(p.assetsMinor, undefined, { trimZeroFraction: true })}
                 </td>

@@ -1,10 +1,4 @@
-import {
-  type Cadence,
-  formatMonthPeriod,
-  getMonthPeriod,
-  type Insight,
-  type PeriodSettings,
-} from '@et/shared';
+import { type Cadence, getMonthPeriod, type Insight, type PeriodSettings } from '@et/shared';
 import { Link } from '@tanstack/react-router';
 import {
   CircleDollarSign,
@@ -60,7 +54,7 @@ function useWording() {
   const categories = useCategoryMap();
   const accounts = useAccountMap();
   const settings: PeriodSettings = { calendar: ws.calendar, monthStartDay: ws.monthStartDay };
-  const month = (start: string) => formatMonthPeriod(getMonthPeriod(start, settings));
+  const month = (start: string) => f.month(getMonthPeriod(start, settings));
   const category = (id: string | null) => (id && categories.get(id)?.name) || 'Uncategorized';
   const money = (minor: number, currency?: string) =>
     f.money(minor, currency, { trimZeroFraction: true });

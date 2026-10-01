@@ -58,7 +58,8 @@ function useMajorUnits() {
   return {
     f,
     major: (minor: number | null) => (minor === null ? null : minor / unit),
-    tick: (value: number) => f.compact(Math.round(value * unit)).replace(/^(-?)Rs\. /, '$1'),
+    tick: (value: number) =>
+      f.compact(Math.round(value * unit)).replace(/^(-?)(?:Rs\.|रु\.) /, '$1'),
   };
 }
 

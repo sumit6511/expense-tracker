@@ -195,6 +195,20 @@ export function GeneralSettings() {
             <CardTitle>Display (just for you)</CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-5">
+            <Field label="Language">
+              <Segmented
+                value={me.user.locale}
+                onChange={(locale) =>
+                  updateMe.mutate({ locale }, { onError: (err) => toast.error(errorMessage(err)) })
+                }
+                label="Language"
+                options={[
+                  { value: 'en', label: 'English' },
+                  { value: 'ne', label: 'नेपाली' },
+                ]}
+                className="w-full"
+              />
+            </Field>
             <Field label="Number format">
               <Segmented
                 value={me.user.numberGrouping}

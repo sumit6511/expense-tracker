@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Tooltip } from '@/components/ui/menu';
 import { ApiError, errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import {
   useAccounts,
   useAiStatus,
@@ -50,6 +51,7 @@ export function QuickDescribe({
   onReceipt: (file: File) => void;
 }) {
   const f = useFormat();
+  const t = useT();
   const [text, setText] = useState('');
   const parse = useParseText();
   const scan = useScanReceipt();
@@ -130,8 +132,8 @@ export function QuickDescribe({
           onKeyDown={(e) => {
             if (e.key === 'Enter') void submit(e);
           }}
-          placeholder="Describe it: lunch 450 at Bhojan Griha yesterday"
-          aria-label="Describe the transaction"
+          placeholder={t('Describe it: lunch 450 at Bhojan Griha yesterday')}
+          aria-label={t('Describe the transaction')}
           className="pl-9"
           maxLength={300}
         />
@@ -141,19 +143,19 @@ export function QuickDescribe({
         variant="outline"
         onClick={(e) => void submit(e)}
         disabled={parse.isPending || !text.trim()}
-        aria-label="Fill in"
+        aria-label={t('Fill in')}
       >
         {parse.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
-        <span className="hidden sm:inline">Fill in</span>
+        <span className="hidden sm:inline">{t('Fill in')}</span>
       </Button>
       {aiOn && (
         <>
-          <Tooltip content="Scan a receipt">
+          <Tooltip content={t('Scan a receipt')}>
             <Button
               type="button"
               variant="outline"
               size="icon"
-              aria-label="Scan a receipt"
+              aria-label={t('Scan a receipt')}
               disabled={scan.isPending}
               onClick={() => fileInput.current?.click()}
             >

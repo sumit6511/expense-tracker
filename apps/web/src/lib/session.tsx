@@ -51,6 +51,11 @@ export function useSession(): SessionValue {
   return value;
 }
 
+/** The session if someone is signed in (sign-in pages have none). */
+export function useOptionalSession(): SessionValue | null {
+  return useContext(SessionContext);
+}
+
 export function useWorkspace(): Workspace {
   return useSession().workspace;
 }

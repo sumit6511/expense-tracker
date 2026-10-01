@@ -15,6 +15,7 @@ import {
   type RecurringKind,
   type Transaction,
   toDecimalString,
+  toDevanagariDigits,
   WEEKDAY_NAMES,
 } from '@et/shared';
 import { Loader2, Trash2 } from 'lucide-react';
@@ -101,6 +102,14 @@ export function describeSchedule(
 /** "Today", "Tomorrow", "In 5 days", "3 days overdue", or the date ("today" mid-sentence). */
 export function dueLabel(date: IsoDate, f: Formatters, midSentence = false) {
   const days = diffDays(f.today, date);
+  if (f.locale === 'ne') {
+    const n = toDevanagariDigits(Math.abs(days));
+    if (days === 0) return 'आज';
+    if (days === 1) return 'भोलि';
+    if (days < 0) return `${n} दिन ढिला`;
+    if (days <= 7) return `${n} दिनमा`;
+    return f.date(date, 'short');
+  }
   const word = (w: string) => (midSentence ? w.toLowerCase() : w);
   if (days === 0) return word('Today');
   if (days === 1) return word('Tomorrow');

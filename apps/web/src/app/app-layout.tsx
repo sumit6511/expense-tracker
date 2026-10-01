@@ -53,6 +53,7 @@ import {
   useTransactionDialog,
 } from '@/features/transactions/transaction-dialog';
 import { ApiError, authApi } from '@/lib/api';
+import { useT } from '@/lib/i18n';
 import { clearOfflineData } from '@/lib/offline';
 import { outbox } from '@/lib/outbox';
 import { useMeQuery, useReviewCounts } from '@/lib/queries';
@@ -172,6 +173,12 @@ function isActive(pathname: string, to: string) {
 
 function Shell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const t = useT();
+  const { me } = useSession();
+  // Screen readers and hyphenation follow the chosen language.
+  useEffect(() => {
+    document.documentElement.lang = me.user.locale;
+  }, [me.user.locale]);
   const { openNew } = useTransactionDialog();
   const canWrite = useCanWrite();
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -221,7 +228,7 @@ function Shell() {
         </div>
         {canWrite && (
           <Button className="mt-4 w-full justify-start" onClick={() => openNew()}>
-            <Plus /> New transaction
+            <Plus /> {t('New transaction')}
             <kbd className="ml-auto rounded bg-primary-foreground/20 px-1.5 text-[11px]">N</kbd>
           </Button>
         )}
@@ -230,7 +237,7 @@ function Shell() {
           onClick={() => setPaletteOpen(true)}
           className="mt-2 flex h-9 items-center gap-2 rounded-lg border bg-card px-3 text-sm text-muted-foreground hover:bg-muted"
         >
-          <Search className="size-4" /> Search & jump
+          <Search className="size-4" /> {t('Search & jump')}
           <kbd className="ml-auto text-[11px]">⌘K</kbd>
         </button>
         <nav className="mt-4 grid grid-cols-1 gap-0.5" aria-label="Main">
@@ -243,7 +250,7 @@ function Shell() {
                 isActive(pathname, item.to) && 'bg-accent text-accent-foreground hover:bg-accent',
               )}
             >
-              <item.icon /> {item.label}
+              <item.icon /> {t(item.label)}
               {item.to === '/inbox' && <ReviewBadge />}
             </Link>
           ))}
@@ -256,7 +263,7 @@ function Shell() {
               isActive(pathname, '/settings') && 'bg-accent text-accent-foreground',
             )}
           >
-            <Settings /> Settings
+            <Settings /> {t('Settings')}
           </Link>
           <UserMenu />
         </div>
@@ -270,7 +277,7 @@ function Shell() {
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Search"
+            aria-label={t('Search')}
             onClick={() => setPaletteOpen(true)}
           >
             <Search />
@@ -294,7 +301,7 @@ function Shell() {
           {canWrite && (
             <button
               type="button"
-              aria-label="Add transaction"
+              aria-label={t('Add transaction')}
               onClick={() => openNew()}
               className="-mt-5 grid grid-cols-1 size-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background active:scale-95"
             >
@@ -311,14 +318,14 @@ function Shell() {
             MORE_NAV.some((item) => isActive(pathname, item.to)) && 'text-primary',
           )}
         >
-          <Menu className="size-5" /> More
+          <Menu className="size-5" /> {t('More')}
         </button>
       </nav>
 
       <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
         <DialogContent aria-describedby={undefined}>
           <DialogHeader>
-            <DialogTitle>More</DialogTitle>
+            <DialogTitle>{t('More')}</DialogTitle>
           </DialogHeader>
           <DialogBody className="grid grid-cols-2 gap-2 pb-6">
             {MORE_NAV.map((item) => (
@@ -328,7 +335,7 @@ function Shell() {
                 onClick={() => setMoreOpen(false)}
                 className="flex items-center gap-3 rounded-xl border p-4 text-sm font-medium hover:bg-muted [&_svg]:size-5 [&_svg]:text-primary"
               >
-                <item.icon /> {item.label}
+                <item.icon /> {t(item.label)}
                 {item.to === '/inbox' && <ReviewBadge />}
               </Link>
             ))}
@@ -347,6 +354,7 @@ function Shell() {
 }
 
 function BottomLink({ item, active }: { item: NavItem; active: boolean }) {
+  const t = useT();
   return (
     <Link
       to={item.to}
@@ -355,7 +363,7 @@ function BottomLink({ item, active }: { item: NavItem; active: boolean }) {
         active && 'text-primary',
       )}
     >
-      <item.icon className="size-5" /> {item.label}
+      <item.icon className="size-5" /> {t(item.label)}
     </Link>
   );
 }

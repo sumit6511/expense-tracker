@@ -1,4 +1,4 @@
-import { formatMonthPeriod, getMonthPeriod, shiftMonthPeriod } from '@et/shared';
+import { getMonthPeriod, shiftMonthPeriod } from '@et/shared';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import {
   CalendarDays,
@@ -279,8 +279,8 @@ function CashFlowReport({ range }: { range: ReportRange }) {
   if (!report.data) return <Skeleton className="h-96" />;
   const periods = report.data.periods;
   const data = periods.map((p) => ({
-    label: p.label,
-    shortLabel: formatMonthPeriod(p, 'short'),
+    label: f.month(p),
+    shortLabel: f.month(p, 'short'),
     income: p.incomeMinor,
     expense: p.expenseMinor,
   }));
@@ -332,7 +332,7 @@ function CashFlowReport({ range }: { range: ReportRange }) {
           <tbody className="divide-y">
             {periods.map((p) => (
               <tr key={p.start}>
-                <td className="px-4 py-2">{p.label}</td>
+                <td className="px-4 py-2">{f.month(p)}</td>
                 <td className="px-4 py-2 text-right">
                   {f.money(p.incomeMinor, undefined, { trimZeroFraction: true })}
                 </td>
@@ -384,8 +384,8 @@ function TrendsReport({ range }: { range: ReportRange }) {
     if (!report.data) return null;
     const top = report.data.series.slice(0, 9);
     const max = Math.max(1, ...top.flatMap((s) => s.valuesMinor));
-    return { top, max, labels: report.data.periods.map((p) => p.label) };
-  }, [report.data]);
+    return { top, max, labels: report.data.periods.map((p) => f.month(p)) };
+  }, [report.data, f]);
 
   if (report.error) return <ErrorState error={report.error} retry={() => report.refetch()} />;
   if (!report.data || !view) return <Skeleton className="h-96" />;
@@ -460,8 +460,8 @@ function BudgetReport({ to }: { to: string }) {
   if (report.error) return <ErrorState error={report.error} retry={() => report.refetch()} />;
   if (!report.data) return <Skeleton className="h-96" />;
   const data = report.data.periods.map((p) => ({
-    label: p.label,
-    shortLabel: formatMonthPeriod(p, 'short'),
+    label: f.month(p),
+    shortLabel: f.month(p, 'short'),
     spent: p.spentMinor,
     budgeted: p.budgetedMinor || null,
   }));
@@ -506,7 +506,7 @@ function BudgetReport({ to }: { to: string }) {
               const diff = p.budgetedMinor - p.spentMinor;
               return (
                 <tr key={p.start}>
-                  <td className="px-4 py-2">{p.label}</td>
+                  <td className="px-4 py-2">{f.month(p)}</td>
                   <td className="px-4 py-2 text-right">
                     {p.budgetedMinor
                       ? f.money(p.budgetedMinor, undefined, { trimZeroFraction: true })
