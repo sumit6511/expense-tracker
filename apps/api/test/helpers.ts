@@ -30,7 +30,6 @@ function build() {
   });
   const logger = createLogger(env.LOG_LEVEL, false);
   const { db, pool } = createDb(env.DATABASE_URL, 5);
-  const auth = createAuth(db, env);
   // Keeps sent email in memory so tests can read it.
   const outbox: Mail[] = [];
   const mailer: Mailer = {
@@ -38,6 +37,7 @@ function build() {
       outbox.push(mail);
     },
   };
+  const auth = createAuth(db, env, mailer);
   // Records pushes instead of sending them; endpoints containing "gone" act unsubscribed.
   const pushed: Array<{ target: PushTarget; message: PushMessage }> = [];
   const pusher: Pusher = {

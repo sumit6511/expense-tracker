@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query';
 import {
   Link,
   Navigate,
@@ -37,7 +36,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  useConfirm,
 } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -55,10 +53,8 @@ import {
   TransactionDialogProvider,
   useTransactionDialog,
 } from '@/features/transactions/transaction-dialog';
-import { ApiError, authApi } from '@/lib/api';
+import { ApiError } from '@/lib/api';
 import { useT } from '@/lib/i18n';
-import { clearOfflineData } from '@/lib/offline';
-import { outbox } from '@/lib/outbox';
 import { useMeQuery, useReviewCounts } from '@/lib/queries';
 import {
   pickWorkspace,
@@ -68,6 +64,7 @@ import {
   useSession,
 } from '@/lib/session';
 import { takeSharedReceipts } from '@/lib/shared-receipts';
+import { useSignOut } from '@/lib/sign-out';
 import { cn } from '@/lib/utils';
 import { CommandPalette } from './command-palette';
 import { OutboxBanner } from './outbox-banner';
@@ -464,25 +461,8 @@ function WorkspaceMenu({ compact }: { compact?: boolean }) {
 function UserMenu() {
   const { me } = useSession();
   const { startTour } = useTour();
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const confirm = useConfirm();
-  async function signOut() {
-    const waiting = outbox.list().length;
-    if (waiting > 0) {
-      const ok = await confirm({
-        title: 'Sign out and discard unsynced transactions?',
-        description: `${waiting} transaction${waiting === 1 ? '' : 's'} recorded offline haven’t reached the server yet and will be lost.`,
-        confirmLabel: 'Sign out',
-        destructive: true,
-      });
-      if (!ok) return;
-    }
-    await clearOfflineData();
-    await authApi.signOut().catch(() => undefined);
-    queryClient.clear();
-    navigate({ to: '/login', search: {} });
-  }
+  const signOut = useSignOut();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -505,7 +485,7 @@ function UserMenu() {
           <Compass /> Take the tour
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={signOut}>
+        <DropdownMenuItem onSelect={() => void signOut()}>
           <LogOut /> Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>

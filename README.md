@@ -139,7 +139,7 @@ Useful settings (environment variables, see [`.env.example`](.env.example)):
 | `PUBLIC_URL` | The URL people open, e.g. `https://money.example.com` (secure cookies are used for https). |
 | `ALLOW_SIGNUP` | Set to `false` once your own account exists, to close sign-ups. |
 | `FX_NRB_ENABLED` | Fetch daily rates from Nepal Rastra Bank (default `true`). |
-| `SMTP_URL` | Optional SMTP server for email notifications, e.g. `smtps://user:pass@smtp.example.com:465`. People opt in under Settings → Notifications. |
+| `SMTP_URL` | Optional SMTP server, e.g. `smtps://user:pass@smtp.example.com:465`. Enables “Forgot password?” emails, invitations by email and email notifications (people opt in under Settings → Notifications). |
 | `MAIL_FROM` | Sender for those emails, e.g. `Expense Tracker <money@example.com>`. |
 | `WEB_PUSH` | Push notifications to browsers and installed apps (default `true`). The server makes its VAPID keys on first start; set `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` to manage them yourself. |
 | `ANTHROPIC_API_KEY` | Optional. Enables the AI helpers; each workspace's owner or admin still has to turn them on. |
@@ -158,6 +158,17 @@ Put a TLS-terminating reverse proxy (Caddy, nginx, Cloudflare Tunnel) in front f
 access. If the proxy runs on another machine, add its address to `TRUST_PROXY`; otherwise every
 visitor looks like the proxy and shares one sign-in rate limit. Passkeys are tied to the host name in `PUBLIC_URL`, so set it before people add them, and
 browsers only allow push notifications on https (or `localhost`).
+
+### Forgotten passwords
+
+With `SMTP_URL` set, “Forgot password?” on the sign-in page emails a link that works for an hour;
+choosing a new password signs out every other device. Without email, reset a password from the
+server; it prints a temporary password and signs the person out everywhere:
+
+```bash
+docker compose exec app node dist/reset-password.js person@example.com
+# in development: pnpm --filter @et/api reset-password person@example.com
+```
 
 ### Email in
 

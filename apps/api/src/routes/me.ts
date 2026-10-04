@@ -1,4 +1,10 @@
-import { CreateWorkspaceSchema, MeSchema, UpdateMeSchema, WorkspaceSchema } from '@et/shared';
+import {
+  CreateWorkspaceSchema,
+  MeSchema,
+  SignInOptionsSchema,
+  UpdateMeSchema,
+  WorkspaceSchema,
+} from '@et/shared';
 import { createRoute } from '@hono/zod-openapi';
 import { z } from 'zod';
 import { badRequest } from '../lib/errors';
@@ -8,6 +14,20 @@ import { restoreBackup } from '../services/backup';
 import { createWorkspace, getMe, listWorkspaces, updateMe } from '../services/workspaces';
 
 export const meRouter = createRouter();
+
+meRouter.openapi(
+  createRoute({
+    method: 'get',
+    path: '/sign-in-options',
+    tags: ['Me'],
+    summary: 'What the sign-in page can offer on this server (no sign-in needed)',
+    responses: { 200: jsonContent(SignInOptionsSchema) },
+  }),
+  (c) => {
+    const { env, mailer } = c.get('deps');
+    return c.json({ signUp: env.ALLOW_SIGNUP, passwordReset: mailer !== null }, 200);
+  },
+);
 
 meRouter.openapi(
   createRoute({

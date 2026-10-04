@@ -147,6 +147,13 @@ export function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
+          <Link
+            to="/forgot-password"
+            search={{ email: email.trim() || undefined }}
+            className="justify-self-end text-xs font-medium text-primary hover:underline"
+          >
+            Forgot password?
+          </Link>
         </Field>
         {error && (
           <p className="text-sm text-destructive" role="alert">

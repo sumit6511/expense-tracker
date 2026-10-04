@@ -71,6 +71,27 @@ test.describe('getting started', () => {
     await page.getByRole('menuitem', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/login/);
   });
+
+  test('forgot password: what to do, and an expired link', async ({ page }) => {
+    await page.goto('/login');
+    await page.getByLabel('Email').fill('someone@example.com');
+    await page.getByRole('link', { name: 'Forgot password?' }).click();
+    await expect(page).toHaveURL(/\/forgot-password\?email=someone/);
+    // This test server has no SMTP, so it explains who can reset the password instead.
+    await expect(page.getByText('This server can’t send email')).toBeVisible();
+    await expect(page.getByText(/Ask the person who runs this Expense Tracker/)).toBeVisible();
+
+    await page.goto('/reset-password?token=not-a-real-token');
+    await page.getByLabel('New password').fill('a-brand-new-password');
+    await page.getByLabel('Type it again').fill('a-brand-new-password-typo');
+    await page.getByRole('button', { name: 'Set new password' }).click();
+    await expect(page.getByRole('alert')).toHaveText('The two passwords don’t match.');
+    await page.getByLabel('Type it again').fill('a-brand-new-password');
+    await page.getByRole('button', { name: 'Set new password' }).click();
+    await expect(page.getByRole('heading', { name: 'This link has expired' })).toBeVisible();
+    await page.getByRole('link', { name: 'Send a new link' }).click();
+    await expect(page).toHaveURL(/\/forgot-password/);
+  });
 });
 
 test.describe('account security', () => {

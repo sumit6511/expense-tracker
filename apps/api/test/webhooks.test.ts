@@ -354,6 +354,21 @@ describe('webhook helpers', () => {
       ).rejects.toThrow(/No answer within/);
       slow.closeAllConnections();
       slow.close();
+
+      // A receiver that answers, then dribbles out a byte at a time, still hits the deadline.
+      const drip = createServer((_req, res) => {
+        res.writeHead(200);
+        const timer = setInterval(() => res.write('.'), 50);
+        res.on('close', () => clearInterval(timer));
+      });
+      await new Promise<void>((resolve) => drip.listen(0, '127.0.0.1', resolve));
+      const started = Date.now();
+      await expect(
+        quick(`http://127.0.0.1:${(drip.address() as AddressInfo).port}/`, '{}', {}),
+      ).rejects.toThrow(/No answer within/);
+      expect(Date.now() - started).toBeLessThan(2_000);
+      drip.closeAllConnections();
+      drip.close();
     } finally {
       server.close();
     }

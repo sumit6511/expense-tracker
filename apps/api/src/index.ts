@@ -17,8 +17,8 @@ const logger = createLogger(env.LOG_LEVEL, env.NODE_ENV === 'development');
 const { db, pool } = createDb(env.DATABASE_URL);
 
 await runMigrations(db);
-const auth = createAuth(db, env);
 const mailer = createMailer(env, logger);
+const auth = createAuth(db, env, mailer);
 const pusher = await createPusher(db, env, logger);
 const ai = createAiProvider(env, logger);
 const webhookSender = httpSender({ allowPrivate: env.WEBHOOK_ALLOW_PRIVATE });

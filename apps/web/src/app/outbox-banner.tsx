@@ -4,14 +4,18 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useFormat } from '@/lib/format';
-import { flushOutbox, outbox, retryOutboxItem, useOutbox } from '@/lib/outbox';
+import { belongsTo, flushOutbox, outbox, retryOutboxItem, useOutbox } from '@/lib/outbox';
+import { useSession } from '@/lib/session';
 
 /**
  * Sends transactions recorded offline as soon as the connection is back (and every 30 s while
  * any are waiting), and shows what's still waiting or was refused.
  */
 export function OutboxBanner() {
-  const items = useOutbox();
+  const { me } = useSession();
+  const userId = me.user.id;
+  const all = useOutbox();
+  const items = all.filter((i) => belongsTo(i, userId));
   const qc = useQueryClient();
   const f = useFormat();
   const [syncing, setSyncing] = useState(false);
@@ -20,13 +24,13 @@ export function OutboxBanner() {
   const sync = useCallback(async () => {
     if (!navigator.onLine) return;
     setSyncing(true);
-    const { sent } = await flushOutbox();
+    const { sent } = await flushOutbox(userId);
     setSyncing(false);
     if (sent > 0) {
       await qc.invalidateQueries({ queryKey: ['ws'] });
       toast.success(`Synced ${sent} transaction${sent === 1 ? '' : 's'} recorded offline`);
     }
-  }, [qc]);
+  }, [qc, userId]);
 
   const pending = items.filter((i) => !i.error);
   useEffect(() => {
@@ -81,7 +85,7 @@ export function OutboxBanner() {
             {item.body.payee ? ` · ${item.body.payee}` : ''} from {f.date(item.body.date)}:{' '}
             {item.error}
           </span>
-          <Button size="sm" variant="outline" onClick={() => retryOutboxItem(item.id)}>
+          <Button size="sm" variant="outline" onClick={() => retryOutboxItem(item.id, userId)}>
             <RefreshCw /> Retry
           </Button>
           <Button

@@ -1,3 +1,4 @@
+import { MAX_BACKUP_BYTES } from '@et/shared';
 import { useNavigate } from '@tanstack/react-router';
 import { Download, FileJson, Loader2, TriangleAlert, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -37,6 +38,10 @@ export function DataSettings() {
 
   async function onRestoreFile(file: File | undefined) {
     if (!file) return;
+    if (file.size > MAX_BACKUP_BYTES) {
+      toast.error('This backup is too large to restore here (at most 50 MB).');
+      return;
+    }
     let backup: unknown;
     try {
       backup = JSON.parse(await file.text());

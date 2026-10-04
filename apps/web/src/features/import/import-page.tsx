@@ -10,6 +10,7 @@ import {
   type ImportBatch,
   type ImportMapping,
   type ImportPreview,
+  MAX_AI_FILE_BYTES,
   matchCategory,
   type NormalizedRow,
   normalizePayeeName,
@@ -228,6 +229,12 @@ export function ImportPage() {
     if (!aiOn) {
       toast.error(
         'Reading PDF statements needs the AI helpers (Settings → General). Or download the statement as Excel or CSV.',
+      );
+      return;
+    }
+    if (selected.size > MAX_AI_FILE_BYTES) {
+      toast.error(
+        'This PDF is too large to read (at most 10 MB). Download the statement as Excel or CSV instead.',
       );
       return;
     }

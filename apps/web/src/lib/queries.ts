@@ -69,6 +69,7 @@ import type {
   RulePreview,
   SetBudgetCapInput,
   SetRolloverInput,
+  SignInOptions,
   SpendingByCategory,
   SpendingByGroup,
   SplitExpenseBody,
@@ -113,6 +114,15 @@ import { useWorkspace } from './session';
 // ---------------------------------------------------------------------------------------------
 
 export const meKey = ['me'] as const;
+
+/** What the sign-in page can offer on this server (sign-ups, password reset by email). */
+export function useSignInOptions() {
+  return useQuery({
+    queryKey: ['sign-in-options'],
+    queryFn: () => api<SignInOptions>('/sign-in-options'),
+    staleTime: 5 * 60_000,
+  });
+}
 const wsKey = (wid: string) => ['ws', wid] as const;
 
 function useWs() {

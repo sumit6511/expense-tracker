@@ -41,8 +41,8 @@ How findings were verified:
   from a good one.
 - **Fix**: Run the end-to-end tests in full Chromium (Playwright's `chromium` channel, "new
   headless"). Also give the CI Postgres health check a user, which removes a log line every 5 s.
-- **Status**: Fixed in phase 1 (config change). Can only be confirmed by CI, since the
-  Chromium build Playwright uses isn't installed in the audit environment.
+- **Status**: Fixed in phase 1. Confirmed by CI: the run for `cd1a63c` is the first green one
+  since the push test was added.
 
 ## High
 
@@ -57,7 +57,9 @@ How findings were verified:
 - **Fix**: A default limit of 1 MB for API and auth requests, 10 MB for imports and AI uploads,
   50 MB for backup restores; clients get a clear `413`. The web app checks AI uploads before
   sending them.
-- **Status**: Planned (phase 2).
+- **Status**: Fixed in phase 2 (`middleware/body-limits.ts`). Re-running the probe: `413` in
+  25 ms and memory unchanged, with or without `Content-Length`. Tests cover both, and that
+  imports and restores still accept larger bodies.
 
 ### H2. A slow webhook receiver can stall all webhook deliveries — Read
 
@@ -67,7 +69,8 @@ How findings were verified:
 - **Impact**: Any workspace admin (anyone can create a workspace) can halt webhooks server-wide.
 - **Fix**: An overall deadline per request (10 s for webhooks, 60 s for bank sync) as well as the
   idle timeout. Test with a receiver that drips bytes.
-- **Status**: Planned (phase 2).
+- **Status**: Fixed in phase 2. The new test (a receiver that drips a byte every 50 ms) fails
+  with a timeout without the deadline and passes with it.
 
 ### H3. No way to recover a forgotten password — Read
 
@@ -79,7 +82,9 @@ How findings were verified:
   out every other session. Without SMTP, the server owner can reset a password from the command
   line (`pnpm --filter @et/api reset-password <email>`, or `node dist/reset-password.js` in
   Docker).
-- **Status**: Planned (phase 2).
+- **Status**: Fixed in phase 2. API tests cover the email, the same answer for unknown
+  addresses, one-time and expiring links, sessions signed out, and the CLI; E2E covers the
+  pages; the success path was also checked in a browser.
 
 ### H4. Signing out doesn't always clear the device — Read
 
@@ -90,7 +95,7 @@ How findings were verified:
   categories, and the outbox would try to send the previous person's queued transactions.
 - **Fix**: One sign-out routine used everywhere (asks before discarding unsynced transactions);
   outbox items remember who queued them and are only sent for that person.
-- **Status**: Planned (phase 2).
+- **Status**: Fixed in phase 2 (`lib/sign-out.ts`; outbox items carry `userId`).
 
 ## Medium
 

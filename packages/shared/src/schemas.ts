@@ -122,6 +122,14 @@ export type CreateWorkspaceInput = z.input<typeof CreateWorkspaceSchema>;
 export const UpdateWorkspaceSchema = WorkspaceSettingsSchema.partial();
 export type UpdateWorkspaceInput = z.infer<typeof UpdateWorkspaceSchema>;
 
+/** What the sign-in page can offer on this server (public). */
+export const SignInOptionsSchema = z.object({
+  signUp: z.boolean(),
+  /** "Forgot password?" can email a link (SMTP is set up). */
+  passwordReset: z.boolean(),
+});
+export type SignInOptions = z.infer<typeof SignInOptionsSchema>;
+
 export const MeSchema = z.object({
   user: z.object({
     id: z.string(),

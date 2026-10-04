@@ -67,7 +67,7 @@ import {
   useUpdateTransfer,
   useUploadAttachment,
 } from '@/lib/queries';
-import { useCanWrite, useWorkspace } from '@/lib/session';
+import { useCanWrite, useSession, useWorkspace } from '@/lib/session';
 import { cn, storage } from '@/lib/utils';
 import { TransactionHistory } from './history';
 import { QuickDescribe } from './quick-describe';
@@ -213,6 +213,7 @@ function EditorForm({
   const { data: groups = [] } = useCategories();
   const { openRecurring } = useRecurringDialog();
   const ws = useWorkspace();
+  const { me } = useSession();
 
   const isEdit = existing !== null;
   const isTransfer = existing?.transfer != null;
@@ -509,7 +510,7 @@ function EditorForm({
             });
           } else {
             // Offline: keep it on this device and send it when the connection is back.
-            outbox.add({ id: body.id, workspaceId: ws.id, body });
+            outbox.add({ id: body.id, userId: me.user.id, workspaceId: ws.id, body });
             toast.success(t('Saved on this device'), {
               description: `${summary} · ${t('it syncs when you’re back online')}`,
             });

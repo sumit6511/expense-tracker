@@ -10,9 +10,10 @@ import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { Loader2, MailWarning, UsersRound } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ApiError, api, authApi, errorMessage } from '@/lib/api';
+import { ApiError, api, errorMessage } from '@/lib/api';
 import { meKey } from '@/lib/queries';
 import { rememberWorkspace } from '@/lib/session';
+import { useSignOut } from '@/lib/sign-out';
 import { AuthShell } from './auth-pages';
 
 /** Where an invitation link lands: who invited you to what, then sign in (or up) and join. */
@@ -61,12 +62,8 @@ export function InvitePage() {
     }
   }
 
-  async function signOut() {
-    await authApi.signOut().catch(() => undefined);
-    qc.removeQueries({ queryKey: meKey });
-    await me.refetch();
-    navigate({ to: '/login', search: { next: `/invite/${token}`, email: preview.data?.email } });
-  }
+  const signOutNow = useSignOut();
+  const signOut = () => signOutNow({ next: `/invite/${token}`, email: preview.data?.email });
 
   if (preview.isPending || me.isPending) {
     return (

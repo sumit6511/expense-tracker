@@ -10,6 +10,8 @@ import { storage } from './utils';
  */
 export interface OutboxItem {
   id: string;
+  /** Who recorded it: only sent while they're signed in (missing on items from older versions). */
+  userId?: string;
   workspaceId: string;
   body: CreateTransactionInput & { id: string };
   createdAt: string;
@@ -70,18 +72,22 @@ export function useOutbox(): OutboxItem[] {
   return useSyncExternalStore(outbox.subscribe, read, read);
 }
 
+/** Whether `userId` may send this item (someone else's stays put, unsent). */
+export const belongsTo = (item: OutboxItem, userId: string) =>
+  !item.userId || item.userId === userId;
+
 let flushing: Promise<{ sent: number; failed: number }> | null = null;
 
 /**
  * Sends queued transactions in order. Stops at the first network failure (still offline);
  * items the server rejects are kept with the reason so nothing is silently lost.
  */
-export function flushOutbox(): Promise<{ sent: number; failed: number }> {
+export function flushOutbox(userId: string): Promise<{ sent: number; failed: number }> {
   flushing ??= (async () => {
     let sent = 0;
     let failed = 0;
     for (const item of read()) {
-      if (item.error) continue;
+      if (item.error || !belongsTo(item, userId)) continue;
       try {
         await api(`/workspaces/${item.workspaceId}/transactions`, {
           method: 'POST',
@@ -108,9 +114,9 @@ export function flushOutbox(): Promise<{ sent: number; failed: number }> {
   return flushing;
 }
 
-export function retryOutboxItem(id: string) {
+export function retryOutboxItem(id: string, userId: string) {
   write(read().map((i) => (i.id === id ? { ...i, error: undefined } : i)));
-  return flushOutbox();
+  return flushOutbox(userId);
 }
 
 /** Is this error "couldn't reach the server" (as opposed to the server saying no)? */

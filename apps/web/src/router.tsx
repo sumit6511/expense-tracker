@@ -49,6 +49,26 @@ const signupRoute = createRoute({
   component: SignupPage,
 });
 
+const forgotPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/forgot-password',
+  validateSearch: z.object({ email: z.string().optional() }),
+  component: lazyRouteComponent(
+    () => import('./features/auth/password-reset'),
+    'ForgotPasswordPage',
+  ),
+});
+
+const resetPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/reset-password',
+  validateSearch: z.object({ token: z.string().optional() }),
+  component: lazyRouteComponent(
+    () => import('./features/auth/password-reset'),
+    'ResetPasswordPage',
+  ),
+});
+
 const inviteRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/invite/$token',
@@ -226,6 +246,8 @@ const settingsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   loginRoute,
   signupRoute,
+  forgotPasswordRoute,
+  resetPasswordRoute,
   inviteRoute,
   onboardingRoute,
   appRoute.addChildren([

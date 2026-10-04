@@ -115,6 +115,23 @@ export const authApi = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(input),
     }),
+  /** Emails a reset link when an account uses this address (same answer either way). */
+  requestPasswordReset: (email: string) =>
+    request<unknown>('/api/auth/request-password-reset', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }),
+  resetPassword: (token: string, newPassword: string) =>
+    request<unknown>(
+      '/api/auth/reset-password',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ token, newPassword }),
+      },
+      { quiet401: true },
+    ),
   signOut: () =>
     request<unknown>('/api/auth/sign-out', {
       method: 'POST',

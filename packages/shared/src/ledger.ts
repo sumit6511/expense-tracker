@@ -69,6 +69,10 @@ export const ATTACHMENT_TYPES = [
   'application/pdf',
 ] as const;
 export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+/** A receipt photo or PDF statement sent to the AI helpers. */
+export const MAX_AI_FILE_BYTES = 10 * 1024 * 1024;
+/** A JSON backup to restore. */
+export const MAX_BACKUP_BYTES = 50 * 1024 * 1024;
 
 export const AttachmentSchema = z.object({
   id: Id,

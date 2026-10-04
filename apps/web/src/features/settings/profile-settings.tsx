@@ -9,9 +9,9 @@ import { useConfirm } from '@/components/ui/dialog';
 import { Field, Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/menu';
 import { authApi, errorMessage } from '@/lib/api';
-import { clearOfflineData } from '@/lib/offline';
 import { useUpdateMe } from '@/lib/queries';
 import { useSession } from '@/lib/session';
+import { forgetDevice, useSignOut } from '@/lib/sign-out';
 import { ProfilePicture } from './avatar-picker';
 import { SecuritySettings } from './security-settings';
 
@@ -62,12 +62,7 @@ export function ProfileSettings() {
     }
   }
 
-  async function signOut() {
-    await clearOfflineData();
-    await authApi.signOut().catch(() => undefined);
-    queryClient.clear();
-    navigate({ to: '/login', search: {} });
-  }
+  const signOut = useSignOut();
 
   async function deleteAccount() {
     const ok = await confirm({
@@ -80,7 +75,7 @@ export function ProfileSettings() {
     if (!ok) return;
     try {
       await authApi.deleteUser(deletePassword);
-      queryClient.clear();
+      await forgetDevice(queryClient);
       navigate({ to: '/signup' });
     } catch (err) {
       toast.error(errorMessage(err));
@@ -112,7 +107,7 @@ export function ProfileSettings() {
               <Button type="submit" disabled={updateMe.isPending || name.trim() === me.user.name}>
                 Save
               </Button>
-              <Button variant="outline" onClick={signOut}>
+              <Button variant="outline" onClick={() => void signOut()}>
                 <LogOut /> Sign out
               </Button>
             </div>

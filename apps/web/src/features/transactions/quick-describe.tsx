@@ -1,4 +1,9 @@
-import { currencyDigits, parseQuickText, type TransactionDraft } from '@et/shared';
+import {
+  currencyDigits,
+  MAX_AI_FILE_BYTES,
+  parseQuickText,
+  type TransactionDraft,
+} from '@et/shared';
 import { Camera, Loader2, Sparkles, Wand2 } from 'lucide-react';
 import { type FormEvent, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -106,6 +111,10 @@ export function QuickDescribe({
     if (!file) return;
     try {
       const body = await shrink(file);
+      if (body.size > MAX_AI_FILE_BYTES) {
+        toast.error('That file is too large to read (at most 10 MB).');
+        return;
+      }
       const draft = await scan.mutateAsync(body);
       onDraft(draft);
       onReceipt(file);

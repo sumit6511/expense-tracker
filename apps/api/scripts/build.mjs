@@ -13,6 +13,7 @@ await build({
     worker: 'src/worker.ts',
     migrate: 'src/db/migrate-cli.ts',
     seed: 'src/db/seed-cli.ts',
+    'reset-password': 'src/reset-password-cli.ts',
   },
   outdir: 'dist',
   bundle: true,

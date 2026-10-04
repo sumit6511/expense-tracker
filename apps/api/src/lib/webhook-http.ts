@@ -99,7 +99,9 @@ export interface SafeResponse {
 
 /**
  * An HTTP request to an address someone gave us: private addresses refused (unless allowed),
- * no redirects, a timeout, and at most `maxBytes` of response kept.
+ * no redirects, at most `maxBytes` of response kept, and `timeoutMs` for the whole exchange. The
+ * deadline covers the response too: a receiver dribbling out a byte at a time can't keep the
+ * request (and the delivery loop waiting on it) open.
  */
 export function safeRequest(
   url: string,
@@ -120,7 +122,16 @@ export function safeRequest(
     maxBytes?: number;
   },
 ): Promise<SafeResponse> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolveOuter, rejectOuter) => {
+    let deadline: NodeJS.Timeout | undefined;
+    const resolve = (value: SafeResponse) => {
+      clearTimeout(deadline);
+      resolveOuter(value);
+    };
+    const reject = (err: unknown) => {
+      clearTimeout(deadline);
+      rejectOuter(err);
+    };
     const target = new URL(url);
     const host = target.hostname.replace(/^\[|\]$/g, '');
     // Literal addresses skip DNS, so check them here.
@@ -152,9 +163,10 @@ export function safeRequest(
         res.on('error', reject);
       },
     );
-    req.on('timeout', () =>
-      req.destroy(new WebhookSendError(`No answer within ${timeoutMs / 1000} seconds`)),
-    );
+    const tooSlow = () =>
+      req.destroy(new WebhookSendError(`No answer within ${timeoutMs / 1000} seconds`));
+    req.on('timeout', tooSlow);
+    deadline = setTimeout(tooSlow, timeoutMs);
     req.on('error', reject);
     req.end(body ?? '');
   });

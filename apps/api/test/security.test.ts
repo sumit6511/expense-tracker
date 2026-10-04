@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { workspaceMembers } from '../src/db/schema';
-import { Client, setupWorkspace, signUp, testApp } from './helpers';
+import { Client, ORIGIN, setupWorkspace, signUp, testApp } from './helpers';
 
 afterAll(async () => {
   await testApp().pool.end();
@@ -165,5 +165,69 @@ describe('workspaces and preferences', () => {
     expect((await a.client.delete(a.base)).status).toBe(204);
     expect((await a.client.get(`${a.base}/accounts`)).status).toBe(404);
     expect((await a.client.get('/api/v1/me')).body.defaultWorkspaceId).toBeNull();
+  });
+});
+
+describe('request size limits', () => {
+  const post = (
+    path: string,
+    body: string | ReadableStream<Uint8Array>,
+    headers: Record<string, string> = {},
+  ) =>
+    testApp().app.request(path, {
+      method: 'POST',
+      headers: { origin: ORIGIN, 'content-type': 'application/json', ...headers },
+      body,
+      // A streamed body (no Content-Length) needs this in Node's fetch.
+      ...(body instanceof ReadableStream ? { duplex: 'half' } : {}),
+    } as RequestInit);
+  const bigJson = (bytes: number) => JSON.stringify({ name: 'x'.repeat(bytes) });
+
+  it('refuses oversized bodies before reading them, signed in or not', async () => {
+    const anon = await post('/api/v1/workspaces', bigJson(2 * 1024 * 1024));
+    expect(anon.status).toBe(413);
+    expect(((await anon.json()) as any).error.code).toBe('too_large');
+    const auth = await post('/api/auth/sign-in/email', bigJson(200 * 1024));
+    expect(auth.status).toBe(413);
+
+    // Without a Content-Length the body is counted as it streams in.
+    const chunk = new TextEncoder().encode('x'.repeat(64 * 1024));
+    let sent = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent++ < 40) controller.enqueue(chunk);
+        else controller.close();
+      },
+    });
+    expect((await post('/api/v1/workspaces', stream)).status).toBe(413);
+  });
+
+  it('allows larger bodies where they are needed', async () => {
+    const a = await setupWorkspace();
+    const headers = { cookie: a.client.cookie };
+    // A 3 MB import or backup gets past the size check (and is then validated as usual).
+    const rows = Array.from({ length: 2000 }, (_, i) => ({
+      date: '2026-09-01',
+      amountMinor: -100 - i,
+      description: 'd'.repeat(500),
+      notes: 'n'.repeat(900),
+    }));
+    const preview = await post(
+      `${a.base}/imports/preview`,
+      JSON.stringify({ accountId: a.accounts.Cash, rows }),
+      headers,
+    );
+    expect(preview.status).toBe(200);
+    const restore = await post(
+      '/api/v1/workspaces/restore',
+      JSON.stringify({ backup: { padding: 'p'.repeat(3 * 1024 * 1024) } }),
+      headers,
+    );
+    expect(restore.status).toBe(400);
+    expect(((await restore.json()) as any).error.message).toMatch(/not a valid backup/);
+    // …but not elsewhere.
+    expect((await post(`${a.base}/categories`, bigJson(2 * 1024 * 1024), headers)).status).toBe(
+      413,
+    );
   });
 });

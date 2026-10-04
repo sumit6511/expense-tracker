@@ -1,12 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { MAX_ATTACHMENT_BYTES, MAX_AVATAR_BYTES } from '@et/shared';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { Scalar } from '@scalar/hono-api-reference';
 import { sql } from 'drizzle-orm';
-import { bodyLimit } from 'hono/body-limit';
 import { HTTPException } from 'hono/http-exception';
 import { secureHeaders } from 'hono/secure-headers';
 import { ZodError } from 'zod';
@@ -14,6 +12,7 @@ import type { AppEnv, Deps } from './context';
 import { CLIENT_IP_HEADER, clientIp, trustedProxies } from './lib/client-ip';
 import { ApiError, mapDatabaseError, validationError } from './lib/errors';
 import { createRouter } from './lib/openapi';
+import { authBodyLimit, bodyLimits } from './middleware/body-limits';
 import { originCheck, tokenAccess, tokenRateLimit, writeRateLimit } from './middleware/security';
 import { loadSession } from './middleware/session';
 import { loadWorkspace } from './middleware/workspace';
@@ -101,6 +100,7 @@ export function createApp(deps: Deps) {
 
   // Better Auth handles sign-up, sign-in, sessions and account deletion under /api/auth/*. It
   // rate-limits by client address, which it reads from a header only the server sets.
+  app.use('/api/auth/*', authBodyLimit());
   app.on(['GET', 'POST'], '/api/auth/*', (c) => {
     const headers = new Headers(c.req.raw.headers);
     const ip = c.get('clientIp');
@@ -110,28 +110,12 @@ export function createApp(deps: Deps) {
   });
 
   const api = createRouter();
+  api.use('*', bodyLimits());
   api.use('*', loadSession);
   api.use('*', originCheck([env.PUBLIC_URL, ...env.TRUSTED_ORIGINS]));
   api.use('*', tokenAccess('/api/v1'));
   api.use('*', tokenRateLimit(env.NODE_ENV === 'test' ? 0 : 300));
   api.use('*', writeRateLimit(env.NODE_ENV === 'test' ? 0 : 600));
-  // Receipts are the only large uploads; everything else is small JSON.
-  api.use(
-    '/workspaces/:wid/transactions/:id/attachments',
-    bodyLimit({
-      maxSize: MAX_ATTACHMENT_BYTES + 64 * 1024,
-      onError: (c) =>
-        c.json({ error: { code: 'too_large', message: 'Files can be at most 5 MB' } }, 413),
-    }),
-  );
-  api.use(
-    '/me/avatar',
-    bodyLimit({
-      maxSize: MAX_AVATAR_BYTES + 64 * 1024,
-      onError: (c) =>
-        c.json({ error: { code: 'too_large', message: 'Photos can be at most 512 KB' } }, 413),
-    }),
-  );
   api.use('/workspaces/:wid', loadWorkspace);
   api.use('/workspaces/:wid/*', loadWorkspace);
   for (const router of [
