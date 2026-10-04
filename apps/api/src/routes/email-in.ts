@@ -175,7 +175,8 @@ emailInRouter.openapi(
     return c.body(new Uint8Array(file.data), 200, {
       'content-type': file.contentType,
       'content-disposition': `inline; filename="${encodeURIComponent(file.fileName)}"`,
-      'content-security-policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
+      'content-security-policy':
+        "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
       'x-content-type-options': 'nosniff',
       'cache-control': 'private, max-age=300',
     });

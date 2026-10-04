@@ -191,6 +191,7 @@ describe('email in', () => {
     );
     expect(file.status).toBe(200);
     expect(file.headers.get('content-type')).toBe('image/png');
+    expect(file.headers.get('content-security-policy')).toContain('sandbox');
 
     const recorded = await f.client.post(`${f.base}/email-in/messages/${waiting.id}/transaction`, {
       accountId: f.accounts.Cash,

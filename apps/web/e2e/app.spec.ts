@@ -72,6 +72,31 @@ test.describe('getting started', () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
+  test('after signing in, only ever continues to a page of this app', async ({
+    page,
+    baseURL,
+    browser,
+  }) => {
+    const user = await createUser((await browser.newContext({ baseURL })).request, baseURL!);
+    // Browsers treat "/\host" like "//host", another site.
+    await page.goto(`/login?next=${encodeURIComponent('/\\evil.example/steal')}`);
+    await page.getByLabel('Email').fill(user.email);
+    await page.getByLabel('Password').fill(user.password);
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await expect(page.getByText('Let’s record your first expense')).toBeVisible();
+    expect(new URL(page.url()).origin).toBe(new URL(baseURL!).origin);
+    expect(new URL(page.url()).pathname).toBe('/');
+  });
+
+  test('source maps aren’t published with the app', async ({ page, request }) => {
+    await page.goto('/login');
+    const script = await page.locator('script[type="module"][src]').first().getAttribute('src');
+    expect(script).toBeTruthy();
+    const code = await (await request.get(script!)).text();
+    expect(code).not.toContain('sourceMappingURL');
+    expect((await request.get(`${script}.map`)).status()).toBe(404);
+  });
+
   test('forgot password: what to do, and an expired link', async ({ page }) => {
     await page.goto('/login');
     await page.getByLabel('Email').fill('someone@example.com');

@@ -160,32 +160,47 @@ How findings were verified:
 - **Problem**: IPv4-mapped addresses are covered, but IPv4-compatible (`::/96`), 6to4
   (`2002::/16`) and Teredo (`2001::/32`) addresses aren't. They aren't normally routable, so this
   is defence in depth.
-- **Status**: Planned (phase 4).
+- **Status**: Fixed in phase 4; the address tests include these forms.
 
 ### L2. Inbound-email files are served without a CSP sandbox — Read
 
 - **Problem**: Receipt attachments use `sandbox`; files from inbound email don't. Only images and
   PDFs are stored, so the risk is small.
-- **Status**: Planned (phase 4).
+- **Status**: Fixed in phase 4; the email-in test checks the header.
 
 ### L3. Post-login redirect accepts `/\…` paths — Read
 
 - **Problem**: Browsers read `/\example.com` like `//example.com`. Client-side navigation made
   this harmless in practice, but the check should reject it.
-- **Status**: Planned (phase 4).
+- **Status**: Fixed in phase 4. E2E test: signing in with `next=/\evil.example/…` lands on
+  the dashboard; it fails with the old check.
 
 ### L4. Offline transactions refused with 401 need a manual retry — Read
 
 - **Problem**: If the session expired while offline, queued transactions are marked as failed
   instead of waiting for sign-in.
-- **Status**: Planned (phase 4).
+- **Status**: Fixed in phase 4: a 401 stops the sync and keeps the item queued.
 
 ### L5. Production source maps are published — Read
 
 - **Problem**: `sourcemap: true` serves full source maps with the app (about 6 MB extra).
 - **Fix**: Build "hidden" source maps (written but not linked) so stack traces can still be
   decoded.
-- **Status**: Planned (phase 4).
+- **Status**: Fixed in phase 4. The built code no longer links to maps, and the server answers
+  `404` for `.map` files (E2E test).
+
+## Results
+
+| | Before | After |
+|---|---|---|
+| CI on this branch | red for 12 commits | green |
+| API integration tests | 166 | 183 |
+| End-to-end tests | 35 | 39 |
+| Shared unit tests | 150 | 150 |
+
+All 17 findings are fixed. Each security fix has a test that fails without it (C1, H1, H2, M3,
+L3 were also checked by temporarily undoing the fix), and the reproduced issues were re-run
+against a live server afterwards.
 
 ### Not changing (reviewed and accepted)
 

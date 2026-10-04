@@ -312,6 +312,10 @@ describe('webhook helpers', () => {
       'fd00::1',
       'fe80::1',
       '::ffff:127.0.0.1',
+      '::ffff:a00:1',
+      '::7f00:1',
+      '2002:7f00:1::1',
+      '2001:0:4136:e378::1',
       'not-an-ip',
     ]) {
       expect([ip, isPublicAddress(ip)]).toEqual([ip, false]);

@@ -31,10 +31,13 @@ for (const [net, prefix] of [
   PRIVATE.addSubnet(net, prefix, 'ipv4');
 }
 for (const [net, prefix] of [
-  ['::', 128],
-  ['::1', 128],
+  // Unspecified, loopback and IPv4-compatible addresses (::a.b.c.d).
+  ['::', 96],
   ['64:ff9b::', 96],
   ['100::', 64],
+  // Teredo and 6to4 tunnels embed an IPv4 address; documentation range.
+  ['2001::', 32],
+  ['2002::', 16],
   ['2001:db8::', 32],
   ['fc00::', 7],
   ['fe80::', 10],

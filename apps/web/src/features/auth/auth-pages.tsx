@@ -10,9 +10,12 @@ import { ApiError, authApi, errorMessage } from '@/lib/api';
 import { isCancelled, passkeysSupported, signInWithPasskey } from '@/lib/passkeys';
 import { meKey } from '@/lib/queries';
 
-/** A same-site path to continue to after signing in (never another site). */
-function safeNext(next: string | undefined) {
-  return next?.startsWith('/') && !next.startsWith('//') ? next : null;
+/**
+ * A same-site path to continue to after signing in (never another site). Browsers read a
+ * backslash like a slash, so "/\example.com" counts as another site too.
+ */
+export function safeNext(next: string | undefined) {
+  return next?.startsWith('/') && !next.startsWith('//') && !next.includes('\\') ? next : null;
 }
 
 export function AuthShell({

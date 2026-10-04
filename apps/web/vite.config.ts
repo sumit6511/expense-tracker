@@ -89,6 +89,7 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
-    sourcemap: true,
+    // Written for decoding stack traces, but not linked from (or served with) the app's code.
+    sourcemap: 'hidden',
   },
 });

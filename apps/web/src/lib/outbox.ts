@@ -96,7 +96,8 @@ export function flushOutbox(userId: string): Promise<{ sent: number; failed: num
         outbox.remove(item.id);
         sent++;
       } catch (err) {
-        if (err instanceof ApiError && err.status === 0) break;
+        // Offline, or signed out meanwhile: keep it for later rather than marking it failed.
+        if (err instanceof ApiError && (err.status === 0 || err.status === 401)) break;
         failed++;
         write(
           read().map((i) =>

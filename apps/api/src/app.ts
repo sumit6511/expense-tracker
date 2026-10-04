@@ -243,6 +243,8 @@ function mountWebApp(app: OpenAPIHono<AppEnv>, root: string) {
   const staticFiles = serveStatic({ root });
   app.use('*', async (c, next) => {
     if (c.req.path.startsWith('/api/') || !/\.[a-z0-9]+$/i.test(c.req.path)) return next();
+    // Source maps are built for decoding stack traces, not published with the app.
+    if (c.req.path.endsWith('.map')) return c.text('Not found', 404);
     if (/^\/(sw\.js|registerSW\.js|manifest\.webmanifest)$/.test(c.req.path)) {
       // The service worker and manifest must be re-checked so updates reach installed apps.
       c.header('Cache-Control', 'no-cache');
