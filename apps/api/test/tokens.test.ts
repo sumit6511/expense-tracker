@@ -200,3 +200,37 @@ describe('personal access tokens', () => {
     expect(body.security).toEqual([{ accessToken: [] }, { session: [] }]);
   });
 });
+
+describe('tokens of people who leave', () => {
+  it('are deleted, so inviting them back doesn’t revive old tokens', async () => {
+    const f = await setupWorkspace();
+    const sita = await join(f, 'editor');
+    const sitaWs = { client: sita, base: f.base };
+    const removed = await makeToken(sitaWs);
+    const left = await makeToken(sitaWs, 'read', 'Other');
+    expect((await withToken(removed.token, 'GET', `${f.base}/accounts`)).status).toBe(200);
+
+    const sitaId = (await sita.get('/api/v1/me')).body.user.id;
+    expect((await f.client.delete(`${f.base}/members/${sitaId}`)).status).toBe(204);
+    const rows = await testApp().db.select().from(apiTokens).where(eq(apiTokens.userId, sitaId));
+    expect(rows).toEqual([]);
+
+    // Invited back: the old tokens stay dead.
+    const invite = await f.client.post(`${f.base}/invitations`, {
+      email: sita.email,
+      role: 'editor',
+    });
+    const link = invite.body.link.split('/invite/')[1];
+    expect((await sita.post(`/api/v1/invitations/${link}/accept`)).status).toBe(200);
+    expect((await withToken(removed.token, 'GET', `${f.base}/accounts`)).status).toBe(401);
+    expect((await withToken(left.token, 'GET', `${f.base}/accounts`)).status).toBe(401);
+
+    // Leaving on your own does the same.
+    const again = await makeToken(sitaWs);
+    expect((await sita.delete(`/api/v1/me/workspaces/${f.ws.id}`)).status).toBe(204);
+    expect((await withToken(again.token, 'GET', `${f.base}/accounts`)).status).toBe(401);
+    expect(await testApp().db.select().from(apiTokens).where(eq(apiTokens.userId, sitaId))).toEqual(
+      [],
+    );
+  });
+});

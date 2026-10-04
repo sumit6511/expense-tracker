@@ -160,13 +160,44 @@ test.describe('account security', () => {
     await page.goto('/settings?tab=profile');
     await page.getByRole('button', { name: 'Add a passkey' }).click();
     await expect(page.getByText('Passkey added')).toBeVisible();
-    await expect(page.getByText(/^Chrome on /)).toBeVisible();
+    const passkeys = page.locator('section', { hasText: 'Sign in with your fingerprint' });
+    await expect(passkeys.getByText(/^Chrome on /)).toBeVisible();
 
     await page.getByRole('button', { name: 'Asha Test' }).click();
     await page.getByRole('menuitem', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/login/);
     await page.getByRole('button', { name: 'Sign in with a passkey' }).click();
     await expect(page.getByText('Let’s record your first expense')).toBeVisible();
+  });
+});
+
+test.describe('signed-in devices', () => {
+  test('see where you’re signed in and sign another device out', async ({
+    signedIn: page,
+    user,
+    browser,
+    baseURL,
+  }) => {
+    // The same person on a second device.
+    const other = await browser.newContext({ baseURL });
+    const phone = await other.newPage();
+    await phone.goto('/login');
+    await phone.getByLabel('Email').fill(user.email);
+    await phone.getByLabel('Password').fill(user.password);
+    await phone.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await expect(phone).not.toHaveURL(/\/login/);
+
+    await page.goto('/settings?tab=profile');
+    const card = page.locator('section', { hasText: 'Where you’re signed in' });
+    await expect(card.getByText('This device')).toBeVisible();
+    await expect(card.getByRole('listitem')).toHaveCount(2);
+    await card.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await expect(page.getByText(/^Signed out /)).toBeVisible();
+    await expect(card.getByRole('listitem')).toHaveCount(1);
+
+    await phone.reload();
+    await expect(phone).toHaveURL(/\/login/);
+    await other.close();
   });
 });
 

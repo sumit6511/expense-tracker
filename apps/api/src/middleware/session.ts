@@ -27,5 +27,6 @@ export const loadSession: MiddlewareHandler<AppEnv> = async (c, next) => {
     'user',
     result ? { id: result.user.id, email: result.user.email, name: result.user.name } : null,
   );
+  c.set('sessionId', result?.session.id ?? null);
   await next();
 };

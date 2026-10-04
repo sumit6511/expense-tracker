@@ -14,9 +14,13 @@ import { DATE_FORMATS } from './import';
 // ---------------------------------------------------------------------------------------------
 
 export const Id = z.uuid();
+/** Dates people enter: wide enough for any real record, narrow enough to catch typos (2803). */
+export const MIN_DATE = '1900-01-01';
+export const MAX_DATE = '2099-12-31';
 export const IsoDateSchema = z
   .string()
-  .refine(isIsoDate, { error: 'Expected a date as YYYY-MM-DD' });
+  .refine(isIsoDate, { error: 'Expected a date as YYYY-MM-DD', abort: true })
+  .refine((d) => d >= MIN_DATE && d <= MAX_DATE, { error: 'Use a date between 1900 and 2099' });
 export const CurrencyCode = z
   .string()
   .transform((s) => s.toUpperCase())
@@ -129,6 +133,19 @@ export const SignInOptionsSchema = z.object({
   passwordReset: z.boolean(),
 });
 export type SignInOptions = z.infer<typeof SignInOptionsSchema>;
+
+/** A device or browser signed in to your account. */
+export const SessionInfoSchema = z.object({
+  id: z.string(),
+  /** The session making this request. */
+  current: z.boolean(),
+  userAgent: z.string().nullable(),
+  ipAddress: z.string().nullable(),
+  createdAt: z.string(),
+  /** Roughly when it was last used (sessions are refreshed at most once a day). */
+  lastActiveAt: z.string(),
+});
+export type SessionInfo = z.infer<typeof SessionInfoSchema>;
 
 export const MeSchema = z.object({
   user: z.object({

@@ -144,10 +144,29 @@ const EnvSchema = z.object({
     .transform((v) => v === 'true'),
 });
 
+/** The placeholder from .env.example, or something nearly as guessable. */
+function isWeakSecret(secret: string) {
+  return /change-?me/i.test(secret) || new Set(secret).size < 8;
+}
+
+const CheckedEnvSchema = EnvSchema.superRefine((env, ctx) => {
+  if (env.NODE_ENV !== 'production') return;
+  for (const key of ['AUTH_SECRET', 'ENCRYPTION_KEY'] as const) {
+    const value = env[key];
+    if (value && isWeakSecret(value)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [key],
+        message: `${key} is the example value or too easy to guess. Generate one with: openssl rand -base64 32`,
+      });
+    }
+  }
+});
+
 export type Env = z.infer<typeof EnvSchema>;
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
-  const result = EnvSchema.safeParse(source);
+  const result = CheckedEnvSchema.safeParse(source);
   if (!result.success) {
     const problems = result.error.issues
       .map((i) => `  ${i.path.join('.')}: ${i.message}`)

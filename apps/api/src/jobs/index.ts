@@ -10,6 +10,7 @@ import type { Logger } from '../logger';
 import type { Mailer } from '../mailer';
 import type { Pusher } from '../push';
 import { syncAllBanks } from '../services/bank';
+import { pruneExpiredAuthData } from '../services/cleanup';
 import { pruneInboundEmails } from '../services/email-in';
 import { snapshotAllHoldings } from '../services/holding-values';
 import { runHeadsUp } from '../services/insights';
@@ -74,6 +75,7 @@ export async function startJobs(
     await pruneNotifications(db);
     await pruneDeliveries(db);
     await pruneInboundEmails(db);
+    logger.info(await pruneExpiredAuthData(db), 'deleted expired sessions, links and tokens');
   });
 
   // Hourly, so each workspace's items are recorded soon after midnight in its own time zone.

@@ -10,6 +10,7 @@ import { Toaster } from 'sonner';
 import { z } from 'zod';
 import { AppLayout } from './app/app-layout';
 import { NotFoundPage } from './app/not-found';
+import { RouteError } from './app/route-error';
 import { useThemeClass } from './app/theme';
 import { ConfirmProvider } from './components/ui/dialog';
 import { TooltipProvider } from './components/ui/menu';
@@ -272,6 +273,7 @@ export const router = createRouter({
   routeTree,
   context: { queryClient: undefined! },
   defaultPreload: 'intent',
+  defaultErrorComponent: RouteError,
   scrollRestoration: true,
 });
 

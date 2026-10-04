@@ -1,4 +1,5 @@
-import { filterIntegerInput } from '@et/shared';
+import type { SessionInfo } from '@et/shared';
+import { filterIntegerInput, todayIn } from '@et/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Copy,
@@ -6,9 +7,12 @@ import {
   Ellipsis,
   KeyRound,
   Loader2,
+  LogOut,
+  Monitor,
   Pencil,
   Plus,
   ShieldCheck,
+  Smartphone,
   Trash2,
 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
@@ -33,10 +37,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/menu';
 import { ApiError, authApi, errorMessage, type Passkey } from '@/lib/api';
+import { deviceLabel, isMobileDevice } from '@/lib/device';
 import { useFormat } from '@/lib/format';
-import { addPasskey, deviceLabel, isCancelled, passkeysSupported } from '@/lib/passkeys';
-import { meKey } from '@/lib/queries';
-import { useSession } from '@/lib/session';
+import { addPasskey, isCancelled, passkeyName, passkeysSupported } from '@/lib/passkeys';
+import { meKey, useSessionMutations, useSessions } from '@/lib/queries';
+import { useSession, useWorkspace } from '@/lib/session';
 
 // ---------------------------------------------------------------------------------------------
 // Two-step sign-in (authenticator app)
@@ -489,7 +494,7 @@ function PasskeysCard() {
   async function add() {
     setAdding(true);
     try {
-      await addPasskey(deviceLabel());
+      await addPasskey(passkeyName());
       await qc.invalidateQueries({ queryKey: passkeysKey });
       toast.success('Passkey added. Next time, sign in with it instead of your password.');
     } catch (err) {
@@ -584,11 +589,130 @@ function PasskeysCard() {
   );
 }
 
+/** "Active today" rather than "Active Today". */
+const lower = (s: string) => (/^(Today|Yesterday)$/.test(s) ? s.toLowerCase() : s);
+
+const SESSIONS_SHOWN = 5;
+
+function SessionsCard() {
+  const f = useFormat();
+  const { timezone } = useWorkspace();
+  // The day a timestamp falls on in the workspace's time zone, like every other date here.
+  const day = (iso: string) => todayIn(timezone, new Date(iso));
+  const confirm = useConfirm();
+  const sessions = useSessions();
+  const { revoke, signOutOthers } = useSessionMutations();
+  const [showAll, setShowAll] = useState(false);
+  const all = sessions.data ?? [];
+  const others = all.filter((s) => !s.current);
+  // This device first, then the most recently used; the rest on request.
+  const shown = showAll ? all : all.slice(0, SESSIONS_SHOWN);
+
+  async function signOutOne(s: SessionInfo) {
+    try {
+      await revoke.mutateAsync(s.id);
+      toast.success(`Signed out ${deviceLabel(s.userAgent ?? '')}`);
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  }
+
+  async function signOutRest() {
+    const ok = await confirm({
+      title: 'Sign out everywhere else?',
+      description: `${others.length} other device${others.length === 1 ? '' : 's'} will need your password (or passkey) to sign in again. This one stays signed in.`,
+      confirmLabel: 'Sign out others',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      const { signedOut } = await signOutOthers.mutateAsync();
+      toast.success(`Signed out of ${signedOut} other device${signedOut === 1 ? '' : 's'}`);
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Where you’re signed in</CardTitle>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 gap-4">
+        <p className="text-sm text-muted-foreground">
+          Don’t recognise one, or lost a phone? Sign it out, then change your password.
+        </p>
+        {sessions.isPending ? (
+          <Skeleton className="h-28" />
+        ) : sessions.error ? (
+          <p className="text-sm text-destructive">{errorMessage(sessions.error)}</p>
+        ) : (
+          <ul className="divide-y rounded-xl border">
+            {shown.map((s) => {
+              const Icon = isMobileDevice(s.userAgent ?? '') ? Smartphone : Monitor;
+              return (
+                <li key={s.id} className="flex items-center gap-3 px-3 py-2.5">
+                  <Icon className="size-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-x-2 text-sm font-medium">
+                      <span className="truncate">{deviceLabel(s.userAgent ?? '')}</span>
+                      {s.current && <Badge tone="primary">This device</Badge>}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {[
+                        s.ipAddress,
+                        s.current
+                          ? 'Active now'
+                          : `Active ${lower(f.relativeDate(day(s.lastActiveAt)))}`,
+                        `signed in ${f.date(day(s.createdAt))}`,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  </div>
+                  {!s.current && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => signOutOne(s)}
+                      disabled={revoke.isPending}
+                    >
+                      Sign out
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {all.length > SESSIONS_SHOWN && (
+          <button
+            type="button"
+            className="justify-self-start text-sm font-medium text-primary hover:underline"
+            onClick={() => setShowAll((v) => !v)}
+          >
+            {showAll ? 'Show fewer' : `Show all ${all.length}`}
+          </button>
+        )}
+        {others.length > 0 && (
+          <div>
+            <Button variant="outline" onClick={signOutRest} disabled={signOutOthers.isPending}>
+              {signOutOthers.isPending ? <Loader2 className="animate-spin" /> : <LogOut />} Sign out
+              everywhere else
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function SecuritySettings() {
   return (
     <>
       <TwoFactorCard />
       <PasskeysCard />
+      <SessionsCard />
     </>
   );
 }

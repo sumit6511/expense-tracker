@@ -1,6 +1,7 @@
 import {
   CreateWorkspaceSchema,
   MeSchema,
+  SessionInfoSchema,
   SignInOptionsSchema,
   UpdateMeSchema,
   WorkspaceSchema,
@@ -8,9 +9,17 @@ import {
 import { createRoute } from '@hono/zod-openapi';
 import { z } from 'zod';
 import { badRequest } from '../lib/errors';
-import { createRouter, errorResponses, jsonBody, jsonContent, requireUser } from '../lib/openapi';
+import {
+  createRouter,
+  errorResponses,
+  jsonBody,
+  jsonContent,
+  NoContent,
+  requireUser,
+} from '../lib/openapi';
 import { getAvatarPhoto, setAvatarPhoto } from '../services/avatars';
 import { restoreBackup } from '../services/backup';
+import { listSessions, revokeOtherSessions, revokeSession } from '../services/sessions';
 import { createWorkspace, getMe, listWorkspaces, updateMe } from '../services/workspaces';
 
 export const meRouter = createRouter();
@@ -62,6 +71,55 @@ meRouter.openapi(
   async (c) => {
     const user = requireUser(c.get('user'));
     return c.json(await updateMe(c.get('deps').db, user.id, c.req.valid('json')), 200);
+  },
+);
+
+meRouter.openapi(
+  createRoute({
+    method: 'get',
+    path: '/me/sessions',
+    tags: ['Me'],
+    summary: 'Devices and browsers signed in to your account',
+    responses: { 200: jsonContent(z.array(SessionInfoSchema)), ...errorResponses },
+  }),
+  async (c) => {
+    const user = requireUser(c.get('user'));
+    return c.json(await listSessions(c.get('deps').db, user.id, c.get('sessionId')), 200);
+  },
+);
+
+meRouter.openapi(
+  createRoute({
+    method: 'delete',
+    path: '/me/sessions/{id}',
+    tags: ['Me'],
+    summary: 'Sign out one of your other devices',
+    request: { params: z.object({ id: z.string().min(1).max(100) }) },
+    responses: { 204: NoContent, ...errorResponses },
+  }),
+  async (c) => {
+    const user = requireUser(c.get('user'));
+    const { id } = c.req.valid('param');
+    await revokeSession(c.get('deps').db, user.id, c.get('sessionId'), id);
+    return c.body(null, 204);
+  },
+);
+
+meRouter.openapi(
+  createRoute({
+    method: 'post',
+    path: '/me/sessions/sign-out-others',
+    tags: ['Me'],
+    summary: 'Sign out everywhere except this device',
+    responses: {
+      200: jsonContent(z.object({ signedOut: z.number().int() })),
+      ...errorResponses,
+    },
+  }),
+  async (c) => {
+    const user = requireUser(c.get('user'));
+    const signedOut = await revokeOtherSessions(c.get('deps').db, user.id, c.get('sessionId'));
+    return c.json({ signedOut }, 200);
   },
 );
 

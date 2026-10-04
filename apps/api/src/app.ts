@@ -62,6 +62,7 @@ export function createApp(deps: Deps) {
     c.set('deps', deps);
     c.set('user', null);
     c.set('token', null);
+    c.set('sessionId', null);
     c.set('clientIp', clientIp(socketAddress(c), c.req.header('x-forwarded-for'), proxies));
     const started = performance.now();
     await next();

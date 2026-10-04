@@ -21,6 +21,7 @@ import type { SessionUser, WorkspaceCtx } from '../context';
 import type { Db, Executor } from '../db/client';
 import {
   accounts,
+  apiTokens,
   goals,
   invitations,
   notifications,
@@ -138,11 +139,17 @@ export async function updateMemberRole(
   return listMembers(db, ws);
 }
 
-/** Takes someone out of the workspace. Their past transactions stay, attributed to them. */
+/**
+ * Takes someone out of the workspace. Their past transactions stay, attributed to them; their
+ * access tokens for it go, so being invited back later doesn't bring old tokens back to life.
+ */
 async function dropMember(db: Executor, workspaceId: string, userId: string) {
   await db
     .delete(workspaceMembers)
     .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)));
+  await db
+    .delete(apiTokens)
+    .where(and(eq(apiTokens.workspaceId, workspaceId), eq(apiTokens.userId, userId)));
   await db
     .delete(notifications)
     .where(and(eq(notifications.workspaceId, workspaceId), eq(notifications.userId, userId)));

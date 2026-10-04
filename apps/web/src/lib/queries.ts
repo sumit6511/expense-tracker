@@ -67,6 +67,7 @@ import type {
   Rule,
   RuleInput,
   RulePreview,
+  SessionInfo,
   SetBudgetCapInput,
   SetRolloverInput,
   SignInOptions,
@@ -114,6 +115,28 @@ import { useWorkspace } from './session';
 // ---------------------------------------------------------------------------------------------
 
 export const meKey = ['me'] as const;
+
+const sessionsKey = ['me', 'sessions'] as const;
+
+/** Devices and browsers signed in to your account. */
+export const useSessions = () =>
+  useQuery({ queryKey: sessionsKey, queryFn: () => api<SessionInfo[]>('/me/sessions') });
+
+export function useSessionMutations() {
+  const qc = useQueryClient();
+  const refresh = () => qc.invalidateQueries({ queryKey: sessionsKey });
+  return {
+    revoke: useMutation({
+      mutationFn: (id: string) => api<void>(`/me/sessions/${id}`, { method: 'DELETE' }),
+      onSuccess: refresh,
+    }),
+    signOutOthers: useMutation({
+      mutationFn: () =>
+        api<{ signedOut: number }>('/me/sessions/sign-out-others', { method: 'POST' }),
+      onSuccess: refresh,
+    }),
+  };
+}
 
 /** What the sign-in page can offer on this server (sign-ups, password reset by email). */
 export function useSignInOptions() {

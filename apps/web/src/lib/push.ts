@@ -64,31 +64,4 @@ export async function unsubscribeThisDevice(): Promise<string | null> {
   return endpoint;
 }
 
-/** "Chrome on Android", "Safari on iPhone": enough to tell devices apart. */
-export function deviceLabel(ua = navigator.userAgent): string {
-  const browser = /Edg\//.test(ua)
-    ? 'Edge'
-    : /SamsungBrowser/.test(ua)
-      ? 'Samsung Internet'
-      : /Firefox\//.test(ua)
-        ? 'Firefox'
-        : /Chrome\//.test(ua)
-          ? 'Chrome'
-          : /Safari\//.test(ua)
-            ? 'Safari'
-            : 'Browser';
-  const os = /Android/.test(ua)
-    ? 'Android'
-    : /iPhone/.test(ua)
-      ? 'iPhone'
-      : /iPad/.test(ua)
-        ? 'iPad'
-        : /Windows/.test(ua)
-          ? 'Windows'
-          : /Mac OS X/.test(ua)
-            ? 'Mac'
-            : /Linux/.test(ua)
-              ? 'Linux'
-              : null;
-  return os ? `${browser} on ${os}` : browser;
-}
+export { deviceLabel } from './device';

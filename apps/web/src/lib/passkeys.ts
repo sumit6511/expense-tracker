@@ -4,6 +4,7 @@ import {
   startRegistration,
 } from '@simplewebauthn/browser';
 import { authApi } from './api';
+import { deviceLabel } from './device';
 
 export const passkeysSupported = () => browserSupportsWebAuthn();
 
@@ -13,35 +14,10 @@ export function isCancelled(err: unknown) {
 }
 
 /** A default name for a passkey created on this device, e.g. "Chrome on Android". */
-export function deviceLabel(ua = navigator.userAgent) {
-  const os = /iPhone|iPad/.test(ua)
-    ? /iPad/.test(ua)
-      ? 'iPad'
-      : 'iPhone'
-    : /Android/.test(ua)
-      ? 'Android'
-      : /Mac OS X/.test(ua)
-        ? 'Mac'
-        : /Windows/.test(ua)
-          ? 'Windows'
-          : /Linux/.test(ua)
-            ? 'Linux'
-            : null;
-  const browser = /Edg\//.test(ua)
-    ? 'Edge'
-    : /Firefox\//.test(ua)
-      ? 'Firefox'
-      : /Chrome\//.test(ua)
-        ? 'Chrome'
-        : /Safari\//.test(ua)
-          ? 'Safari'
-          : null;
-  if (browser && os) return `${browser} on ${os}`;
-  return os ?? browser ?? 'Passkey';
-}
+export const passkeyName = (ua = navigator.userAgent) => deviceLabel(ua, 'Passkey');
 
 /** Creates a passkey on this device for the signed-in person. */
-export async function addPasskey(name = deviceLabel()) {
+export async function addPasskey(name = passkeyName()) {
   const optionsJSON = await authApi.passkey.registrationOptions();
   const response = await startRegistration({ optionsJSON });
   return authApi.passkey.verifyRegistration(response, name);

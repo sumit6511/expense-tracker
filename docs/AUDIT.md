@@ -103,31 +103,37 @@ How findings were verified:
 
 - **Problem**: You can't see where you're signed in or sign out a lost phone, except by changing
   your password.
-- **Fix**: Settings → Security lists sessions (device, approximate place by IP, last active) with
-  "Sign out" for each and "Sign out everywhere else". This relies on C1 for correct addresses.
-- **Status**: Planned (phase 3).
+- **Fix**: Settings → Profile lists sessions (device, IP address, last active), the five most
+  recent first, with "Sign out" for each and "Sign out everywhere else". Our own endpoints, so
+  session tokens never reach the browser (Better Auth's `list-sessions` returns them). This relies
+  on C1 for correct addresses.
+- **Status**: Fixed in phase 3. API test (list without tokens, sign out one, not this one,
+  not someone else's, everyone else) and an E2E test with two browsers.
 
 ### M2. No error page for crashes or stale app versions — Read
 
 - **Problem**: There is no route error boundary. A rendering error, or a missing code chunk after
   a new version is deployed, shows the router's unstyled default error.
-- **Fix**: A styled error page with "Reload" and "Go to dashboard"; a missing chunk reloads once
-  automatically.
-- **Status**: Planned (phase 3).
+- **Fix**: A styled error page with "Reload", "Try again" and "Go to dashboard", and a clear "A new
+  version is available" message when a page's code went missing. (The router already reloads once
+  for a missing chunk; the page shows if that didn't help.)
+- **Status**: Fixed in phase 3. Checked against a production build with one page's file
+  deleted: one reload, then the "new version" page.
 
 ### M3. Removed members' access tokens come back if they're re-invited — Read
 
 - **Problem**: Removing a member (or a member leaving) keeps their API tokens. They stop working
   only because the member check fails, so re-inviting the person silently revives old tokens.
 - **Fix**: Delete the person's tokens for that workspace when they're removed or leave.
-- **Status**: Planned (phase 3).
+- **Status**: Fixed in phase 3. Test: removed, then re-invited; old tokens stay invalid and are
+  gone from the database. Leaving works the same.
 
 ### M4. The example `AUTH_SECRET` is accepted in production — Read
 
 - **Problem**: `.env.example`'s placeholder secret passes validation. Copying the example file
   makes session cookies and sealed secrets use a publicly known key.
 - **Fix**: Refuse to start in production with the placeholder (or another obviously weak secret).
-- **Status**: Planned (phase 3).
+- **Status**: Fixed in phase 3 (development still accepts the example file).
 
 ### M5. Any date from year 1 to 9999 is accepted — Reproduced
 
@@ -136,7 +142,8 @@ How findings were verified:
   never shows in the expected month.
 - **Fix**: Dates people enter (transactions, recurring items, goals, budgets, imports) must fall
   between 1900-01-01 and 2099-12-31, with a clear message.
-- **Status**: Planned (phase 3).
+- **Status**: Fixed in phase 3 in the shared date schema, so every API input is covered.
+  Backups keep their own date check, so older backups still restore.
 
 ### M6. Expired sessions, sign-in codes, invitations and tokens pile up — Read
 
@@ -144,7 +151,7 @@ How findings were verified:
   `api_tokens`.
 - **Fix**: The nightly clean-up deletes them (expired invitations after 30 days, so "this link has
   expired" still shows for a while).
-- **Status**: Planned (phase 3).
+- **Status**: Fixed in phase 3 (`services/cleanup.ts`, in the nightly job), with a test.
 
 ## Low
 
