@@ -198,9 +198,9 @@ How findings were verified:
 | End-to-end tests | 35 | 39 |
 | Shared unit tests | 150 | 150 |
 
-All 17 findings are fixed. Each security fix has a test that fails without it (C1, H1, H2, M3,
-L3 were also checked by temporarily undoing the fix), and the reproduced issues were re-run
-against a live server afterwards.
+All 17 findings are fixed, and each fix has tests. For C1, H2 and L3 the new test was also run
+with the fix temporarily undone, to confirm it catches the problem. The reproduced issues (C1,
+H1, M5) were re-run against a live server after the fix.
 
 ### Not changing (reviewed and accepted)
 
