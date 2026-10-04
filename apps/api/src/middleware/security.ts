@@ -25,7 +25,8 @@ export function originCheck(allowedOrigins: string[]): MiddlewareHandler<AppEnv>
 }
 
 /**
- * Small fixed-window rate limiter for write requests, keyed by user (or IP when signed out).
+ * Small fixed-window rate limiter for write requests, keyed by user (or the client's address,
+ * see lib/client-ip, when signed out).
  * In-memory, so limits are per process; that is enough for a single-server deployment.
  */
 export function writeRateLimit(maxPerMinute: number): MiddlewareHandler<AppEnv> {
@@ -33,8 +34,7 @@ export function writeRateLimit(maxPerMinute: number): MiddlewareHandler<AppEnv> 
   return async (c, next) => {
     if (SAFE_METHODS.has(c.req.method) || maxPerMinute <= 0) return next();
     const now = Date.now();
-    const key =
-      c.get('user')?.id ?? c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'anonymous';
+    const key = c.get('user')?.id ?? c.get('clientIp') ?? 'anonymous';
     let entry = windows.get(key);
     if (!entry || entry.resetAt <= now) {
       entry = { count: 0, resetAt: now + 60_000 };

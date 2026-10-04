@@ -151,10 +151,12 @@ Useful settings (environment variables, see [`.env.example`](.env.example)):
 | `BANK_SYNC` | Let owners and admins connect SimpleFIN bank sync (default `true`). |
 | `WEBHOOK_ALLOW_PRIVATE` | Let webhooks reach your own network, e.g. Home Assistant on `192.168.x.x` (default `false`). |
 | `ENCRYPTION_KEY` | Key for stored secrets (webhook keys, bank connections). Defaults to one derived from `AUTH_SECRET`; set it if you might change `AUTH_SECRET`. |
+| `TRUST_PROXY` | Which reverse proxies' `X-Forwarded-For` to believe when working out a visitor's address (for sign-in rate limits and the signed-in devices list). Default `loopback,private`: a proxy on the same machine or Docker network. Use `none`, or list your proxy's addresses or CIDR ranges. |
 | `POSTGRES_PASSWORD` | Database password used by compose. |
 
 Put a TLS-terminating reverse proxy (Caddy, nginx, Cloudflare Tunnel) in front for internet
-access. Passkeys are tied to the host name in `PUBLIC_URL`, so set it before people add them, and
+access. If the proxy runs on another machine, add its address to `TRUST_PROXY`; otherwise every
+visitor looks like the proxy and shares one sign-in rate limit. Passkeys are tied to the host name in `PUBLIC_URL`, so set it before people add them, and
 browsers only allow push notifications on https (or `localhost`).
 
 ### Email in

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { trustedProxies } from './lib/client-ip';
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -17,6 +18,29 @@ const EnvSchema = z.object({
         .map((o) => o.trim())
         .filter(Boolean),
     ),
+  /**
+   * Reverse proxies whose X-Forwarded-For header is believed, comma separated: `loopback`,
+   * `private` (10/8, 172.16/12, 192.168/16, fc00::/7), `linklocal`, addresses or CIDR ranges, or
+   * `none`. The default covers a proxy on the same machine or Docker network. Requests from
+   * anywhere else are identified by their own address, so the header can't be used to dodge
+   * sign-in rate limits.
+   */
+  TRUST_PROXY: z
+    .string()
+    .default('loopback,private')
+    .transform((s) =>
+      s
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean),
+    )
+    .superRefine((entries, ctx) => {
+      try {
+        trustedProxies(entries);
+      } catch (err) {
+        ctx.addIssue({ code: 'custom', message: (err as Error).message });
+      }
+    }),
   AUTH_SECRET: z.string().min(32, 'AUTH_SECRET must be at least 32 characters'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   /** Directory with the built web app to serve (production). */

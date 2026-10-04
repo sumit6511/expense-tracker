@@ -60,6 +60,8 @@ export type AppEnv = {
     user: SessionUser | null;
     /** Set when the request was made with a personal access token instead of a session. */
     token: TokenCtx | null;
+    /** The client's address (see lib/client-ip); null only without a real connection (tests). */
+    clientIp: string | null;
     workspace: WorkspaceCtx;
   };
 };

@@ -21,7 +21,9 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     timezoneId: 'Asia/Kathmandu',
-    ...(executablePath ? { launchOptions: { executablePath } } : {}),
+    // Full Chromium ("new headless"), not the default headless shell: the shell reports
+    // notifications as blocked, so push notifications can't be tested in it.
+    ...(executablePath ? { launchOptions: { executablePath } } : { channel: 'chromium' }),
   },
   projects: [
     {

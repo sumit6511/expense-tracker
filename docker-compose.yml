@@ -32,6 +32,7 @@ services:
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
       AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET, e.g. openssl rand -base64 32}
       ALLOW_SIGNUP: ${ALLOW_SIGNUP:-true}
+      TRUST_PROXY: ${TRUST_PROXY:-loopback,private}
       FX_NRB_ENABLED: ${FX_NRB_ENABLED:-true}
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-Expense Tracker <no-reply@localhost>}

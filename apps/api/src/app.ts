@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { MAX_ATTACHMENT_BYTES, MAX_AVATAR_BYTES } from '@et/shared';
+import { getConnInfo } from '@hono/node-server/conninfo';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { Scalar } from '@scalar/hono-api-reference';
@@ -10,6 +11,7 @@ import { HTTPException } from 'hono/http-exception';
 import { secureHeaders } from 'hono/secure-headers';
 import { ZodError } from 'zod';
 import type { AppEnv, Deps } from './context';
+import { CLIENT_IP_HEADER, clientIp, trustedProxies } from './lib/client-ip';
 import { ApiError, mapDatabaseError, validationError } from './lib/errors';
 import { createRouter } from './lib/openapi';
 import { originCheck, tokenAccess, tokenRateLimit, writeRateLimit } from './middleware/security';
@@ -55,11 +57,13 @@ const CONTENT_SECURITY_POLICY = [
 export function createApp(deps: Deps) {
   const { env, logger } = deps;
   const app = new OpenAPIHono<AppEnv>();
+  const proxies = trustedProxies(env.TRUST_PROXY);
 
   app.use('*', async (c, next) => {
     c.set('deps', deps);
     c.set('user', null);
     c.set('token', null);
+    c.set('clientIp', clientIp(socketAddress(c), c.req.header('x-forwarded-for'), proxies));
     const started = performance.now();
     await next();
     if (c.req.path.startsWith('/api/')) {
@@ -95,8 +99,15 @@ export function createApp(deps: Deps) {
   // Raw emails from a mail service (its own secret; no session or CSRF check).
   mountInboundEmail(app);
 
-  // Better Auth handles sign-up, sign-in, sessions and account deletion under /api/auth/*.
-  app.on(['GET', 'POST'], '/api/auth/*', (c) => deps.auth.handler(c.req.raw));
+  // Better Auth handles sign-up, sign-in, sessions and account deletion under /api/auth/*. It
+  // rate-limits by client address, which it reads from a header only the server sets.
+  app.on(['GET', 'POST'], '/api/auth/*', (c) => {
+    const headers = new Headers(c.req.raw.headers);
+    const ip = c.get('clientIp');
+    if (ip) headers.set(CLIENT_IP_HEADER, ip);
+    else headers.delete(CLIENT_IP_HEADER);
+    return deps.auth.handler(new Request(c.req.raw, { headers }));
+  });
 
   const api = createRouter();
   api.use('*', loadSession);
@@ -217,6 +228,15 @@ export function createApp(deps: Deps) {
 
   if (env.WEB_DIST_DIR) mountWebApp(app, env.WEB_DIST_DIR);
   return app;
+}
+
+/** The TCP peer's address (undefined for in-process requests, as in tests). */
+function socketAddress(c: Parameters<typeof getConnInfo>[0]): string | undefined {
+  try {
+    return getConnInfo(c).remote.address;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Serves the built single-page app, with long caching for fingerprinted assets. */

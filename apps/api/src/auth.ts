@@ -17,6 +17,7 @@ import {
   workspaces,
 } from './db/schema';
 import type { Env } from './env';
+import { CLIENT_IP_HEADER } from './lib/client-ip';
 import { deletePrivateAccountsOf, handOverOwnedWorkspaces } from './services/members';
 
 // OWASP-recommended Argon2id parameters (19 MiB memory, 2 iterations).
@@ -78,6 +79,9 @@ export function createAuth(db: Db, env: Env) {
       },
     },
     advanced: {
+      // The app works out the client's address (honouring only trusted proxies) and passes it
+      // in this header; see lib/client-ip.ts.
+      ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
       cookiePrefix: 'et',
       useSecureCookies: secure,
       database: { generateId: () => uuidv7() },
