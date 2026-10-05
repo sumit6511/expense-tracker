@@ -26,7 +26,15 @@ import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
 import { EmptyState, ErrorState } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, Progress, Skeleton } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  ListSkeleton,
+  Progress,
+  Skeleton,
+} from '@/components/ui/card';
 import { InsightList } from '@/features/insights/insight-list';
 import { dueLabel, isDue, useRecordNow } from '@/features/recurring/recurring-dialog';
 import { useTransactionDialog } from '@/features/transactions/transaction-dialog';
@@ -79,9 +87,7 @@ export function DashboardPage() {
             <ChevronLeft />
           </Button>
           <div className="px-1">
-            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-              {dashboard.data ? f.month(dashboard.data.period) : '…'}
-            </h1>
+            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{f.month(current)}</h1>
             <p className="text-xs text-muted-foreground">
               {f.date(current.start, 'short')} – {f.date(current.end, 'medium')}
               {isCurrent && dashboard.data
@@ -122,14 +128,36 @@ function wholeUnits(minor: number, digits: number) {
   return Math.floor(minor / unit) * unit;
 }
 
+/** The headline, the month's numbers and a list, roughly where they'll appear. */
 function DashboardSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <Skeleton className="h-72 lg:col-span-2" />
-      <Skeleton className="h-72" />
-      <Skeleton className="h-56" />
-      <Skeleton className="h-56" />
-      <Skeleton className="h-56" />
+    <div role="status" className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+      <span className="sr-only">Loading…</span>
+      <Card className="lg:col-span-2">
+        <CardContent className="grid grid-cols-1 gap-3 pt-5">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-11 w-56 sm:h-12" />
+          <Skeleton className="h-4 w-64 max-w-full" />
+          <Skeleton className="mt-2 h-2 w-full" />
+          <Skeleton className="mt-2 h-[200px] w-full lg:h-[240px]" />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="grid grid-cols-1 gap-4 pt-5">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex items-center justify-between">
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-5 w-28" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+      <Card className="lg:col-span-2">
+        <div className="px-5 pt-4 pb-1">
+          <Skeleton className="h-4 w-20" />
+        </div>
+        <ListSkeleton rows={4} className="divide-y-0" />
+      </Card>
     </div>
   );
 }

@@ -22,7 +22,7 @@ import { Money } from '@/components/money';
 import { EmptyState, ErrorState, PageHeader } from '@/components/page';
 import { AccountSelect, CategoryFilter, CategoryPicker } from '@/components/pickers';
 import { Button } from '@/components/ui/button';
-import { Card, Skeleton } from '@/components/ui/card';
+import { Card, ListSkeleton } from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
@@ -48,6 +48,7 @@ import {
 import { useCanWrite, useWorkspace } from '@/lib/session';
 import { cn, useMediaQuery } from '@/lib/utils';
 import type { TransactionsSearch } from '@/router';
+import { AddOrImport } from './add-or-import';
 import { useTransactionDialog } from './transaction-dialog';
 import { TransactionRow } from './transaction-row';
 
@@ -157,6 +158,8 @@ export function TransactionsPage() {
   }, [items, f.base]);
 
   const hasFilters = Object.keys(filters).some((k) => k !== 'deleted');
+  // Nothing recorded yet: filters, totals and export have nothing to work on.
+  const noData = !trash && !hasFilters && !list.isPending && !list.error && items.length === 0;
   const selectedIds = [...selected];
 
   async function runBulk(
@@ -189,13 +192,15 @@ export function TransactionsPage() {
             </Button>
           ) : (
             <>
-              <Button variant="outline" size="sm" asChild>
-                <a
-                  href={`/api/v1/workspaces/${ws.id}/export/transactions.csv${toQueryString(filters as Record<string, string>)}`}
-                >
-                  <Download /> Export CSV
-                </a>
-              </Button>
+              {!noData && (
+                <Button variant="outline" size="sm" asChild>
+                  <a
+                    href={`/api/v1/workspaces/${ws.id}/export/transactions.csv${toQueryString(filters as Record<string, string>)}`}
+                  >
+                    <Download /> Export CSV
+                  </a>
+                </Button>
+              )}
               <Button variant="ghost" size="sm" onClick={() => setSearch({ deleted: 'true' })}>
                 <Trash2 /> Trash
               </Button>
@@ -210,7 +215,7 @@ export function TransactionsPage() {
       />
 
       {/* Filters */}
-      <div className="mb-3 grid grid-cols-1 gap-2">
+      <div className={cn('mb-3 grid grid-cols-1 gap-2', noData && 'hidden')}>
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -311,7 +316,7 @@ export function TransactionsPage() {
         </div>
       </div>
 
-      {totals && (
+      {totals && !noData && (
         <div className="mb-2 flex items-center gap-3 px-1">
           <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground tabular">
             <span>
@@ -341,12 +346,7 @@ export function TransactionsPage() {
 
       <Card className="overflow-clip">
         {list.isPending ? (
-          <div className="grid grid-cols-1 gap-3 p-4">
-            {Array.from({ length: 6 }, (_, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows
-              <Skeleton key={i} className="h-11" />
-            ))}
-          </div>
+          <ListSkeleton rows={8} />
         ) : items.length === 0 ? (
           <EmptyState
             icon={trash ? Trash2 : hasFilters ? Search : ArrowLeftRight}
@@ -364,13 +364,7 @@ export function TransactionsPage() {
                   ? 'Try a wider date range or fewer filters.'
                   : 'Add one, or import a statement.'
             }
-            action={
-              !trash && !hasFilters && canWrite ? (
-                <Button onClick={() => openNew()}>
-                  <Plus /> Add transaction
-                </Button>
-              ) : undefined
-            }
+            action={!trash && !hasFilters ? <AddOrImport /> : undefined}
           />
         ) : (
           groups.map((g) => (

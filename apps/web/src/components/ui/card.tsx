@@ -64,6 +64,35 @@ export function Skeleton({ className, ...props }: ComponentProps<'div'>) {
   return <div className={cn('animate-pulse rounded-md bg-muted', className)} {...props} />;
 }
 
+const TITLE_WIDTHS = ['w-2/5', 'w-1/2', 'w-1/3', 'w-3/5'];
+
+/** A list row while it loads, shaped like the real one: icon, two lines of text, an amount. */
+export function RowSkeleton({ index = 0 }: { index?: number }) {
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5 sm:px-4">
+      <Skeleton className="size-9 shrink-0 rounded-full" />
+      <div className="grid min-w-0 flex-1 grid-cols-1 gap-1.5">
+        <Skeleton className={cn('h-3.5', TITLE_WIDTHS[index % TITLE_WIDTHS.length])} />
+        <Skeleton className="h-3 w-1/4" />
+      </div>
+      <Skeleton className="h-3.5 w-16" />
+    </div>
+  );
+}
+
+/** Loading rows for a list, announced once to screen readers. */
+export function ListSkeleton({ rows = 6, className }: { rows?: number; className?: string }) {
+  return (
+    <div role="status" className={cn('divide-y', className)}>
+      <span className="sr-only">Loading…</span>
+      {Array.from({ length: rows }, (_, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: placeholder rows
+        <RowSkeleton key={i} index={i} />
+      ))}
+    </div>
+  );
+}
+
 export function Separator({ className }: { className?: string }) {
   return <hr className={cn('border-t border-border', className)} />;
 }

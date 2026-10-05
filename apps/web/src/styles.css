@@ -206,7 +206,7 @@
 /* A person's avatar: tinted with their own hue (set as --hue on the element). */
 @utility person-avatar {
   background-color: oklch(0.75 0.12 var(--hue) / 0.22);
-  color: oklch(0.5 0.14 var(--hue));
+  color: oklch(0.47 0.14 var(--hue));
   &:where(.dark, .dark *) {
     color: oklch(0.82 0.11 var(--hue));
   }

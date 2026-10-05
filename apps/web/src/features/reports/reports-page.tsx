@@ -23,6 +23,7 @@ import { AccountSelect } from '@/components/pickers';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, Progress, Skeleton } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/menu';
+import { AddOrImport } from '@/features/transactions/add-or-import';
 import { useFormat } from '@/lib/format';
 import {
   type ReportRange,
@@ -31,6 +32,7 @@ import {
   useCategoryMap,
   useCategoryTrends,
   useSpendingByCategory,
+  useTransactions,
 } from '@/lib/queries';
 import { useWorkspace } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -61,6 +63,9 @@ export function ReportsPage() {
     ...(search.accountIds ? { accountIds: search.accountIds.split(',') } : {}),
   };
   const tab: Tab = search.tab ?? 'spending';
+  // Before anything is recorded, most tabs are empty: say so once, with a way forward.
+  const any = useTransactions({}, 1);
+  const nothingYet = any.data?.pages[0]?.items.length === 0;
 
   return (
     <div>
@@ -102,6 +107,17 @@ export function ReportsPage() {
           </>
         }
       />
+      {nothingYet && (
+        <Card className="mb-4">
+          <EmptyState
+            icon={ChartPie}
+            title="No reports yet"
+            description="Reports fill in as you record spending and income: where the money goes, how it changes month to month, and how budgets are holding up."
+            action={<AddOrImport />}
+            className="py-8"
+          />
+        </Card>
+      )}
       <Tabs
         value={tab}
         onValueChange={(v) => navigate({ search: (s) => ({ ...s, tab: v as Tab }), replace: true })}

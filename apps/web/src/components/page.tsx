@@ -41,14 +41,14 @@ export function EmptyState({
   description,
   action,
   className,
-  as: Heading = 'h3',
+  as: Heading = 'h2',
 }: {
   icon: LucideIcon;
   title: ReactNode;
   description?: ReactNode;
   action?: ReactNode;
   className?: string;
-  /** The heading level: h1 when the empty state is the whole page (404, crash). */
+  /** The heading level: h1 when it's the whole page (404, crash), h3 under a titled card. */
   as?: 'h1' | 'h2' | 'h3';
 }) {
   const tr = useTr();

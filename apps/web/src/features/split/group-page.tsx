@@ -137,6 +137,7 @@ export function SplitGroupPage() {
           </CardHeader>
           {g.activity.length === 0 ? (
             <EmptyState
+              as="h3"
               icon={Receipt}
               title="Nothing yet"
               description="Add the first expense: who paid, how much, and who it was for."

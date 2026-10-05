@@ -19,14 +19,14 @@ import {
   Sigma,
   Target,
 } from 'lucide-react';
-import { type FormEvent, type ReactNode, useMemo, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
 import { EmptyState, ErrorState, PageHeader } from '@/components/page';
 import { AmountInput } from '@/components/pickers';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, Progress, Skeleton } from '@/components/ui/card';
+import { Card, CardContent, ListSkeleton, Progress, Skeleton } from '@/components/ui/card';
 import {
   Dialog,
   DialogBody,
@@ -79,6 +79,16 @@ export function BudgetsPage() {
   const go = (delta: number) =>
     navigate({ search: { date: shiftMonthPeriod(period, delta, settings).start } });
   const previous = shiftMonthPeriod(period, -1, settings);
+  // Say why an action can't be used yet, rather than letting it do nothing.
+  const previousMonth = useBudgetMonth(previous.start);
+  const nothingToCopy =
+    previousMonth.data && !previousMonth.data.lines.some((l) => l.budgetedMinor > 0)
+      ? 'Last month has no budgets to copy'
+      : undefined;
+  const nothingToAverage =
+    month.data && !month.data.lines.some((l) => l.averageMinor > 0)
+      ? 'Needs some spending in the last three months'
+      : undefined;
 
   async function copyLast() {
     try {
@@ -147,7 +157,7 @@ export function BudgetsPage() {
             >
               <ChevronLeft />
             </Button>
-            <span>{month.data ? f.month(month.data.period) : '…'}</span>
+            <span>{f.month(period)}</span>
             <Button variant="ghost" size="icon-sm" onClick={() => go(1)} aria-label="Next month">
               <ChevronRight />
             </Button>
@@ -159,17 +169,20 @@ export function BudgetsPage() {
             {viewSwitch}
             {canWrite && (
               <>
-                <Button variant="outline" size="sm" onClick={copyLast} disabled={copy.isPending}>
+                <PageAction
+                  onClick={copyLast}
+                  disabled={copy.isPending || !month.data}
+                  unavailable={nothingToCopy}
+                >
                   <Copy /> Copy last month
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
+                </PageAction>
+                <PageAction
                   onClick={fillAverages}
-                  disabled={fill.isPending}
+                  disabled={fill.isPending || !month.data}
+                  unavailable={nothingToAverage}
                 >
                   <Sigma /> Use 3-month averages
-                </Button>
+                </PageAction>
               </>
             )}
           </>
@@ -188,8 +201,13 @@ export function BudgetsPage() {
       ) : (
         !month.error && (
           <div className="grid grid-cols-1 gap-4">
-            <Skeleton className="h-32" />
-            <Skeleton className="h-80" />
+            <Skeleton className="h-32 rounded-xl" />
+            <Card className="overflow-hidden">
+              <div className="border-b bg-muted/40 px-4 py-2.5">
+                <Skeleton className="h-4 w-32" />
+              </div>
+              <ListSkeleton rows={5} />
+            </Card>
           </div>
         )
       )}
@@ -235,6 +253,15 @@ function BudgetBody({
     .filter((g) => g.categories.length > 0);
 
   const [moving, setMoving] = useState<{ categoryId: string | null } | null>(null);
+  const canWrite = useCanWrite();
+  // "Set budgets" shows every category and puts the cursor in the first amount.
+  const list = useRef<HTMLDivElement>(null);
+  const focusFirst = useRef(false);
+  useEffect(() => {
+    if (!showAll || !focusFirst.current) return;
+    focusFirst.current = false;
+    list.current?.querySelector<HTMLInputElement>('input[aria-label^="Budget for "]')?.focus();
+  }, [showAll]);
   const expenseCategories = groups
     .filter((g) => g.kind === 'expense')
     .flatMap((g) => g.categories.filter((c) => !c.archived));
@@ -246,7 +273,7 @@ function BudgetBody({
   );
 
   return (
-    <div className="grid grid-cols-1 gap-4">
+    <div ref={list} className="grid grid-cols-1 gap-4">
       {data.envelope ? (
         <EnvelopeSummary
           data={data}
@@ -302,7 +329,23 @@ function BudgetBody({
           <EmptyState
             icon={Target}
             title="No budgets yet"
-            description="Turn on “Show all categories” and type an amount next to any category, or use your 3-month averages once you’ve tracked a little."
+            description={
+              canWrite
+                ? 'Give each category a monthly amount, and see what’s left as you spend.'
+                : 'Nobody has set budgets for this month yet.'
+            }
+            action={
+              canWrite ? (
+                <Button
+                  onClick={() => {
+                    focusFirst.current = true;
+                    onShowAll(true);
+                  }}
+                >
+                  <Target /> Set budgets
+                </Button>
+              ) : undefined
+            }
           />
         </Card>
       )}
@@ -958,5 +1001,42 @@ function MonthlyLimit({ data }: { data: BudgetMonth }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * A page header action. When it can't be used yet it stays focusable and says why: in a tooltip
+ * with a mouse or keyboard, and in a message when tapped.
+ */
+function PageAction({
+  onClick,
+  disabled,
+  unavailable,
+  children,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  unavailable?: string;
+  children: ReactNode;
+}) {
+  if (!unavailable) {
+    return (
+      <Button variant="outline" size="sm" onClick={onClick} disabled={disabled}>
+        {children}
+      </Button>
+    );
+  }
+  return (
+    <Tooltip content={unavailable}>
+      <Button
+        variant="outline"
+        size="sm"
+        aria-disabled
+        className="cursor-not-allowed opacity-50 hover:bg-card"
+        onClick={() => toast(unavailable)}
+      >
+        {children}
+      </Button>
+    </Tooltip>
   );
 }

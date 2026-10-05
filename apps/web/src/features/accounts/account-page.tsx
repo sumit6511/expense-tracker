@@ -20,7 +20,7 @@ import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
 import { EmptyState, ErrorState } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Badge, Card, Skeleton } from '@/components/ui/card';
+import { Badge, Card, ListSkeleton, Skeleton } from '@/components/ui/card';
 import { Dialog, useConfirm } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -229,10 +229,7 @@ export function AccountPage() {
 
       <Card className="overflow-hidden">
         {list.isPending ? (
-          <div className="grid grid-cols-1 gap-3 p-4">
-            <Skeleton className="h-11" />
-            <Skeleton className="h-11" />
-          </div>
+          <ListSkeleton rows={6} />
         ) : (
           <div className="divide-y">
             {items.map((tx) => (

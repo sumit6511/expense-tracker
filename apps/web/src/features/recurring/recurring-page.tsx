@@ -169,6 +169,7 @@ export function RecurringPage() {
               </CardHeader>
               {series.length === 0 ? (
                 <EmptyState
+                  as="h3"
                   icon={Repeat}
                   title="Nothing recurring yet"
                   description="Add rent, internet, school fees, EMIs or your salary to see what’s coming and get reminded."

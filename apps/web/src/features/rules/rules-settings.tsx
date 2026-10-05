@@ -60,7 +60,6 @@ export function RulesSettings() {
       {rules.length === 0 ? (
         <Card>
           <EmptyState
-            as="h2"
             icon={Wand2}
             title="No rules yet"
             description="Create one here, or categorize a transaction in the review inbox and choose “Always do this”."

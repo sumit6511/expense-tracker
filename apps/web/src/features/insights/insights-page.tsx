@@ -59,6 +59,7 @@ export function InsightsPage() {
           </div>
         ) : insights.data.items.length === 0 ? (
           <EmptyState
+            as="h3"
             icon={Lightbulb}
             title="Nothing stands out right now"
             description="As your history grows, this is where unusual spending, price changes, subscriptions to track and good months show up."

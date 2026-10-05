@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { EmptyState, ErrorState, PageHeader } from '@/components/page';
 import { CategoryPicker } from '@/components/pickers';
 import { Button } from '@/components/ui/button';
-import { Card, Skeleton } from '@/components/ui/card';
+import { Card, ListSkeleton } from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/dialog';
 import { Segmented } from '@/components/ui/menu';
 import { canMakeRule, ruleFromTransaction, useRuleDialog } from '@/features/rules/rule-dialog';
@@ -142,7 +142,9 @@ export function InboxPage() {
       {list.error ? (
         <ErrorState error={list.error} retry={() => list.refetch()} />
       ) : list.isPending ? (
-        <Skeleton className="h-80" />
+        <Card>
+          <ListSkeleton rows={5} />
+        </Card>
       ) : items.length === 0 ? (
         <Card>
           <EmptyState

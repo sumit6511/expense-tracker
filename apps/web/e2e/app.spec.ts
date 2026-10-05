@@ -1211,6 +1211,33 @@ test.describe('everyday use', () => {
     await expect(page.getByText('Remittance')).toBeVisible();
   });
 
+  test('first run: empty pages point the way', async ({ signedIn: page }) => {
+    await page.goto('/transactions');
+    await expect(page.getByText('No transactions yet')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Import statement' })).toBeVisible();
+    // Nothing to search, filter or export yet.
+    await expect(page.getByLabel('Search transactions')).toBeHidden();
+    await expect(page.getByRole('link', { name: 'Export CSV' })).toBeHidden();
+
+    await page.goto('/reports');
+    await expect(page.getByText('No reports yet')).toBeVisible();
+
+    // Budgets: actions that can't work yet say why; "Set budgets" starts at the first amount.
+    await page.goto('/budgets');
+    const copy = page.getByRole('button', { name: 'Copy last month' });
+    await expect(copy).toHaveAttribute('aria-disabled', 'true');
+    await copy.click({ force: true });
+    await expect(
+      page.locator('[data-sonner-toast]').getByText('Last month has no budgets to copy'),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Set budgets' }).click();
+    await expect(page.getByLabel('Budget for Food & Groceries')).toBeFocused();
+    await page.keyboard.type('15000');
+    await page.keyboard.press('Enter');
+    await expect(page.getByText('Rs. 15,000').first()).toBeVisible();
+    await expect(page.getByText('No budgets yet')).toBeHidden();
+  });
+
   test('select transactions and change them together', async ({
     signedIn: page,
     user,
