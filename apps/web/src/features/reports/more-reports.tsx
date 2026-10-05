@@ -446,7 +446,9 @@ export function CalendarReport({ range }: { range: ReportRange }) {
           tabIndex={0}
           role="region"
           aria-label="Spending by day"
-          // Start at the most recent weeks when the year doesn't fit (phones).
+          // Start at the most recent weeks when the year doesn't fit (phones). The sticky weekday
+          // labels paint the card colour over the padding to their left, so days scrolling past
+          // don't show in that gutter.
           ref={(el) => {
             if (el) el.scrollLeft = el.scrollWidth;
           }}
@@ -460,7 +462,7 @@ export function CalendarReport({ range }: { range: ReportRange }) {
               gridTemplateRows: 'auto repeat(7, 0.8rem)',
             }}
           >
-            <span className="sticky left-0 z-10 bg-card" />
+            <span className="sticky left-0 z-10 bg-card shadow-[-1.25rem_0_0_var(--color-card),3px_0_0_var(--color-card)]" />
             {grid.weeks.map((week) => {
               const firstOfMonth = week.find((d) => d && monthLabel(d, ws.calendar).first);
               return (
@@ -568,7 +570,7 @@ function DayRow({
   const weekday = (weekStart + row) % 7;
   return (
     <>
-      <span className="sticky left-0 z-10 bg-card pr-1 text-right text-2xs leading-[0.8rem] text-muted-foreground">
+      <span className="sticky left-0 z-10 bg-card pr-1 text-right text-2xs leading-[0.8rem] text-muted-foreground shadow-[-1.25rem_0_0_var(--color-card),3px_0_0_var(--color-card)]">
         {row % 2 === 0 ? WEEKDAY_NAMES[weekday]!.slice(0, 3) : ''}
       </span>
       {grid.weeks.map((week) => {

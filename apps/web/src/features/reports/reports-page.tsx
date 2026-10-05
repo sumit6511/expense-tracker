@@ -35,7 +35,7 @@ import {
   useTransactions,
 } from '@/lib/queries';
 import { useWorkspace } from '@/lib/session';
-import { cn } from '@/lib/utils';
+import { cn, edgeFade, revealActive } from '@/lib/utils';
 import { CalendarReport, CompareReport, GroupReport, NetWorthReport } from './more-reports';
 
 type Tab =
@@ -123,13 +123,11 @@ export function ReportsPage() {
         onValueChange={(v) => navigate({ search: (s) => ({ ...s, tab: v as Tab }), replace: true })}
       >
         <TabsList
-          className="mb-4 flex max-w-full justify-start overflow-x-auto"
+          className="edge-fade mb-4 flex max-w-full justify-start overflow-x-auto"
           // Keep the chosen tab in view when the row scrolls (phones).
           ref={(el) => {
-            el?.querySelector('[data-state="active"]')?.scrollIntoView({
-              block: 'nearest',
-              inline: 'nearest',
-            });
+            revealActive(el);
+            return edgeFade(el);
           }}
         >
           <TabsTrigger value="spending">
@@ -266,7 +264,7 @@ function SpendingReport({ range }: { range: ReportRange }) {
     );
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_20rem]">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_17rem] lg:grid-cols-[1fr_20rem]">
       <Card>
         <CardHeader>
           <CardTitle>Spending by category</CardTitle>
@@ -425,7 +423,7 @@ function TrendsReport({ range }: { range: ReportRange }) {
         Monthly spending in your top categories. All small charts share one scale, so bar heights
         compare across categories.
       </p>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
         {view.top.map((s) => {
           const cat = s.categoryId ? categories.get(s.categoryId) : undefined;
           const total = s.valuesMinor.reduce((a, b) => a + b, 0);

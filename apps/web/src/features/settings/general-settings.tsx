@@ -11,8 +11,10 @@ import { Segmented, Switch } from '@/components/ui/menu';
 import { Select, SelectItem } from '@/components/ui/select';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import { useAiStatus, useUpdateMe, useUpdateWorkspace } from '@/lib/queries';
 import { useSession } from '@/lib/session';
+import { useUnsavedChanges } from '@/lib/unsaved-changes';
 
 const TIME_ZONES = [
   'Asia/Kathmandu',
@@ -32,6 +34,7 @@ const TIME_ZONES = [
 export function GeneralSettings() {
   const { me, workspace } = useSession();
   const f = useFormat();
+  const t = useT();
   const update = useUpdateWorkspace();
   const updateMe = useUpdateMe();
   const { preference, setPreference } = useTheme();
@@ -43,6 +46,28 @@ export function GeneralSettings() {
   const [weekStart, setWeekStart] = useState(workspace.weekStart);
   const [timezone, setTimezone] = useState(workspace.timezone);
   const [budgetMode, setBudgetMode] = useState(workspace.budgetMode);
+  // Workspace settings change things for everyone, so they wait for "Save"; until then the
+  // page says so, and leaving asks first.
+  const dirty =
+    canEdit &&
+    (name.trim() !== workspace.name ||
+      baseCurrency !== workspace.baseCurrency ||
+      calendar !== workspace.calendar ||
+      monthStartDay !== workspace.monthStartDay ||
+      weekStart !== workspace.weekStart ||
+      timezone !== workspace.timezone ||
+      budgetMode !== workspace.budgetMode);
+  useUnsavedChanges(dirty);
+
+  function discard() {
+    setName(workspace.name);
+    setBaseCurrency(workspace.baseCurrency);
+    setCalendar(workspace.calendar);
+    setMonthStartDay(workspace.monthStartDay);
+    setWeekStart(workspace.weekStart);
+    setTimezone(workspace.timezone);
+    setBudgetMode(workspace.budgetMode);
+  }
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -68,10 +93,11 @@ export function GeneralSettings() {
     : [workspace.timezone, ...TIME_ZONES];
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
       <Card>
         <CardHeader>
           <CardTitle>Workspace</CardTitle>
+          <span className="text-xs text-muted-foreground">{t('For everyone in it')}</span>
         </CardHeader>
         <CardContent>
           <form onSubmit={save} className="grid grid-cols-1 gap-4">
@@ -101,6 +127,7 @@ export function GeneralSettings() {
                 value={calendar}
                 onChange={setCalendar}
                 label="Calendar"
+                disabled={!canEdit}
                 options={[
                   {
                     value: 'bs',
@@ -182,9 +209,21 @@ export function GeneralSettings() {
               </Field>
             </div>
             {canEdit && (
-              <Button type="submit" className="justify-self-start" disabled={update.isPending}>
-                {update.isPending && <Loader2 className="animate-spin" />} Save
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="submit" disabled={!dirty || update.isPending}>
+                  {update.isPending && <Loader2 className="animate-spin" />} Save
+                </Button>
+                {dirty && (
+                  <>
+                    <Button variant="ghost" onClick={discard}>
+                      Discard
+                    </Button>
+                    <span role="status" className="text-xs text-muted-foreground">
+                      Unsaved changes
+                    </span>
+                  </>
+                )}
+              </div>
             )}
           </form>
         </CardContent>
@@ -193,7 +232,10 @@ export function GeneralSettings() {
       <div className="grid grid-cols-1 content-start gap-4">
         <Card>
           <CardHeader>
-            <CardTitle>Display (just for you)</CardTitle>
+            <CardTitle>Display</CardTitle>
+            <span className="text-xs text-muted-foreground">
+              {t('Just for you · applies right away')}
+            </span>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-5">
             <Field label="Language">

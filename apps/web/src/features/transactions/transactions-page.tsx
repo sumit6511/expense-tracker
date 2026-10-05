@@ -46,7 +46,7 @@ import {
   useTransactions,
 } from '@/lib/queries';
 import { useCanWrite, useWorkspace } from '@/lib/session';
-import { cn, useMediaQuery } from '@/lib/utils';
+import { cn, edgeFade, useMediaQuery } from '@/lib/utils';
 import type { TransactionsSearch } from '@/router';
 import { AddOrImport } from './add-or-import';
 import { useTransactionDialog } from './transaction-dialog';
@@ -177,6 +177,7 @@ export function TransactionsPage() {
 
   const categoryFilter = search.categoryIds?.split(',')[0];
   const allSelected = items.length > 0 && selected.size === items.length;
+  const exportUrl = `/api/v1/workspaces/${ws.id}/export/transactions.csv${toQueryString(filters as Record<string, string>)}`;
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(items.map((i) => i.id)));
 
   return (
@@ -192,18 +193,41 @@ export function TransactionsPage() {
             </Button>
           ) : (
             <>
+              {/* Phones: the rarer actions go in a menu, leaving room for the title. */}
               {!noData && (
-                <Button variant="outline" size="sm" asChild>
-                  <a
-                    href={`/api/v1/workspaces/${ws.id}/export/transactions.csv${toQueryString(filters as Record<string, string>)}`}
-                  >
+                <Button variant="outline" size="sm" className="hidden sm:inline-flex" asChild>
+                  <a href={exportUrl}>
                     <Download /> Export CSV
                   </a>
                 </Button>
               )}
-              <Button variant="ghost" size="sm" onClick={() => setSearch({ deleted: 'true' })}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hidden sm:inline-flex"
+                onClick={() => setSearch({ deleted: 'true' })}
+              >
                 <Trash2 /> Trash
               </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon-sm" aria-label="More" className="sm:hidden">
+                    <Ellipsis />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {!noData && (
+                    <DropdownMenuItem asChild>
+                      <a href={exportUrl}>
+                        <Download /> Export CSV
+                      </a>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onSelect={() => setSearch({ deleted: 'true' })}>
+                    <Trash2 /> Trash
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               {canWrite && (
                 <Button size="sm" onClick={() => openNew()} className="hidden sm:inline-flex">
                   <Plus /> Add
@@ -222,14 +246,25 @@ export function TransactionsPage() {
             ref={searchRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search payee, notes or bank description  ( / )"
-            className="pl-9"
+            placeholder="Search payee, notes or bank description"
+            className="peer pl-9"
             aria-label="Search transactions"
+            aria-keyshortcuts="/"
             maxLength={100}
           />
+          {/* The shortcut, on devices with a keyboard and mouse, until you start typing. */}
+          <kbd
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 rounded border bg-muted px-1.5 font-sans text-2xs text-muted-foreground pointer-fine:peer-[:placeholder-shown:not(:focus)]:inline-block"
+          >
+            /
+          </kbd>
         </div>
         {/* One row that scrolls sideways on phones; wraps on wider screens. */}
-        <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&>*]:shrink-0">
+        <div
+          ref={edgeFade}
+          className="edge-fade -mx-4 flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:[mask-image:none] [&>*]:shrink-0"
+        >
           <DateRangePicker
             value={{ from: search.from, to: search.to }}
             onChange={(r) => setSearch({ from: r.from, to: r.to })}

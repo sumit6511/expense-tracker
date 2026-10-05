@@ -203,6 +203,25 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* A sideways-scrolling row whose edges fade where there's more (set by edgeFade() in utils). */
+@utility edge-fade {
+  --fade-start: 0px;
+  --fade-end: 0px;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--fade-start),
+    #000 calc(100% - var(--fade-end)),
+    transparent
+  );
+  &[data-fade-start] {
+    --fade-start: 1.5rem;
+  }
+  &[data-fade-end] {
+    --fade-end: 1.5rem;
+  }
+}
+
 /* A person's avatar: tinted with their own hue (set as --hue on the element). */
 @utility person-avatar {
   background-color: oklch(0.75 0.12 var(--hue) / 0.22);

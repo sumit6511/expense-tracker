@@ -238,6 +238,7 @@ const settingsRoute = createRoute({
         'integrations',
         'data',
         'profile',
+        'security',
       ])
       .optional(),
   }),

@@ -144,7 +144,7 @@ test.describe('account security', () => {
     browser,
     baseURL,
   }) => {
-    await page.goto('/settings?tab=profile');
+    await page.goto('/settings?tab=security');
     await page.getByRole('button', { name: 'Turn on' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Your password').fill(user.password);
@@ -200,7 +200,7 @@ test.describe('account security', () => {
         automaticPresenceSimulation: true,
       },
     });
-    await page.goto('/settings?tab=profile');
+    await page.goto('/settings?tab=security');
     await page.getByRole('button', { name: 'Add a passkey' }).click();
     await expect(page.getByText('Passkey added')).toBeVisible();
     const passkeys = page.locator('section', { hasText: 'Sign in with your fingerprint' });
@@ -230,7 +230,7 @@ test.describe('signed-in devices', () => {
     await phone.getByRole('button', { name: 'Sign in', exact: true }).click();
     await expect(phone).not.toHaveURL(/\/login/);
 
-    await page.goto('/settings?tab=profile');
+    await page.goto('/settings?tab=security');
     const card = page.locator('section', { hasText: 'Where you’re signed in' });
     await expect(card.getByText('This device')).toBeVisible();
     await expect(card.getByRole('listitem')).toHaveCount(2);
@@ -1209,6 +1209,27 @@ test.describe('everyday use', () => {
     await expect(page.getByLabel('Main currency')).toContainText('NPR');
     await page.getByRole('tab', { name: 'Categories' }).click();
     await expect(page.getByText('Remittance')).toBeVisible();
+  });
+
+  test('workspace settings wait for Save, and leaving with changes asks first', async ({
+    signedIn: page,
+  }) => {
+    await page.goto('/settings');
+    const save = page.getByRole('button', { name: 'Save', exact: true });
+    await expect(save).toBeDisabled();
+    await page.getByLabel('Name', { exact: true }).fill('Home budget');
+    await expect(page.getByText('Unsaved changes')).toBeVisible();
+    await page.getByRole('tab', { name: 'Members' }).click();
+    await expect(page.getByRole('dialog', { name: 'Leave without saving?' })).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Home budget');
+    await save.click();
+    await expect(page.getByText('Settings saved')).toBeVisible();
+    await expect(save).toBeDisabled();
+    // Saved, so moving on doesn't ask.
+    await page.getByRole('tab', { name: 'Members' }).click();
+    await expect(page.getByRole('dialog')).toBeHidden();
+    await expect(page).toHaveTitle(/^Members · Settings · Home budget/);
   });
 
   test('first run: empty pages point the way', async ({ signedIn: page }) => {

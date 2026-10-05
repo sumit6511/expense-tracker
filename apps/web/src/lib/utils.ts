@@ -62,3 +62,37 @@ export function useMediaQuery(query: string): boolean {
     () => false,
   );
 }
+
+/**
+ * For a row that scrolls sideways (with the `edge-fade` class): fades the edge where there's
+ * more to scroll to, so it's clear the row continues. Use as a ref: `ref={edgeFade}`.
+ */
+export function edgeFade(el: HTMLElement | null) {
+  if (!el) return;
+  const update = () => {
+    el.toggleAttribute('data-fade-start', el.scrollLeft > 1);
+    el.toggleAttribute('data-fade-end', el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  };
+  update();
+  el.addEventListener('scroll', update, { passive: true });
+  const resize = new ResizeObserver(update);
+  resize.observe(el);
+  // Items that appear later (filters waiting on data) change the width too.
+  const mutations = new MutationObserver(update);
+  mutations.observe(el, { childList: true, subtree: true });
+  return () => {
+    el.removeEventListener('scroll', update);
+    resize.disconnect();
+    mutations.disconnect();
+  };
+}
+
+/** Scrolls a sideways row (never the page) so its selected tab is in view. */
+export function revealActive(el: HTMLElement | null) {
+  const active = el?.querySelector<HTMLElement>('[data-state="active"]');
+  if (!el || !active || el.scrollWidth <= el.clientWidth) return;
+  const row = el.getBoundingClientRect();
+  const item = active.getBoundingClientRect();
+  if (item.left < row.left) el.scrollLeft -= row.left - item.left + 24;
+  else if (item.right > row.right) el.scrollLeft += item.right - row.right + 24;
+}

@@ -24,8 +24,10 @@ import {
   Repeat,
   Search,
   Settings,
+  ShieldCheck,
   Target,
   Upload,
+  UserRound,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { UserAvatar } from '@/components/person';
@@ -217,6 +219,7 @@ function Shell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const { startTour } = useTour();
+  const signOut = useSignOut();
   const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
@@ -401,6 +404,19 @@ function Shell() {
             <DialogTitle>{t('More')}</DialogTitle>
           </DialogHeader>
           <DialogBody className="grid grid-cols-2 gap-2 pb-6">
+            {/* Who's signed in, and the way to your own settings or out. */}
+            <div className="col-span-2 mb-1 flex items-center gap-3 rounded-xl bg-muted/60 p-3">
+              <UserAvatar id={me.user.id} name={me.user.name} avatar={me.user.avatar} size="lg" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{me.user.name}</p>
+                <p className="truncate text-xs text-muted-foreground">{me.user.email}</p>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/settings" search={{ tab: 'profile' }} onClick={() => setMoreOpen(false)}>
+                  {t('Profile')}
+                </Link>
+              </Button>
+            </div>
             {MORE_NAV.map((item) => (
               <Link
                 key={item.to}
@@ -422,6 +438,16 @@ function Shell() {
               className="col-span-2 flex items-center justify-center gap-2 rounded-xl p-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground [&_svg]:size-4"
             >
               <Compass /> {t('Take the tour')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMoreOpen(false);
+                void signOut();
+              }}
+              className="col-span-2 -mt-2 flex items-center justify-center gap-2 rounded-xl p-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground [&_svg]:size-4"
+            >
+              <LogOut /> {t('Sign out')}
             </button>
           </DialogBody>
         </DialogContent>
@@ -524,7 +550,12 @@ function UserMenu() {
         <DropdownMenuItem
           onSelect={() => navigate({ to: '/settings', search: { tab: 'profile' } })}
         >
-          <Settings /> Profile & security
+          <UserRound /> Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => navigate({ to: '/settings', search: { tab: 'security' } })}
+        >
+          <ShieldCheck /> Security
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={startTour}>
           <Compass /> Take the tour

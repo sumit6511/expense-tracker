@@ -174,6 +174,8 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
   // Desktop: a grid of columns. Phones: one column in order of use (rendered in that order, so
   // keyboard and screen-reader order match what's on screen).
   const wide = useMediaQuery('(min-width: 1024px)');
+  // Tablets: two columns under a full-width headline.
+  const medium = useMediaQuery('(min-width: 768px)');
   const hasBudget = data.budget.budgetedMinor > 0;
   const noActivity =
     data.cashFlow.expenseMinor === 0 && data.cashFlow.incomeMinor === 0 && recentItems.length === 0;
@@ -504,6 +506,27 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
       </div>
     </Card>
   );
+
+  if (medium && !wide) {
+    return (
+      <div className="grid grid-cols-2 items-start gap-4">
+        {rates && <div className="col-span-2">{rates}</div>}
+        <div className="col-span-2">{headline}</div>
+        <div className="grid grid-cols-1 gap-4">
+          {attention}
+          {recentCard}
+          {where}
+          {goals}
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          {upcoming}
+          {stats}
+          {insights}
+          {accountsCard}
+        </div>
+      </div>
+    );
+  }
 
   if (!wide) {
     // What people check most first: where they stand, what needs them, what just happened.

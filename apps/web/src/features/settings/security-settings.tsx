@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FilteredInput, Input } from '@/components/ui/input';
 import {
+  Checkbox,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -707,12 +708,87 @@ function SessionsCard() {
   );
 }
 
+/** Settings → Security: how you sign in, and where you're signed in. */
 export function SecuritySettings() {
   return (
-    <>
+    <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+      <PasswordCard />
       <TwoFactorCard />
       <PasskeysCard />
       <SessionsCard />
-    </>
+    </div>
+  );
+}
+
+function PasswordCard() {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [signOutOthers, setSignOutOthers] = useState(true);
+  const [pending, setPending] = useState(false);
+
+  async function changePassword(e: FormEvent) {
+    e.preventDefault();
+    if (next.length < 8) {
+      toast.error('Use at least 8 characters');
+      return;
+    }
+    setPending(true);
+    try {
+      await authApi.changePassword({
+        currentPassword: current,
+        newPassword: next,
+        revokeOtherSessions: signOutOthers,
+      });
+      toast.success('Password changed');
+      setCurrent('');
+      setNext('');
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Password</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={changePassword} className="grid grid-cols-1 gap-4">
+          <Field label="Current password" htmlFor="pw-current">
+            <Input
+              id="pw-current"
+              type="password"
+              autoComplete="current-password"
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+              required
+            />
+          </Field>
+          <Field label="New password" htmlFor="pw-new" hint="At least 8 characters.">
+            <Input
+              id="pw-new"
+              type="password"
+              autoComplete="new-password"
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+              required
+              minLength={8}
+            />
+          </Field>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={signOutOthers}
+              onCheckedChange={(v) => setSignOutOthers(v === true)}
+            />{' '}
+            Sign out other devices
+          </label>
+          <Button type="submit" className="justify-self-start" disabled={pending}>
+            {pending && <Loader2 className="animate-spin" />} Change password
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

@@ -1,19 +1,18 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { Loader2, LogOut, TriangleAlert } from 'lucide-react';
+import { LogOut, TriangleAlert } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/dialog';
 import { Field, Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/menu';
 import { authApi, errorMessage } from '@/lib/api';
 import { useUpdateMe } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { forgetDevice, useSignOut } from '@/lib/sign-out';
+import { useUnsavedChanges } from '@/lib/unsaved-changes';
 import { ProfilePicture } from './avatar-picker';
-import { SecuritySettings } from './security-settings';
 
 export function ProfileSettings() {
   const { me } = useSession();
@@ -22,11 +21,8 @@ export function ProfileSettings() {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const [name, setName] = useState(me.user.name);
-  const [current, setCurrent] = useState('');
-  const [next, setNext] = useState('');
-  const [signOutOthers, setSignOutOthers] = useState(true);
-  const [pending, setPending] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
+  useUnsavedChanges(name.trim() !== me.user.name);
 
   async function saveName(e: FormEvent) {
     e.preventDefault();
@@ -37,29 +33,6 @@ export function ProfileSettings() {
         onError: (err) => toast.error(errorMessage(err)),
       },
     );
-  }
-
-  async function changePassword(e: FormEvent) {
-    e.preventDefault();
-    if (next.length < 8) {
-      toast.error('Use at least 8 characters');
-      return;
-    }
-    setPending(true);
-    try {
-      await authApi.changePassword({
-        currentPassword: current,
-        newPassword: next,
-        revokeOtherSessions: signOutOthers,
-      });
-      toast.success('Password changed');
-      setCurrent('');
-      setNext('');
-    } catch (err) {
-      toast.error(errorMessage(err));
-    } finally {
-      setPending(false);
-    }
   }
 
   const signOut = useSignOut();
@@ -83,7 +56,7 @@ export function ProfileSettings() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div className="grid max-w-2xl grid-cols-1 gap-4">
       <Card>
         <CardHeader>
           <CardTitle>Profile</CardTitle>
@@ -114,48 +87,7 @@ export function ProfileSettings() {
           </form>
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Password</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={changePassword} className="grid grid-cols-1 gap-4">
-            <Field label="Current password" htmlFor="pw-current">
-              <Input
-                id="pw-current"
-                type="password"
-                autoComplete="current-password"
-                value={current}
-                onChange={(e) => setCurrent(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="New password" htmlFor="pw-new" hint="At least 8 characters.">
-              <Input
-                id="pw-new"
-                type="password"
-                autoComplete="new-password"
-                value={next}
-                onChange={(e) => setNext(e.target.value)}
-                required
-                minLength={8}
-              />
-            </Field>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={signOutOthers}
-                onCheckedChange={(v) => setSignOutOthers(v === true)}
-              />{' '}
-              Sign out other devices
-            </label>
-            <Button type="submit" className="justify-self-start" disabled={pending}>
-              {pending && <Loader2 className="animate-spin" />} Change password
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-      <SecuritySettings />
-      <Card className="border-destructive/40 lg:col-span-2">
+      <Card className="border-destructive/40">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-destructive">
             <TriangleAlert className="size-4" /> Delete account
