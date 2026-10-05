@@ -267,9 +267,9 @@ function Thumb({
           type="button"
           aria-label={`Remove ${name}`}
           onClick={onRemove}
-          className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full bg-foreground text-background shadow"
+          className="absolute -top-2 -right-2 grid size-6 place-items-center rounded-full bg-foreground text-background shadow"
         >
-          <X className="size-3" />
+          <X className="size-3.5" />
         </button>
       )}
     </div>
@@ -302,9 +302,9 @@ function QueuedThumb({ file, onRemove }: { file: File; onRemove: () => void }) {
         type="button"
         aria-label={`Remove ${file.name}`}
         onClick={onRemove}
-        className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full bg-foreground text-background shadow"
+        className="absolute -top-2 -right-2 grid size-6 place-items-center rounded-full bg-foreground text-background shadow"
       >
-        <X className="size-3" />
+        <X className="size-3.5" />
       </button>
     </div>
   );

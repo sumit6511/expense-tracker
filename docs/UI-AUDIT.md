@@ -376,22 +376,22 @@ The target after phase 2 is **zero serious or critical axe violations**.
 |---|---|---|---|---|
 | UX-C1 | Critical | S | 1 | Fixed (phase 1): 0 contrast violations on all routes, both themes, desktop and phone |
 | UX-C2 | Critical | M | 2 | Fixed (phase 2): full axe WCAG 2.2 AA and best-practice run reports no violations on any route (desktop and phone, both themes); E2E test covers the skip link, titles and focus after navigating. The Payees/Tags bars are hidden from screen readers rather than named, since each row already reads out its name and amount |
-| UX-C3 | Critical | M | 1 (hit areas) + 3 (selection mode) | Hit areas fixed (phase 1); phone selection mode in phase 3 |
+| UX-C3 | Critical | M | 1 (hit areas) + 3 (selection mode) | Fixed (phases 1 and 3): on touch screens the checkboxes appear only in selection mode (long-press a row, or "Select"), where a tap selects; E2E test on a phone |
 | UX-H1 | High | S | 1 | Fixed (phase 1): every label on one line at 1440 and 390 px except the calendar options on phones, which wrap as intended |
-| UX-H2 | High | M | 3 | Planned |
-| UX-H3 | High | S | 3 | Planned |
+| UX-H2 | High | M | 3 | Fixed (phase 3): new and edit both open as the side panel (bottom sheet on phones), with the same type switch (an edit can turn an expense into income) and the same footer |
+| UX-H3 | High | S | 3 | Fixed (phase 3): one row from 768 px (Tag and Status move to "More" below 1280 px), two rows on phones, "Select all 100 shown", Escape clears, room left below the list; E2E test |
 | UX-H4 | High | S | 4 | Planned |
-| UX-H5 | High | S | 3 | Planned |
+| UX-H5 | High | S | 3 | Fixed (phase 3): phones show hero, review, Recent (5), Coming up, then the rest, in DOM order; Worth knowing folds away |
 | UX-H6 | High | S | 1 | Fixed (phase 1) |
 | UX-H7 | High | S | 1 | Fixed (phase 1) |
 | UX-M1 | Medium | S | 5 | Planned |
 | UX-M2 | Medium | S | 5 | Planned |
-| UX-M3 | Medium | S | 3 | Planned |
+| UX-M3 | Medium | S | 3 | Fixed (phase 3): chart 240 px; Where it went and Accounts start at 576 px instead of 814 px at 1440×900 |
 | UX-M4 | Medium | M | 5 | Planned |
 | UX-M5 | Medium | S | 4 | Planned |
 | UX-M6 | Medium | S | 4 | Planned |
 | UX-M7 | Medium | S | 5 | Planned |
-| UX-M8 | Medium | S | 3 | Planned |
+| UX-M8 | Medium | S | 3 | Fixed (phase 3): "Record" on due and overdue reminders in Coming up, sharing the Recurring page's code; E2E test |
 | UX-M9 | Medium | S | 5 | Planned |
 | UX-L1 | Low | S | 1 | Fixed (phase 1): no arbitrary pixel font sizes left |
 | UX-L2 | Low | S | 6 | Planned |

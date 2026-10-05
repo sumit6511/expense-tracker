@@ -64,6 +64,7 @@ export const NE: Record<string, string> = {
   'All goals': 'सबै लक्ष्य',
   'Worth knowing': 'जान्नैपर्ने कुरा',
   'Coming up': 'आउँदै गरेका',
+  Record: 'रेकर्ड गर्नुहोस्',
   '{count} to review': '{count} जाँच्न बाँकी',
   'Imported transactions waiting for a quick check': 'आयात गरिएका कारोबार छिटो जाँचका लागि पर्खिरहेका',
   '{count} uncategorized': '{count} वर्ग नछुट्याइएका',

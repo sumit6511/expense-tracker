@@ -37,7 +37,6 @@ import {
   useCategoryMap,
   useDeleteRecurring,
   useDismissInsight,
-  useRecordRecurring,
   useRecurring,
   useRecurringSuggestions,
   useSkipRecurring,
@@ -46,7 +45,14 @@ import {
 } from '@/lib/queries';
 import { useCanWrite } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import { describeSchedule, dueLabel, recurringStart, useRecurringDialog } from './recurring-dialog';
+import {
+  describeSchedule,
+  dueLabel,
+  isDue,
+  recurringStart,
+  useRecordNow,
+  useRecurringDialog,
+} from './recurring-dialog';
 
 export function RecurringPage() {
   const f = useFormat();
@@ -67,8 +73,8 @@ export function RecurringPage() {
     0,
   );
   const items = upcoming.data ?? [];
-  const due = items.filter((i) => i.isNext && i.mode === 'remind' && i.date <= f.today);
-  const later = items.filter((i) => !(i.isNext && i.mode === 'remind' && i.date <= f.today));
+  const due = items.filter((i) => isDue(i, f.today));
+  const later = items.filter((i) => !isDue(i, f.today));
   const weekOut = items
     .filter((i) => i.date >= f.today && i.date <= addDays(f.today, 7) && i.amountMinor < 0)
     .filter((i) => i.currency === f.base && i.kind !== 'transfer')
@@ -213,26 +219,11 @@ function UpcomingRow({
 }) {
   const f = useFormat();
   const accounts = useAccountMap();
-  const { openRecord } = useRecurringDialog();
-  const record = useRecordRecurring();
+  const record = useRecordNow();
   const skip = useSkipRecurring();
 
   // mutateAsync rather than mutate callbacks: this row unmounts as soon as the list refreshes,
   // and callbacks passed to mutate() are skipped for unmounted components.
-  async function recordNow() {
-    if (!series) return;
-    if (series.variableAmount) {
-      openRecord(series);
-      return;
-    }
-    try {
-      await record.mutateAsync({ id: series.id });
-      toast.success(`${series.name} recorded`);
-    } catch (e) {
-      toast.error(errorMessage(e));
-    }
-  }
-
   async function skipNow() {
     if (!series) return;
     try {
@@ -275,8 +266,8 @@ function UpcomingRow({
           <Button
             size="sm"
             className="flex-1 sm:flex-none"
-            onClick={recordNow}
-            disabled={record.isPending}
+            onClick={() => record.recordNow(series)}
+            disabled={record.pending}
           >
             Record
           </Button>

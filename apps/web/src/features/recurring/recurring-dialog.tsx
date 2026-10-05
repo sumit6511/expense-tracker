@@ -18,6 +18,7 @@ import {
   type Transaction,
   toDecimalString,
   toDevanagariDigits,
+  type UpcomingItem,
   WEEKDAY_NAMES,
 } from '@et/shared';
 import { Loader2, Trash2 } from 'lucide-react';
@@ -138,6 +139,35 @@ export function useRecurringDialog() {
   const ctx = useContext(RecurringDialogContext);
   if (!ctx) throw new Error('useRecurringDialog must be used inside RecurringDialogProvider');
   return ctx;
+}
+
+/** A reminder that's due: the next of its series, dated today or earlier. "Record" acts on it. */
+export function isDue(item: UpcomingItem, today: IsoDate) {
+  return item.isNext && item.mode === 'remind' && item.date <= today;
+}
+
+/**
+ * Records the next occurrence of a series: straight away, or through the amount dialog when the
+ * amount changes from time to time.
+ */
+export function useRecordNow() {
+  const { openRecord } = useRecurringDialog();
+  const record = useRecordRecurring();
+  // mutateAsync rather than mutate callbacks: the row that called this unmounts as soon as the
+  // list refreshes, and callbacks passed to mutate() are skipped for unmounted components.
+  async function recordNow(series: Recurring) {
+    if (series.variableAmount) {
+      openRecord(series);
+      return;
+    }
+    try {
+      await record.mutateAsync({ id: series.id });
+      toast.success(`${series.name} recorded`);
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  }
+  return { recordNow, pending: record.isPending };
 }
 
 /** Turns a saved series back into editor input. */

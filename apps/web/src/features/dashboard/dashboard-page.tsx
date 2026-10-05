@@ -9,6 +9,7 @@ import {
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import {
   ArrowRight,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleCheck,
@@ -19,7 +20,7 @@ import {
   Upload,
   Wallet,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ChartLegend, PaceChart, type PacePoint } from '@/components/charts';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
@@ -27,7 +28,7 @@ import { EmptyState, ErrorState } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, Progress, Skeleton } from '@/components/ui/card';
 import { InsightList } from '@/features/insights/insight-list';
-import { dueLabel } from '@/features/recurring/recurring-dialog';
+import { dueLabel, isDue, useRecordNow } from '@/features/recurring/recurring-dialog';
 import { useTransactionDialog } from '@/features/transactions/transaction-dialog';
 import { TransactionRow } from '@/features/transactions/transaction-row';
 import { useFormat } from '@/lib/format';
@@ -39,11 +40,12 @@ import {
   useDashboard,
   useGoals,
   useInsights,
+  useRecurring,
   useTransactions,
   useUpcoming,
 } from '@/lib/queries';
 import { useCanWrite, useWorkspace } from '@/lib/session';
-import { cn } from '@/lib/utils';
+import { cn, storage, useMediaQuery } from '@/lib/utils';
 
 export function DashboardPage() {
   const t = useT();
@@ -141,6 +143,9 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
   const { data: accounts = [] } = useAccounts();
   const recent = useTransactions({}, 6);
   const recentItems = recent.data?.pages[0]?.items ?? [];
+  // Desktop: a grid of columns. Phones: one column in order of use (rendered in that order, so
+  // keyboard and screen-reader order match what's on screen).
+  const wide = useMediaQuery('(min-width: 1024px)');
   const hasBudget = data.budget.budgetedMinor > 0;
   const noActivity =
     data.cashFlow.expenseMinor === 0 && data.cashFlow.incomeMinor === 0 && recentItems.length === 0;
@@ -197,297 +202,321 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
     );
   }
 
-  return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      {data.missingRates.length > 0 && (
-        <div className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm lg:col-span-3">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
-          <p>
-            No exchange rate for {data.missingRates.join(', ')}, so those amounts are left out of
-            totals.{' '}
-            <Link
-              to="/settings"
-              search={{ tab: 'rates' }}
-              className="font-medium text-primary hover:underline"
-            >
-              Add a rate
-            </Link>
-          </p>
-        </div>
-      )}
-
-      {/* Headline */}
-      <Card className="flex flex-col lg:col-span-2">
-        <CardContent className="flex flex-1 flex-col gap-4 pt-5">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">
-                {hasBudget ? t('Left to spend') : t('Spent this month')}
-              </p>
-              <p
-                className={cn(
-                  'mt-1 text-4xl font-semibold tracking-tight sm:text-5xl',
-                  hasBudget && data.budget.remainingMinor < 0 && 'text-destructive',
-                )}
-              >
-                {f.money(
-                  hasBudget ? data.budget.remainingMinor : data.cashFlow.expenseMinor,
-                  undefined,
-                  {
-                    trimZeroFraction: true,
-                  },
-                )}
-              </p>
-              {hasBudget && (
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {data.budget.remainingMinor < 0
-                    ? t('Over budget by {amount}', {
-                        amount: f.money(-data.budget.remainingMinor, undefined, {
-                          trimZeroFraction: true,
-                        }),
-                      })
-                    : isCurrent && data.budget.safePerDayMinor !== null
-                      ? t('About {amount} a day for the next {days} days', {
-                          amount: f.money(
-                            wholeUnits(data.budget.safePerDayMinor, f.digits()),
-                            undefined,
-                            { trimZeroFraction: true },
-                          ),
-                          days: data.daysLeft,
-                        })
-                      : t(
-                          data.budget.source === 'cap'
-                            ? 'of {amount} monthly limit'
-                            : 'of {amount} budgeted',
-                          {
-                            amount: f.money(data.budget.budgetedMinor, undefined, {
-                              trimZeroFraction: true,
-                            }),
-                          },
-                        )}
-                </p>
+  const rates = data.missingRates.length > 0 && (
+    <div className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm lg:col-span-3">
+      <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+      <p>
+        No exchange rate for {data.missingRates.join(', ')}, so those amounts are left out of
+        totals.{' '}
+        <Link
+          to="/settings"
+          search={{ tab: 'rates' }}
+          className="font-medium text-primary hover:underline"
+        >
+          Add a rate
+        </Link>
+      </p>
+    </div>
+  );
+  const headline = (
+    <Card>
+      <CardContent className="grid grid-cols-1 gap-4 pt-5">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-sm text-muted-foreground">
+              {hasBudget ? t('Left to spend') : t('Spent this month')}
+            </p>
+            <p
+              className={cn(
+                'mt-1 text-4xl font-semibold tracking-tight sm:text-5xl',
+                hasBudget && data.budget.remainingMinor < 0 && 'text-destructive',
               )}
-            </div>
-            {!hasBudget && (
-              <Button variant="outline" size="sm" asChild>
-                <Link to="/budgets">{t('Set a budget')}</Link>
-              </Button>
-            )}
-            {data.budget.readyToAssignMinor !== null && data.budget.readyToAssignMinor !== 0 && (
-              <Link
-                to="/budgets"
-                className={cn(
-                  'rounded-lg border px-3 py-2 text-sm font-medium',
-                  data.budget.readyToAssignMinor > 0
-                    ? 'border-positive/30 bg-positive/10 text-positive'
-                    : 'border-destructive/30 bg-destructive/10 text-destructive',
-                )}
-              >
-                {data.budget.readyToAssignMinor > 0
-                  ? t('{amount} ready to assign', {
-                      amount: f.money(data.budget.readyToAssignMinor, undefined, {
+            >
+              {f.money(
+                hasBudget ? data.budget.remainingMinor : data.cashFlow.expenseMinor,
+                undefined,
+                {
+                  trimZeroFraction: true,
+                },
+              )}
+            </p>
+            {hasBudget && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {data.budget.remainingMinor < 0
+                  ? t('Over budget by {amount}', {
+                      amount: f.money(-data.budget.remainingMinor, undefined, {
                         trimZeroFraction: true,
                       }),
                     })
-                  : t('{amount} more assigned than you have', {
-                      amount: f.money(-data.budget.readyToAssignMinor, undefined, {
-                        trimZeroFraction: true,
-                      }),
-                    })}
-              </Link>
+                  : isCurrent && data.budget.safePerDayMinor !== null
+                    ? t('About {amount} a day for the next {days} days', {
+                        amount: f.money(
+                          wholeUnits(data.budget.safePerDayMinor, f.digits()),
+                          undefined,
+                          { trimZeroFraction: true },
+                        ),
+                        days: data.daysLeft,
+                      })
+                    : t(
+                        data.budget.source === 'cap'
+                          ? 'of {amount} monthly limit'
+                          : 'of {amount} budgeted',
+                        {
+                          amount: f.money(data.budget.budgetedMinor, undefined, {
+                            trimZeroFraction: true,
+                          }),
+                        },
+                      )}
+              </p>
             )}
           </div>
-          {hasBudget && (
-            <div className="grid grid-cols-1 gap-1.5">
-              <Progress value={spentRatio} tone={tone} label={t('Share of budget spent')} />
-              <div className="flex justify-between text-xs text-muted-foreground tabular">
-                <span>
-                  {t('Spent {amount}', {
-                    amount: f.money(data.budget.spentMinor, undefined, { trimZeroFraction: true }),
+          {!hasBudget && (
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/budgets">{t('Set a budget')}</Link>
+            </Button>
+          )}
+          {data.budget.readyToAssignMinor !== null && data.budget.readyToAssignMinor !== 0 && (
+            <Link
+              to="/budgets"
+              className={cn(
+                'rounded-lg border px-3 py-2 text-sm font-medium',
+                data.budget.readyToAssignMinor > 0
+                  ? 'border-positive/30 bg-positive/10 text-positive'
+                  : 'border-destructive/30 bg-destructive/10 text-destructive',
+              )}
+            >
+              {data.budget.readyToAssignMinor > 0
+                ? t('{amount} ready to assign', {
+                    amount: f.money(data.budget.readyToAssignMinor, undefined, {
+                      trimZeroFraction: true,
+                    }),
+                  })
+                : t('{amount} more assigned than you have', {
+                    amount: f.money(-data.budget.readyToAssignMinor, undefined, {
+                      trimZeroFraction: true,
+                    }),
                   })}
-                </span>
-                <span>
-                  {data.budget.source === 'cap' ? t('Limit') : t('Budget')}{' '}
-                  {f.money(data.budget.budgetedMinor, undefined, { trimZeroFraction: true })}
-                </span>
-              </div>
-            </div>
+            </Link>
           )}
-          {/* The chart takes the room the cards beside it leave. */}
-          <div className="flex flex-1 flex-col">
-            {hasBudget && (
-              <ChartLegend
-                className="mb-1"
-                items={[
-                  { label: t('Spent so far'), color: 'var(--series-1)' },
-                  {
-                    label: t('Even pace to budget'),
-                    color: 'var(--chart-reference)',
-                    kind: 'line',
-                  },
-                ]}
+        </div>
+        {hasBudget && (
+          <div className="grid grid-cols-1 gap-1.5">
+            <Progress value={spentRatio} tone={tone} label={t('Share of budget spent')} />
+            <div className="flex justify-between text-xs text-muted-foreground tabular">
+              <span>
+                {t('Spent {amount}', {
+                  amount: f.money(data.budget.spentMinor, undefined, { trimZeroFraction: true }),
+                })}
+              </span>
+              <span>
+                {data.budget.source === 'cap' ? t('Limit') : t('Budget')}{' '}
+                {f.money(data.budget.budgetedMinor, undefined, { trimZeroFraction: true })}
+              </span>
+            </div>
+          </div>
+        )}
+        <div>
+          {hasBudget && (
+            <ChartLegend
+              className="mb-1"
+              items={[
+                { label: t('Spent so far'), color: 'var(--series-1)' },
+                {
+                  label: t('Even pace to budget'),
+                  color: 'var(--chart-reference)',
+                  kind: 'line',
+                },
+              ]}
+            />
+          )}
+          <PaceChart data={pace} paceLabel={t('Even pace')} height={wide ? 240 : 200} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+  const stats = (
+    <Card>
+      <CardContent className="grid grid-cols-1 gap-3 pt-5">
+        <Stat label={t('Income')} value={<Money minor={data.cashFlow.incomeMinor} trimZero />} />
+        <Stat
+          label={t('Spending')}
+          value={<Money minor={data.cashFlow.expenseMinor} trimZero />}
+          note={
+            change === null ? undefined : (
+              <span className={cn(change <= 0 ? 'text-positive' : 'text-muted-foreground')}>
+                {change <= 0 ? '▼' : '▲'}{' '}
+                {t('{pct}% vs last month at this point', { pct: Math.abs(Math.round(change)) })}
+              </span>
+            )
+          }
+        />
+        <Stat
+          label={t('Net')}
+          value={<Money minor={data.cashFlow.netMinor} signed colored trimZero />}
+        />
+      </CardContent>
+    </Card>
+  );
+  const attention = <AttentionCard data={data} />;
+  const insights = isCurrent && <InsightsCard collapsible={!wide} />;
+  const where = (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('Where it went')}</CardTitle>
+        <Link to="/reports" className="hit-area text-xs font-medium text-primary hover:underline">
+          {t('Reports')}
+        </Link>
+      </CardHeader>
+      <CardContent>
+        {data.topCategories.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            {t('No spending yet this month.')}
+          </p>
+        ) : (
+          <ul className="grid grid-cols-1 gap-3">
+            {data.topCategories.map((c) => {
+              const cat = c.categoryId ? categories.get(c.categoryId) : undefined;
+              const share =
+                data.cashFlow.expenseMinor > 0
+                  ? (c.amountMinor / data.cashFlow.expenseMinor) * 100
+                  : 0;
+              return (
+                <li key={c.categoryId ?? 'none'}>
+                  <Link
+                    to="/transactions"
+                    search={{
+                      categoryIds: c.categoryId ?? 'none',
+                      from: data.period.start,
+                      to: data.period.end,
+                    }}
+                    className="grid grid-cols-1 gap-1.5 rounded-lg hover:bg-muted/50"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <CategoryIcon icon={cat?.icon} color={cat?.color} size="sm" />
+                      <span className="min-w-0 flex-1 truncate text-sm">
+                        {cat?.name ?? t('Uncategorized')}
+                      </span>
+                      <Money minor={c.amountMinor} className="text-sm font-medium" trimZero />
+                    </div>
+                    <Progress
+                      value={share}
+                      className="h-1.5"
+                      label={`${Math.round(share)}% of spending`}
+                    />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+  const accountsCard = (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('Accounts')}</CardTitle>
+        <Link to="/accounts" className="hit-area text-xs font-medium text-primary hover:underline">
+          {t('Manage')}
+        </Link>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 gap-1">
+        {accounts
+          .filter((a) => !a.archived)
+          .slice(0, 6)
+          .map((a) => (
+            <Link
+              key={a.id}
+              to="/accounts/$accountId"
+              params={{ accountId: a.id }}
+              className="-mx-2 flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-muted/60"
+            >
+              <CategoryIcon icon={a.icon} color={a.color} size="sm" />
+              <span className="min-w-0 flex-1 truncate text-sm">{a.name}</span>
+              <Money
+                minor={a.balanceMinor}
+                currency={a.currency}
+                className={cn(
+                  'text-sm',
+                  LIABILITY_ACCOUNT_TYPES.includes(a.type) &&
+                    a.balanceMinor < 0 &&
+                    'text-muted-foreground',
+                )}
+                trimZero
               />
-            )}
-            <div className="flex-1">
-              <PaceChart data={pace} paceLabel={t('Even pace')} fill />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* This month in numbers */}
-      <div className="grid grid-cols-1 content-start gap-4">
-        <Card>
-          <CardContent className="grid grid-cols-1 gap-3 pt-5">
-            <Stat
-              label={t('Income')}
-              value={<Money minor={data.cashFlow.incomeMinor} trimZero />}
-            />
-            <Stat
-              label={t('Spending')}
-              value={<Money minor={data.cashFlow.expenseMinor} trimZero />}
-              note={
-                change === null ? undefined : (
-                  <span className={cn(change <= 0 ? 'text-positive' : 'text-muted-foreground')}>
-                    {change <= 0 ? '▼' : '▲'}{' '}
-                    {t('{pct}% vs last month at this point', { pct: Math.abs(Math.round(change)) })}
-                  </span>
-                )
-              }
-            />
-            <Stat
-              label={t('Net')}
-              value={<Money minor={data.cashFlow.netMinor} signed colored trimZero />}
-            />
-          </CardContent>
-        </Card>
-        <AttentionCard data={data} />
-        {isCurrent && <InsightsCard />}
-      </div>
-
-      {/* Top categories */}
-      <Card className="self-start">
-        <CardHeader>
-          <CardTitle>{t('Where it went')}</CardTitle>
-          <Link to="/reports" className="hit-area text-xs font-medium text-primary hover:underline">
-            {t('Reports')}
-          </Link>
-        </CardHeader>
-        <CardContent>
-          {data.topCategories.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              {t('No spending yet this month.')}
-            </p>
-          ) : (
-            <ul className="grid grid-cols-1 gap-3">
-              {data.topCategories.map((c) => {
-                const cat = c.categoryId ? categories.get(c.categoryId) : undefined;
-                const share =
-                  data.cashFlow.expenseMinor > 0
-                    ? (c.amountMinor / data.cashFlow.expenseMinor) * 100
-                    : 0;
-                return (
-                  <li key={c.categoryId ?? 'none'}>
-                    <Link
-                      to="/transactions"
-                      search={{
-                        categoryIds: c.categoryId ?? 'none',
-                        from: data.period.start,
-                        to: data.period.end,
-                      }}
-                      className="grid grid-cols-1 gap-1.5 rounded-lg hover:bg-muted/50"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <CategoryIcon icon={cat?.icon} color={cat?.color} size="sm" />
-                        <span className="min-w-0 flex-1 truncate text-sm">
-                          {cat?.name ?? t('Uncategorized')}
-                        </span>
-                        <Money minor={c.amountMinor} className="text-sm font-medium" trimZero />
-                      </div>
-                      <Progress
-                        value={share}
-                        className="h-1.5"
-                        label={`${Math.round(share)}% of spending`}
-                      />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Accounts and goals */}
-      <div className="grid grid-cols-1 content-start gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('Accounts')}</CardTitle>
-            <Link
-              to="/accounts"
-              className="hit-area text-xs font-medium text-primary hover:underline"
-            >
-              {t('Manage')}
             </Link>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-1">
-            {accounts
-              .filter((a) => !a.archived)
-              .slice(0, 6)
-              .map((a) => (
-                <Link
-                  key={a.id}
-                  to="/accounts/$accountId"
-                  params={{ accountId: a.id }}
-                  className="-mx-2 flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-muted/60"
-                >
-                  <CategoryIcon icon={a.icon} color={a.color} size="sm" />
-                  <span className="min-w-0 flex-1 truncate text-sm">{a.name}</span>
-                  <Money
-                    minor={a.balanceMinor}
-                    currency={a.currency}
-                    className={cn(
-                      'text-sm',
-                      LIABILITY_ACCOUNT_TYPES.includes(a.type) &&
-                        a.balanceMinor < 0 &&
-                        'text-muted-foreground',
-                    )}
-                    trimZero
-                  />
-                </Link>
-              ))}
-            <div className="mt-2 flex items-center justify-between border-t pt-3 text-sm">
-              <span className="text-muted-foreground">Net worth</span>
-              <Money minor={data.netWorthMinor} className="font-semibold" trimZero />
-            </div>
-          </CardContent>
-        </Card>
-        <GoalsCard />
+          ))}
+        <div className="mt-2 flex items-center justify-between border-t pt-3 text-sm">
+          <span className="text-muted-foreground">Net worth</span>
+          <Money minor={data.netWorthMinor} className="font-semibold" trimZero />
+        </div>
+      </CardContent>
+    </Card>
+  );
+  const goals = <GoalsCard />;
+  const upcoming = isCurrent && <UpcomingCard />;
+  const recentCard = (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('Recent')}</CardTitle>
+        <Link
+          to="/transactions"
+          className="hit-area text-xs font-medium text-primary hover:underline"
+        >
+          {t('See all')}
+        </Link>
+      </CardHeader>
+      <div className="-mt-1 divide-y pb-2">
+        {recentItems.length === 0 && (
+          <p className="px-5 py-6 text-sm text-muted-foreground">{t('Nothing yet.')}</p>
+        )}
+        {recentItems.slice(0, wide ? 6 : 5).map((tx) => (
+          <RecentRow key={tx.id} tx={tx} />
+        ))}
       </div>
+    </Card>
+  );
 
-      {/* Coming up and recent */}
-      <div className="grid grid-cols-1 content-start gap-4">
-        {isCurrent && <UpcomingCard />}
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('Recent')}</CardTitle>
-            <Link
-              to="/transactions"
-              className="hit-area text-xs font-medium text-primary hover:underline"
-            >
-              {t('See all')}
-            </Link>
-          </CardHeader>
-          <div className="-mt-1 divide-y pb-2">
-            {recentItems.length === 0 && (
-              <p className="px-5 py-6 text-sm text-muted-foreground">{t('Nothing yet.')}</p>
-            )}
-            {recentItems.map((tx) => (
-              <RecentRow key={tx.id} tx={tx} />
-            ))}
-          </div>
-        </Card>
+  if (!wide) {
+    // What people check most first: where they stand, what needs them, what just happened.
+    return (
+      <div className="grid grid-cols-1 gap-4">
+        {rates}
+        {headline}
+        {attention}
+        {recentCard}
+        {upcoming}
+        {stats}
+        {insights}
+        {where}
+        {accountsCard}
+        {goals}
       </div>
+    );
+  }
+
+  // Two stacks that don't share row heights, so a tall card in one doesn't leave a gap in the
+  // other: the month and where the money went on the left, numbers and what's next on the right.
+  return (
+    <div className="grid grid-cols-3 items-start gap-4">
+      {rates}
+      <div className="col-span-2 grid grid-cols-1 gap-4">
+        {headline}
+        <div className="grid grid-cols-2 items-start gap-4">
+          {where}
+          <div className="grid grid-cols-1 gap-4">
+            {accountsCard}
+            {goals}
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-4">
+        {stats}
+        {attention}
+        {insights}
+        {upcoming}
+      </div>
+      <div className="col-span-3">{recentCard}</div>
     </div>
   );
 }
@@ -558,20 +587,53 @@ function GoalsCard() {
 }
 
 /** Bills and income due in the next three weeks, overdue reminders first. */
-function InsightsCard() {
+const INSIGHTS_OPEN_KEY = 'et.dashboard.insightsOpen';
+
+/** On phones it can be folded away (and stays that way), since it sits above other cards. */
+function InsightsCard({ collapsible }: { collapsible: boolean }) {
   const t = useT();
   const { data } = useInsights();
+  const [open, setOpen] = useState(() => storage.get(INSIGHTS_OPEN_KEY) !== 'false');
   const items = data?.items ?? [];
   if (items.length === 0) return null;
+  const shown = !collapsible || open;
+  const toggle = () => {
+    setOpen(!open);
+    storage.set(INSIGHTS_OPEN_KEY, open ? 'false' : null);
+  };
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{t('Worth knowing')}</CardTitle>
+      <CardHeader className={cn(!shown && 'pb-4')}>
+        {collapsible ? (
+          <CardTitle>
+            <button
+              type="button"
+              onClick={toggle}
+              aria-expanded={open}
+              className="hit-area -my-1 inline-flex items-center gap-1.5"
+            >
+              {t('Worth knowing')}
+              {!open && (
+                <span className="rounded-full bg-muted px-1.5 text-2xs font-medium text-muted-foreground">
+                  {items.length}
+                </span>
+              )}
+              <ChevronDown
+                className={cn(
+                  'size-4 text-muted-foreground transition-transform',
+                  open && 'rotate-180',
+                )}
+              />
+            </button>
+          </CardTitle>
+        ) : (
+          <CardTitle>{t('Worth knowing')}</CardTitle>
+        )}
         <Link to="/insights" className="hit-area text-xs font-medium text-primary hover:underline">
           {items.length > 2 ? t('See all {count}', { count: items.length }) : t('Insights')}
         </Link>
       </CardHeader>
-      <InsightList items={items.slice(0, 2)} className="-mt-1 border-t" />
+      {shown && <InsightList items={items.slice(0, 2)} className="-mt-1 border-t" />}
     </Card>
   );
 }
@@ -579,7 +641,10 @@ function InsightsCard() {
 function UpcomingCard() {
   const t = useT();
   const f = useFormat();
+  const canWrite = useCanWrite();
   const { data: items = [] } = useUpcoming(21);
+  const { data: series = [] } = useRecurring();
+  const record = useRecordNow();
   const next = items.filter((i) => i.isNext || i.date >= f.today).slice(0, 5);
   if (next.length === 0) return null;
   return (
@@ -591,32 +656,50 @@ function UpcomingCard() {
         </Link>
       </CardHeader>
       <CardContent className="grid grid-cols-1 gap-1">
-        {next.map((i) => (
-          <Link
-            key={`${i.recurringId}-${i.date}`}
-            to="/recurring"
-            className="-mx-2 flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-muted/60"
-          >
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm">{i.name}</span>
-              <span
-                className={cn(
-                  'block text-xs text-muted-foreground',
-                  i.overdue && 'font-medium text-destructive',
-                )}
+        {next.map((i) => {
+          // Bills due today or overdue can be recorded right here.
+          const due = canWrite && isDue(i, f.today);
+          const s = due ? series.find((r) => r.id === i.recurringId) : undefined;
+          return (
+            <div key={`${i.recurringId}-${i.date}`} className="flex items-center gap-2">
+              <Link
+                to="/recurring"
+                className="-mx-2 flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-muted/60"
               >
-                {dueLabel(i.date, f)}
-              </span>
-            </span>
-            <Money
-              minor={i.amountMinor}
-              currency={i.currency}
-              signed={i.amountMinor > 0}
-              colored={i.kind !== 'transfer'}
-              className="text-sm"
-            />
-          </Link>
-        ))}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm">{i.name}</span>
+                  <span
+                    className={cn(
+                      'block text-xs text-muted-foreground',
+                      i.overdue && 'font-medium text-destructive',
+                    )}
+                  >
+                    {dueLabel(i.date, f)}
+                  </span>
+                </span>
+                <Money
+                  minor={i.amountMinor}
+                  currency={i.currency}
+                  signed={i.amountMinor > 0}
+                  colored={i.kind !== 'transfer'}
+                  className="text-sm"
+                />
+              </Link>
+              {s && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  disabled={record.pending}
+                  onClick={() => record.recordNow(s)}
+                  aria-label={`${t('Record')} ${i.name}`}
+                >
+                  {t('Record')}
+                </Button>
+              )}
+            </div>
+          );
+        })}
       </CardContent>
     </Card>
   );

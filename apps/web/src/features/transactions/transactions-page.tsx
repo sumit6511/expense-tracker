@@ -5,6 +5,7 @@ import {
   CheckCheck,
   CircleDashed,
   Download,
+  Ellipsis,
   Inbox,
   Loader2,
   Plus,
@@ -28,6 +29,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   Segmented,
 } from '@/components/ui/menu';
@@ -43,6 +46,7 @@ import {
   useTransactions,
 } from '@/lib/queries';
 import { useCanWrite, useWorkspace } from '@/lib/session';
+import { cn, useMediaQuery } from '@/lib/utils';
 import type { TransactionsSearch } from '@/router';
 import { useTransactionDialog } from './transaction-dialog';
 import { TransactionRow } from './transaction-row';
@@ -60,6 +64,15 @@ export function TransactionsPage() {
   const bulk = useBulkTransactions();
   const confirm = useConfirm();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Touch screens hide the checkboxes until you choose "Select" or long-press a row; then a tap
+  // selects instead of opening. With a mouse, the checkboxes are always there.
+  const finePointer = useMediaQuery('(pointer: fine)');
+  const [selecting, setSelecting] = useState(false);
+  const selectMode = selecting || selected.size > 0;
+  const clearSelection = () => {
+    setSelected(new Set());
+    setSelecting(false);
+  };
   const [q, setQ] = useState(search.q ?? '');
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -98,7 +111,23 @@ export function TransactionsPage() {
 
   // Clear the selection whenever the filters change.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset on filter change only
-  useEffect(() => setSelected(new Set()), [filters]);
+  useEffect(() => {
+    setSelected(new Set());
+    setSelecting(false);
+  }, [filters]);
+
+  // Escape clears the selection, once any open menu or dialog has closed.
+  useEffect(() => {
+    if (!selectMode) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (document.querySelector('[role="dialog"], [data-radix-popper-content-wrapper]')) return;
+      setSelected(new Set());
+      setSelecting(false);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectMode]);
 
   // Infinite scroll.
   const sentinel = useRef<HTMLDivElement>(null);
@@ -137,16 +166,19 @@ export function TransactionsPage() {
     try {
       const res = await bulk.mutateAsync(action);
       toast.success(message(res.updated, res.skipped));
-      setSelected(new Set());
+      clearSelection();
     } catch (err) {
       toast.error(errorMessage(err));
     }
   }
 
   const categoryFilter = search.categoryIds?.split(',')[0];
+  const allSelected = items.length > 0 && selected.size === items.length;
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(items.map((i) => i.id)));
 
   return (
-    <div className="pb-16">
+    // While the selection bar is up, leave room for it below the last row.
+    <div className={cn('pb-16', selectMode && 'pb-40 lg:pb-24')}>
       <PageHeader
         title={trash ? 'Trash' : 'Transactions'}
         description={trash ? 'Deleted transactions are kept for 30 days.' : undefined}
@@ -280,17 +312,29 @@ export function TransactionsPage() {
       </div>
 
       {totals && (
-        <p className="mb-2 flex flex-wrap gap-x-3 px-1 text-xs text-muted-foreground tabular">
-          <span>
-            {totals.count} transaction{totals.count === 1 ? '' : 's'}
-          </span>
-          <span>
-            In <Money minor={totals.inflowBaseMinor} className="text-positive" trimZero />
-          </span>
-          <span>
-            Out <Money minor={-totals.outflowBaseMinor} trimZero />
-          </span>
-        </p>
+        <div className="mb-2 flex items-center gap-3 px-1">
+          <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground tabular">
+            <span>
+              {totals.count} transaction{totals.count === 1 ? '' : 's'}
+            </span>
+            <span>
+              In <Money minor={totals.inflowBaseMinor} className="text-positive" trimZero />
+            </span>
+            <span>
+              Out <Money minor={-totals.outflowBaseMinor} trimZero />
+            </span>
+          </p>
+          {!finePointer && canWrite && items.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="-my-1 ml-auto text-primary"
+              onClick={() => (selectMode ? clearSelection() : setSelecting(true))}
+            >
+              {selectMode ? 'Cancel' : 'Select'}
+            </Button>
+          )}
+        </div>
       )}
 
       {list.error && <ErrorState error={list.error} retry={() => list.refetch()} />}
@@ -354,7 +398,16 @@ export function TransactionsPage() {
                       <TransactionRow
                         tx={tx}
                         onOpen={(t) => (trash ? undefined : openEdit(t.id))}
-                        selectable={canWrite}
+                        selectable={canWrite && (finePointer || selectMode)}
+                        selectMode={!finePointer && selectMode}
+                        onLongPress={
+                          canWrite && !finePointer
+                            ? () => {
+                                setSelecting(true);
+                                setSelected((s) => new Set(s).add(tx.id));
+                              }
+                            : undefined
+                        }
                         selected={selected.has(tx.id)}
                         onSelect={(on) =>
                           setSelected((s) => {
@@ -393,158 +446,194 @@ export function TransactionsPage() {
         )}
       </Card>
 
-      {/* Bulk actions */}
-      {selected.size > 0 && (
-        <div className="fixed inset-x-0 bottom-20 z-40 mx-auto flex w-[min(40rem,calc(100%-1.5rem))] flex-wrap items-center gap-2 rounded-2xl border bg-popover p-2 pl-4 shadow-xl lg:bottom-6">
-          <span className="text-sm font-medium">{selected.size} selected</span>
+      {/* Bulk actions: one row on wider screens; on phones the count on top and the actions
+          below, with the rarer ones in "More". */}
+      {selectMode && (
+        <section
+          aria-label="Selected transactions"
+          className="fixed inset-x-0 bottom-20 z-40 mx-auto flex w-[calc(100%-1.5rem)] flex-wrap items-center gap-x-1.5 gap-y-2 rounded-2xl border bg-popover p-2 shadow-xl md:w-max md:max-w-[calc(100%-1.5rem)] md:flex-nowrap lg:bottom-6 lg:left-60"
+        >
+          <div className="flex min-w-0 grow items-center gap-1 pl-2 md:grow-0">
+            <span className="text-sm font-medium whitespace-nowrap" aria-live="polite">
+              {selected.size === 0 ? 'Tap transactions to select' : `${selected.size} selected`}
+            </span>
+            {items.length > 1 && (
+              <Button variant="ghost" size="sm" className="text-primary" onClick={toggleAll}>
+                {allSelected
+                  ? 'Select none'
+                  : list.hasNextPage
+                    ? `Select all ${items.length} shown`
+                    : `Select all ${items.length}`}
+              </Button>
+            )}
+          </div>
           <Button
             variant="ghost"
-            size="sm"
-            onClick={() =>
-              setSelected(
-                selected.size === items.length ? new Set() : new Set(items.map((i) => i.id)),
-              )
-            }
+            size="icon-sm"
+            aria-label="Clear selection"
+            title="Clear selection (Esc)"
+            className="md:order-last"
+            onClick={clearSelection}
           >
-            {selected.size === items.length ? 'None' : 'All'}
+            <X />
           </Button>
-          <div className="ml-auto flex flex-wrap gap-1.5">
-            {trash ? (
-              <Button
-                size="sm"
-                onClick={() =>
-                  runBulk({ action: 'restore', ids: selectedIds }, (n) => `Restored ${n}`)
-                }
-              >
-                <Undo2 /> Restore
-              </Button>
-            ) : (
-              <>
-                <BulkCategorize
-                  onPick={(categoryId) =>
-                    runBulk(
-                      { action: 'setCategory', ids: selectedIds, categoryId },
-                      (n, skipped) =>
-                        skipped
-                          ? `Categorized ${n}. ${skipped} skipped (transfers or split transactions).`
-                          : `Categorized ${n} as ${categoryId ? (categories.get(categoryId)?.name ?? '') : 'uncategorized'}`,
-                    )
+          {selected.size > 0 && (
+            <div className="flex w-full items-center gap-1.5 md:w-auto md:border-l md:pl-1.5">
+              {trash ? (
+                <Button
+                  size="sm"
+                  className="ml-auto md:ml-0"
+                  onClick={() =>
+                    runBulk({ action: 'restore', ids: selectedIds }, (n) => `Restored ${n}`)
                   }
-                />
-                {tags.length > 0 && (
+                >
+                  <Undo2 /> Restore
+                </Button>
+              ) : (
+                <>
+                  <BulkCategorize
+                    className="min-w-0 grow md:w-40 md:grow-0"
+                    onPick={(categoryId) =>
+                      runBulk(
+                        { action: 'setCategory', ids: selectedIds, categoryId },
+                        (n, skipped) =>
+                          skipped
+                            ? `Categorized ${n}. ${skipped} skipped (transfers or split transactions).`
+                            : `Categorized ${n} as ${categoryId ? (categories.get(categoryId)?.name ?? '') : 'uncategorized'}`,
+                      )
+                    }
+                  />
+                  {tags.length > 0 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="hidden xl:inline-flex">
+                          <Tags /> Tag
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        {tags.map((t) => (
+                          <DropdownMenuItem key={t.id} onSelect={() => addTag(t)}>
+                            <TagDot color={t.color} /> #{t.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="hidden md:inline-flex"
+                    onClick={markReviewed}
+                  >
+                    <CheckCheck /> Reviewed
+                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <Tags /> Tag
+                      <Button variant="outline" size="sm" className="hidden xl:inline-flex">
+                        <CircleDashed /> Status
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
-                      {tags.map((t) => (
-                        <DropdownMenuItem
-                          key={t.id}
-                          onSelect={() =>
-                            runBulk(
-                              { action: 'addTags', ids: selectedIds, tagIds: [t.id] },
-                              (n) => `Tagged ${n} with #${t.name}`,
-                            )
-                          }
-                        >
-                          <span
-                            className="size-2 rounded-full"
-                            style={{ backgroundColor: t.color }}
-                          />{' '}
-                          #{t.name}
-                        </DropdownMenuItem>
-                      ))}
+                      <DropdownMenuItem onSelect={() => setStatus('cleared')}>
+                        Cleared (on the statement)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setStatus('pending')}>
+                        Pending
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    runBulk(
-                      { action: 'markReviewed', ids: selectedIds },
-                      (n) => `Marked ${n} as reviewed`,
-                    )
-                  }
-                >
-                  <CheckCheck /> Reviewed
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <CircleDashed /> Status
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem
-                      onSelect={() =>
-                        runBulk(
-                          { action: 'setStatus', ids: selectedIds, status: 'cleared' },
-                          (n) => `Marked ${n} as cleared`,
-                        )
-                      }
-                    >
-                      Cleared (on the statement)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() =>
-                        runBulk(
-                          { action: 'setStatus', ids: selectedIds, status: 'pending' },
-                          (n) => `Marked ${n} as pending`,
-                        )
-                      }
-                    >
-                      Pending
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive"
-                  onClick={async () => {
-                    const ok = await confirm({
-                      title: `Delete ${selected.size} transaction${selected.size === 1 ? '' : 's'}?`,
-                      description:
-                        'They move to the trash, where you can restore them for 30 days.',
-                      confirmLabel: 'Delete',
-                      destructive: true,
-                    });
-                    if (!ok) return;
-                    const ids = selectedIds;
-                    try {
-                      const res = await bulk.mutateAsync({ action: 'delete', ids });
-                      setSelected(new Set());
-                      toast(`Deleted ${res.updated}`, {
-                        action: {
-                          label: 'Undo',
-                          onClick: () => bulk.mutate({ action: 'restore', ids }),
-                        },
-                      });
-                    } catch (err) {
-                      toast.error(errorMessage(err));
-                    }
-                  }}
-                >
-                  <Trash2 /> Delete
-                </Button>
-              </>
-            )}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Clear selection"
-              onClick={() => setSelected(new Set())}
-            >
-              <X />
-            </Button>
-          </div>
-        </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={deleteSelected}
+                  >
+                    <Trash2 /> Delete
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        aria-label="More actions"
+                        className="xl:hidden"
+                      >
+                        <Ellipsis />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem className="md:hidden" onSelect={markReviewed}>
+                        <CheckCheck /> Mark reviewed
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setStatus('cleared')}>
+                        <CircleDashed /> Mark cleared
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setStatus('pending')}>
+                        <CircleDashed /> Mark pending
+                      </DropdownMenuItem>
+                      {tags.length > 0 && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuLabel>Add a tag</DropdownMenuLabel>
+                          {tags.map((t) => (
+                            <DropdownMenuItem key={t.id} onSelect={() => addTag(t)}>
+                              <TagDot color={t.color} /> #{t.name}
+                            </DropdownMenuItem>
+                          ))}
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              )}
+            </div>
+          )}
+        </section>
       )}
     </div>
   );
+
+  function addTag(tag: { id: string; name: string }) {
+    runBulk(
+      { action: 'addTags', ids: selectedIds, tagIds: [tag.id] },
+      (n) => `Tagged ${n} with #${tag.name}`,
+    );
+  }
+
+  function markReviewed() {
+    runBulk({ action: 'markReviewed', ids: selectedIds }, (n) => `Marked ${n} as reviewed`);
+  }
+
+  function setStatus(status: 'cleared' | 'pending') {
+    runBulk({ action: 'setStatus', ids: selectedIds, status }, (n) => `Marked ${n} as ${status}`);
+  }
+
+  async function deleteSelected() {
+    const ok = await confirm({
+      title: `Delete ${selected.size} transaction${selected.size === 1 ? '' : 's'}?`,
+      description: 'They move to the trash, where you can restore them for 30 days.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    const ids = selectedIds;
+    try {
+      const res = await bulk.mutateAsync({ action: 'delete', ids });
+      clearSelection();
+      toast(`Deleted ${res.updated}`, {
+        action: {
+          label: 'Undo',
+          onClick: () => bulk.mutate({ action: 'restore', ids }),
+        },
+      });
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  }
+}
+
+function TagDot({ color }: { color: string }) {
+  return <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />;
 }
 
 /** "Today · 14 Asoj", "Monday, 12 Asoj" or "3 Bhadra". */
@@ -561,10 +650,16 @@ function clean<T extends Record<string, unknown>>(obj: T): T {
   ) as T;
 }
 
-function BulkCategorize({ onPick }: { onPick: (categoryId: string | null) => void }) {
+function BulkCategorize({
+  onPick,
+  className,
+}: {
+  onPick: (categoryId: string | null) => void;
+  className?: string;
+}) {
   const [value, setValue] = useState<string | null>(null);
   return (
-    <div className="w-40">
+    <div className={className}>
       <CategoryPicker
         value={value}
         onChange={(id) => {

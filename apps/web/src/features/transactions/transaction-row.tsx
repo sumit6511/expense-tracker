@@ -1,5 +1,6 @@
 import type { Transaction } from '@et/shared';
 import { ArrowLeftRight, Inbox, Lock, Paperclip, Repeat, Split } from 'lucide-react';
+import { type PointerEvent, useRef } from 'react';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
 import { UserAvatar } from '@/components/person';
@@ -21,12 +22,19 @@ export function TransactionRow({
   showAccount = true,
   showDate = false,
   showReviewHint = true,
+  selectMode = false,
+  onLongPress,
 }: {
   tx: Transaction;
   onOpen: (tx: Transaction) => void;
+  /** Show the checkbox. */
   selectable?: boolean;
   selected?: boolean;
   onSelect?: (selected: boolean) => void;
+  /** Tapping the row selects it instead of opening it (selection mode on touch screens). */
+  selectMode?: boolean;
+  /** Long-press on a touch screen (starts selection mode). */
+  onLongPress?: () => void;
   showAccount?: boolean;
   showDate?: boolean;
   /** Off where every row needs review anyway (the Review page). */
@@ -66,12 +74,15 @@ export function TransactionRow({
   }
   const txTags = tags.filter((t) => tx.tagIds.includes(t.id));
   const uncategorized = !tx.transfer && !isSplit && !category;
+  const press = useLongPress(onLongPress);
 
   return (
     <div
       className={cn(
         'group flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/60 sm:px-4',
         selected && 'bg-accent/60 hover:bg-accent/70',
+        // A long press selects; don't also start selecting text or open the iOS callout.
+        onLongPress && 'select-none [-webkit-touch-callout:none]',
       )}
     >
       {selectable && (
@@ -79,11 +90,18 @@ export function TransactionRow({
           checked={selected}
           onCheckedChange={(v) => onSelect?.(v === true)}
           aria-label={`Select ${title}`}
+          className={cn(selectMode && 'size-5')}
         />
       )}
       <button
         type="button"
-        onClick={() => onOpen(tx)}
+        {...press.handlers}
+        onClick={() => {
+          if (press.consume()) return;
+          if (selectMode) onSelect?.(!selected);
+          else onOpen(tx);
+        }}
+        aria-pressed={selectMode ? selected : undefined}
         className="flex min-w-0 flex-1 items-center gap-3 text-left"
       >
         {tx.transfer ? (
@@ -171,4 +189,50 @@ export function TransactionRow({
       </button>
     </div>
   );
+}
+
+/**
+ * Half a second's press without moving, on touch screens only. `consume()` tells the click that
+ * ends a long press to do nothing (some browsers send one, some don't).
+ */
+function useLongPress(onLongPress: (() => void) | undefined) {
+  const timer = useRef<number | undefined>(undefined);
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const fired = useRef(false);
+  const cancel = () => {
+    window.clearTimeout(timer.current);
+    start.current = null;
+  };
+  return {
+    handlers: onLongPress
+      ? {
+          onPointerDown: (e: PointerEvent) => {
+            fired.current = false;
+            if (e.pointerType !== 'touch') return;
+            start.current = { x: e.clientX, y: e.clientY };
+            timer.current = window.setTimeout(() => {
+              start.current = null;
+              fired.current = true;
+              navigator.vibrate?.(10);
+              onLongPress();
+            }, 500);
+          },
+          onPointerMove: (e: PointerEvent) => {
+            const from = start.current;
+            // Scrolling the list isn't a long press.
+            if (from && Math.hypot(e.clientX - from.x, e.clientY - from.y) > 10) cancel();
+          },
+          onPointerUp: cancel,
+          onPointerCancel: cancel,
+          onContextMenu: (e: { preventDefault: () => void }) => {
+            if (fired.current || start.current) e.preventDefault();
+          },
+        }
+      : {},
+    consume: () => {
+      const was = fired.current;
+      fired.current = false;
+      return was;
+    },
+  };
 }

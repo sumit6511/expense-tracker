@@ -18,7 +18,8 @@ export const DialogClose = DialogPrimitive.Close;
 
 /**
  * `variant="modal"`: centered card on desktop, bottom sheet on phones.
- * `variant="sheet"`: full-height panel from the right on desktop, full screen on phones.
+ * `variant="sheet"`: full-height panel from the right on desktop, bottom sheet on phones (for
+ * longer forms that sit beside the page, like editing a transaction).
  */
 export function DialogContent({
   className,
@@ -39,7 +40,7 @@ export function DialogContent({
           variant === 'modal' &&
             'inset-x-0 bottom-0 max-h-[92dvh] rounded-t-2xl border-t sm:inset-auto sm:top-1/2 sm:left-1/2 sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border',
           variant === 'sheet' &&
-            'inset-0 sm:inset-y-0 sm:right-0 sm:left-auto sm:w-full sm:max-w-md sm:border-l',
+            'inset-x-0 bottom-0 max-h-[92dvh] rounded-t-2xl border-t sm:inset-y-0 sm:right-0 sm:left-auto sm:max-h-none sm:w-full sm:max-w-md sm:rounded-none sm:border-t-0 sm:border-l',
           className,
         )}
         {...props}

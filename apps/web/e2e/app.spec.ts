@@ -1,7 +1,25 @@
 import { createHmac } from 'node:crypto';
 import { createServer, type IncomingHttpHeaders } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import type { Page } from '@playwright/test';
 import { choose, createUser, expect, test, totp } from './fixtures';
+
+/** Adds today's expenses from Cash through the API, one per payee. */
+async function addExpenses(page: Page, workspaceId: string, origin: string, payees: string[]) {
+  const base = `/api/v1/workspaces/${workspaceId}`;
+  const accounts: Array<{ id: string; name: string }> = await (
+    await page.request.get(`${base}/accounts`)
+  ).json();
+  const cash = accounts.find((a) => a.name === 'Cash')!.id;
+  const today = new Date().toISOString().slice(0, 10);
+  for (const payee of payees) {
+    const res = await page.request.post(`${base}/transactions`, {
+      data: { accountId: cash, date: today, amountMinor: -50_000, payee },
+      headers: { origin },
+    });
+    expect(res.ok()).toBeTruthy();
+  }
+}
 
 test.describe('getting started', () => {
   test('sign up, set up a workspace and record the first expense @mobile', async ({ page }) => {
@@ -742,10 +760,18 @@ test.describe('everyday use', () => {
     await dialog.getByRole('button', { name: 'Set up' }).click();
     await expect(page.getByText('“WorldLink” set up')).toBeVisible();
 
-    // Due today, so it waits under "Due now" until recorded.
+    // Due today, so it waits under "Due now" until recorded, and can be recorded from Home too.
     await expect(page.getByText('Due now')).toBeVisible();
-    await page.getByRole('button', { name: 'Record', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Record', exact: true })).toBeVisible();
+    await page.keyboard.press('n');
+    await page.getByRole('dialog').getByLabel('Amount').fill('200');
+    await page.getByRole('dialog').getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Expense added')).toBeVisible();
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Record WorldLink' }).click();
     await expect(page.getByText('WorldLink recorded')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Record WorldLink' })).toBeHidden();
+    await page.goto('/recurring');
     await expect(page.getByText('Due now')).toBeHidden();
 
     await page.goto('/transactions');
@@ -1183,6 +1209,74 @@ test.describe('everyday use', () => {
     await expect(page.getByLabel('Main currency')).toContainText('NPR');
     await page.getByRole('tab', { name: 'Categories' }).click();
     await expect(page.getByText('Remittance')).toBeVisible();
+  });
+
+  test('select transactions and change them together', async ({
+    signedIn: page,
+    user,
+    baseURL,
+  }) => {
+    await addExpenses(page, user.workspaceId, baseURL!, ['Bhatbhateni', 'Daraz', 'Pathao']);
+    await page.goto('/transactions');
+    await page.getByRole('checkbox', { name: 'Select Bhatbhateni' }).click();
+    await page.getByRole('checkbox', { name: 'Select Daraz' }).click();
+    const bar = page.getByRole('region', { name: 'Selected transactions' });
+    await expect(bar).toContainText('2 selected');
+    // Everything is loaded, so "all" is all of them; Escape clears.
+    await bar.getByRole('button', { name: 'Select all 3' }).click();
+    await expect(bar).toContainText('3 selected');
+    await page.keyboard.press('Escape');
+    await expect(bar).toBeHidden();
+    await expect(page.locator('[role=checkbox][data-state=checked]')).toHaveCount(0);
+
+    await page.getByRole('checkbox', { name: 'Select Daraz' }).click();
+    await page.getByRole('checkbox', { name: 'Select Pathao' }).click();
+    await bar.getByRole('button', { name: 'Categorize…' }).click();
+    await page.keyboard.type('Shopping');
+    await page.keyboard.press('Enter');
+    await expect(page.getByText('Categorized 2 as Shopping')).toBeVisible();
+    await expect(bar).toBeHidden();
+    await expect(page.getByRole('button', { name: /^Daraz/ })).toContainText('Shopping');
+  });
+
+  test('on phones, select with a long press or "Select" @mobile', async ({
+    signedIn: page,
+    user,
+    baseURL,
+    isMobile,
+  }) => {
+    test.skip(!isMobile, 'touch screens only; with a mouse the checkboxes are always shown');
+    await addExpenses(page, user.workspaceId, baseURL!, ['Bhatbhateni', 'Daraz']);
+    await page.goto('/transactions');
+    const row = (name: string) => page.getByRole('button', { name: new RegExp(`^${name}`) });
+    await expect(row('Daraz')).toBeVisible();
+    await expect(page.getByRole('checkbox')).toHaveCount(0);
+
+    // A long press selects the row instead of opening it.
+    const box = (await row('Daraz').boundingBox())!;
+    const point = { x: box.x + 40, y: box.y + box.height / 2 };
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+    await page.waitForTimeout(700);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    const bar = page.getByRole('region', { name: 'Selected transactions' });
+    await expect(bar).toContainText('1 selected');
+    await expect(page.getByRole('dialog')).toBeHidden();
+
+    // While selecting, a tap selects too.
+    await row('Bhatbhateni').tap();
+    await expect(bar).toContainText('2 selected');
+    await bar.getByRole('button', { name: 'Clear selection' }).tap();
+    await expect(bar).toBeHidden();
+
+    // "Select" starts the same mode; "Cancel" ends it, and a tap opens the transaction again.
+    await page.getByRole('button', { name: 'Select', exact: true }).tap();
+    await expect(bar).toContainText('Tap transactions to select');
+    await row('Daraz').tap();
+    await expect(bar).toContainText('1 selected');
+    await page.getByRole('button', { name: 'Cancel', exact: true }).tap();
+    await row('Daraz').tap();
+    await expect(page.getByRole('dialog', { name: 'Edit transaction' })).toBeVisible();
   });
 
   test('keyboard: skip link, page titles and focus after navigating', async ({

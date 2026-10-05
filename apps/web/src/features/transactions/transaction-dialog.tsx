@@ -577,7 +577,8 @@ function EditorForm({
   );
 
   return (
-    <DialogContent variant={isEdit ? 'sheet' : 'modal'} aria-describedby={undefined}>
+    // New and edit share one presentation, so Save is always in the same place.
+    <DialogContent variant="sheet" aria-describedby={undefined}>
       <form onSubmit={(e) => submit(e)} className="flex min-h-0 flex-1 flex-col">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -602,7 +603,8 @@ function EditorForm({
               onReceipt={(file) => setQueuedFiles((q) => [...q, file])}
             />
           )}
-          {!isEdit && (
+          {/* A saved expense can become income (a refund) and back; a transfer stays a transfer. */}
+          {!isTransfer && (
             <Segmented
               label={t('Transaction type')}
               value={mode}
@@ -611,10 +613,11 @@ function EditorForm({
                 if (!categoryTouched.current) setCategoryId(null);
               }}
               className="w-full"
+              disabled={!editable}
               options={[
                 { value: 'expense', label: t('Expense') },
                 { value: 'income', label: t('Income') },
-                { value: 'transfer', label: t('Transfer') },
+                ...(isEdit ? [] : [{ value: 'transfer' as const, label: t('Transfer') }]),
               ]}
             />
           )}
@@ -929,42 +932,49 @@ function EditorForm({
           )}
         </DialogBody>
         {editable && (
-          <DialogFooter>
-            {isEdit && (
-              <Button variant="ghost" className="text-destructive sm:mr-auto" onClick={remove}>
-                <Trash2 /> {t('Delete')}
-              </Button>
+          // Edit-only actions on the left, saving on the right. When it doesn't fit in one row
+          // (phones), saving wraps to its own full-width row at the bottom, within thumb reach.
+          <DialogFooter className="flex-row flex-wrap items-center">
+            {existing && (
+              <div className="mr-auto flex flex-wrap gap-1">
+                <Button variant="ghost" className="text-destructive" onClick={remove}>
+                  <Trash2 /> {t('Delete')}
+                </Button>
+                {!existing.recurringId && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      onDone();
+                      const single =
+                        existing.splits.length === 1 ? existing.splits[0]!.categoryId : null;
+                      openRecurring(
+                        recurringFromTransaction(existing, f.calendar, {
+                          category: single ? categoryMap.get(single)?.name : undefined,
+                        }),
+                      );
+                    }}
+                  >
+                    <Repeat /> {t('Make recurring')}
+                  </Button>
+                )}
+              </div>
             )}
-            {existing && !existing.recurringId && (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  onDone();
-                  const single =
-                    existing.splits.length === 1 ? existing.splits[0]!.categoryId : null;
-                  openRecurring(
-                    recurringFromTransaction(existing, f.calendar, {
-                      category: single ? categoryMap.get(single)?.name : undefined,
-                    }),
-                  );
-                }}
-              >
-                <Repeat /> {t('Make recurring')}
+            <div className="flex grow flex-wrap justify-end gap-2 sm:grow-0">
+              {!isEdit && (
+                <Button
+                  variant="outline"
+                  className="grow sm:grow-0"
+                  onClick={(e) => submit(e as unknown as FormEvent, true)}
+                  disabled={saving}
+                >
+                  {t('Save & add another')}
+                </Button>
+              )}
+              <Button type="submit" className="grow sm:grow-0" disabled={saving}>
+                {saving && <Loader2 className="animate-spin" />}
+                {isEdit ? t('Save changes') : t('Save')}
               </Button>
-            )}
-            {!isEdit && (
-              <Button
-                variant="outline"
-                onClick={(e) => submit(e as unknown as FormEvent, true)}
-                disabled={saving}
-              >
-                {t('Save & add another')}
-              </Button>
-            )}
-            <Button type="submit" disabled={saving}>
-              {saving && <Loader2 className="animate-spin" />}
-              {isEdit ? t('Save changes') : t('Save')}
-            </Button>
+            </div>
           </DialogFooter>
         )}
       </form>
