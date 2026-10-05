@@ -416,26 +416,30 @@ function Balances({ g, canWrite, onAdd }: { g: SplitGroup; canWrite: boolean; on
                 {m.name}
                 {m.you && <span className="font-normal text-muted-foreground"> (you)</span>}
               </span>
-              <span className="block text-xs text-muted-foreground tabular">
-                <span className="whitespace-nowrap">
-                  Paid {f.money(m.paidMinor, g.currency, { trimZeroFraction: true })}
-                </span>{' '}
-                ·{' '}
-                <span className="whitespace-nowrap">
-                  share {f.money(m.shareMinor, g.currency, { trimZeroFraction: true })}
-                </span>
+              {/* One line on every row; the balance beside it stacks instead. */}
+              <span className="block truncate text-xs text-muted-foreground tabular">
+                Paid {f.money(m.paidMinor, g.currency, { trimZeroFraction: true })} · share{' '}
+                {f.money(m.shareMinor, g.currency, { trimZeroFraction: true })}
               </span>
             </span>
-            <span
-              className={cn(
-                'text-right text-sm font-medium tabular',
-                m.balanceMinor > 0 && 'text-positive',
-                m.balanceMinor === 0 && 'text-muted-foreground',
+            <span className="shrink-0 text-right tabular">
+              {m.balanceMinor === 0 ? (
+                <span className="text-sm text-muted-foreground">settled</span>
+              ) : (
+                <>
+                  <span className="block text-xs text-muted-foreground">
+                    {m.balanceMinor > 0 ? 'gets back' : 'owes'}
+                  </span>
+                  <span
+                    className={cn(
+                      'block text-sm font-medium',
+                      m.balanceMinor > 0 && 'text-positive',
+                    )}
+                  >
+                    {f.money(Math.abs(m.balanceMinor), g.currency, { trimZeroFraction: true })}
+                  </span>
+                </>
               )}
-            >
-              {m.balanceMinor === 0
-                ? 'settled'
-                : `${m.balanceMinor > 0 ? 'gets back' : 'owes'} ${f.money(Math.abs(m.balanceMinor), g.currency, { trimZeroFraction: true })}`}
             </span>
             {canWrite &&
               !m.you &&

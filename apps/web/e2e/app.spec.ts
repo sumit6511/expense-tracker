@@ -1257,6 +1257,14 @@ test.describe('everyday use', () => {
     await page.keyboard.press('Enter');
     await expect(page.getByText('Rs. 15,000').first()).toBeVisible();
     await expect(page.getByText('No budgets yet')).toBeHidden();
+
+    // The first transaction: the new row is highlighted for a moment as it appears.
+    await page.goto('/transactions');
+    await page.getByRole('button', { name: 'Add transaction' }).click();
+    await page.getByRole('dialog').getByLabel('Amount').fill('120');
+    await page.getByRole('dialog').getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Expense added')).toBeVisible();
+    await expect(page.locator('main .animate-fresh')).toHaveCount(1);
   });
 
   test('select transactions and change them together', async ({

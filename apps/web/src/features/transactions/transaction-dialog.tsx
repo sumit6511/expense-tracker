@@ -51,6 +51,7 @@ import {
 import { canMakeRule, ruleFromTransaction, useRuleDialog } from '@/features/rules/rule-dialog';
 import { ApiError, errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
+import { markFresh } from '@/lib/fresh';
 import { useT } from '@/lib/i18n';
 import { isOffline, outbox } from '@/lib/outbox';
 import {
@@ -503,6 +504,7 @@ function EditorForm({
           if (created) {
             const id = created.id;
             if (queuedFiles.length) await uploadAll(upload, id, queuedFiles);
+            markFresh(id);
             defaults.onCreated?.(created);
             toast.success(mode === 'expense' ? t('Expense added') : t('Income added'), {
               description: summary,

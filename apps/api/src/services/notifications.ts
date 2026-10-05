@@ -109,12 +109,11 @@ async function billCandidates(db: Executor, ws: WorkspaceCtx, today: IsoDate) {
           : 'Record it once it’s paid.';
     return {
       kind: 'bill',
+      // The date rather than "today": the notification is still read days later.
       title:
         date < today
           ? `${r.name} was due ${dateLabel(ws, date)}`
-          : date === today
-            ? `${r.name} is due today`
-            : `${r.name} is due ${dateLabel(ws, date)}`,
+          : `${r.name} is due ${dateLabel(ws, date)}`,
       body: `${amount} ${direction} ${r.account}. ${then}`,
       link: '/recurring',
       dedupeKey: `bill:${r.id}:${date}`,

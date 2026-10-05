@@ -1,7 +1,7 @@
 # UI/UX audit (October 2026)
 
-A review of the whole interface, run against the live app rather than read from code alone.
-Nothing has been changed yet; this is the plan.
+A review of the whole interface, run against the live app rather than read from code alone,
+and the plan that followed. All 24 findings are fixed; see **Results** at the end.
 
 ## How it was checked
 
@@ -394,10 +394,10 @@ The target after phase 2 is **zero serious or critical axe violations**.
 | UX-M8 | Medium | S | 3 | Fixed (phase 3): "Record" on due and overdue reminders in Coming up, sharing the Recurring page's code; E2E test |
 | UX-M9 | Medium | S | 5 | Fixed (phase 5): the sticky weekday labels cover the gutter to their left |
 | UX-L1 | Low | S | 1 | Fixed (phase 1): no arbitrary pixel font sizes left |
-| UX-L2 | Low | S | 6 | Planned |
+| UX-L2 | Low | S | 6 | Fixed (phase 6): `PageHeader` has `leading` and `trailing` slots; Home and Budgets use them, so the month arrows sit beside the title and the heading reads just "Asoj 2083" (Budgets' heading used to include the button labels) |
 | UX-L3 | Low | S | 5 | Fixed (phase 5): on phones, Export CSV and Trash move into a "⋯" menu |
-| UX-L4 | Low | S | 6 | Planned |
-| UX-L5 | Low | S | 6 | Planned |
+| UX-L4 | Low | S | 6 | Fixed (phase 6): a tick after a budget amount saves; "4 days ago"; bill reminders name the date instead of "today" (API test); no minus on recurring totals; split balances stack the same way on every row |
+| UX-L5 | Low | S | 6 | Fixed (phase 6): buttons darken while pressed; rows ease their hover colour; a transaction added on this device is tinted briefly as it appears (E2E check) |
 
 ## Deliberately not changing
 
@@ -408,3 +408,27 @@ The target after phase 2 is **zero serious or critical axe violations**.
 - **List performance.** The transaction list renders 100 rows per page. Load times in dev mode
   (2.4–3.9 s to settle) aren't representative of the production build; measure there before
   considering virtualisation.
+
+## Results
+
+All 24 findings are fixed, in six phases, each checked the same way before it was committed:
+the full axe run (WCAG 2.2 AA and best practices, every route, desktop and phone, light and
+dark), lint, type checks, the unit, API and end-to-end suites, and screenshots of the changed
+screens. Screens the route crawl doesn't reach were checked separately with axe: a brand-new
+empty workspace, tablet width, open dialogs and panels, the bulk-selection bar and the phone
+"More" sheet.
+
+| | Before | After |
+|---|---|---|
+| axe violations on the route crawl | 26 contrast nodes on 16 pages, plus keyboard, heading, landmark and label issues | none |
+| End-to-end runs passing | 39 | 44 (plus 1 skipped: the phone-only selection test skips itself in the desktop profile) |
+| API tests | 183 | 184 |
+| Shared unit tests | 150 | 150 |
+
+Found while fixing, and fixed too:
+
+- Avatar initials fell to 4.3:1 contrast for two of the eight hues, which only showed up with
+  a new account (light mode).
+- Empty states used an `h3` straight under the page `h1`; they now default to `h2`.
+- The receipt "remove" buttons were 20 px, under the 24 px minimum.
+

@@ -24,7 +24,7 @@ import { useMemo, useState } from 'react';
 import { ChartLegend, PaceChart, type PacePoint } from '@/components/charts';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
-import { EmptyState, ErrorState } from '@/components/page';
+import { EmptyState, ErrorState, PageHeader } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -41,7 +41,6 @@ import { useTransactionDialog } from '@/features/transactions/transaction-dialog
 import { TransactionRow } from '@/features/transactions/transaction-row';
 import { useFormat } from '@/lib/format';
 import { useT } from '@/lib/i18n';
-import { usePageTitle } from '@/lib/page-title';
 import {
   useAccounts,
   useCategoryMap,
@@ -57,7 +56,6 @@ import { cn, storage, useMediaQuery } from '@/lib/utils';
 
 export function DashboardPage() {
   const t = useT();
-  usePageTitle(t('Home'));
   const search = useSearch({ from: '/app/' });
   const navigate = useNavigate();
   const ws = useWorkspace();
@@ -76,8 +74,16 @@ export function DashboardPage() {
 
   return (
     <div className="grid grid-cols-1 gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1">
+      <PageHeader
+        className="mb-0"
+        documentTitle={t('Home')}
+        title={f.month(current)}
+        description={`${f.date(current.start, 'short')} – ${f.date(current.end, 'medium')}${
+          isCurrent && dashboard.data
+            ? ` · ${t('{days} days left', { days: dashboard.data.daysLeft })}`
+            : ''
+        }`}
+        leading={
           <Button
             variant="ghost"
             size="icon-sm"
@@ -86,15 +92,8 @@ export function DashboardPage() {
           >
             <ChevronLeft />
           </Button>
-          <div className="px-1">
-            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{f.month(current)}</h1>
-            <p className="text-xs text-muted-foreground">
-              {f.date(current.start, 'short')} – {f.date(current.end, 'medium')}
-              {isCurrent && dashboard.data
-                ? ` · ${t('{days} days left', { days: dashboard.data.daysLeft })}`
-                : ''}
-            </p>
-          </div>
+        }
+        trailing={
           <Button
             variant="ghost"
             size="icon-sm"
@@ -104,13 +103,15 @@ export function DashboardPage() {
           >
             <ChevronRight />
           </Button>
-        </div>
-        {!isCurrent && (
-          <Button variant="outline" size="sm" onClick={() => navigate({ to: '/', search: {} })}>
-            {t('Back to this month')}
-          </Button>
-        )}
-      </div>
+        }
+        actions={
+          !isCurrent && (
+            <Button variant="outline" size="sm" onClick={() => navigate({ to: '/', search: {} })}>
+              {t('Back to this month')}
+            </Button>
+          )
+        }
+      />
 
       {dashboard.error && <ErrorState error={dashboard.error} retry={() => dashboard.refetch()} />}
       {dashboard.data ? (

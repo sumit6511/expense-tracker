@@ -33,9 +33,9 @@ function timeAgo(iso: string, f: Formatters) {
   if (minutes < 1) return 'Just now';
   if (minutes < 60) return `${minutes} min ago`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
+  if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} d ago`;
+  if (days < 7) return days === 1 ? 'Yesterday' : `${days} days ago`;
   return f.date(iso.slice(0, 10), 'short');
 }
 

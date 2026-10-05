@@ -75,6 +75,7 @@ export function RecurringPage() {
   const items = upcoming.data ?? [];
   const due = items.filter((i) => isDue(i, f.today));
   const later = items.filter((i) => !isDue(i, f.today));
+  // Both negative (money out); shown without the sign, since the labels say "bills".
   const weekOut = items
     .filter((i) => i.date >= f.today && i.date <= addDays(f.today, 7) && i.amountMinor < 0)
     .filter((i) => i.currency === f.base && i.kind !== 'transfer')
@@ -103,7 +104,7 @@ export function RecurringPage() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <StatCard
               label="Bills per month"
-              value={<Money minor={monthlyOut} trimZero />}
+              value={<Money minor={-monthlyOut} trimZero />}
               hint="Recurring expenses, averaged"
               className="col-span-2 sm:col-span-1"
             />
@@ -114,7 +115,7 @@ export function RecurringPage() {
             />
             <StatCard
               label="Due in the next 7 days"
-              value={<Money minor={weekOut} trimZero />}
+              value={<Money minor={-weekOut} trimZero />}
               hint={`${f.base} bills`}
             />
           </div>

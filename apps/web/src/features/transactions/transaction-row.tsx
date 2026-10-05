@@ -1,6 +1,6 @@
 import type { Transaction } from '@et/shared';
 import { ArrowLeftRight, Inbox, Lock, Paperclip, Repeat, Split } from 'lucide-react';
-import { type PointerEvent, useRef } from 'react';
+import { type PointerEvent, useRef, useState } from 'react';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
 import { UserAvatar } from '@/components/person';
@@ -8,6 +8,7 @@ import { TagChip } from '@/components/tag-chip';
 import { Badge } from '@/components/ui/card';
 import { Checkbox, Hint } from '@/components/ui/menu';
 import { useFormat } from '@/lib/format';
+import { isFresh } from '@/lib/fresh';
 import { useAccountMap, useCategoryMap, useMemberProfiles, useTags } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -75,12 +76,15 @@ export function TransactionRow({
   const txTags = tags.filter((t) => tx.tagIds.includes(t.id));
   const uncategorized = !tx.transfer && !isSplit && !category;
   const press = useLongPress(onLongPress);
+  // Just added on this device: highlight it once as it appears.
+  const [fresh] = useState(() => isFresh(tx.id));
 
   return (
     <div
       className={cn(
         'group flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/60 sm:px-4',
         selected && 'bg-accent/60 hover:bg-accent/70',
+        fresh && 'animate-fresh',
         // A long press selects; don't also start selecting text or open the iOS callout.
         onLongPress && 'select-none [-webkit-touch-callout:none]',
       )}

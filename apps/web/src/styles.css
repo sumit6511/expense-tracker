@@ -119,6 +119,14 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --animate-in: fade-in 150ms ease-out;
+  --animate-fresh: fresh 1.6s ease-out;
+}
+
+/* A row that was just added: a tint that fades out. */
+@keyframes fresh {
+  from {
+    background-color: color-mix(in oklab, var(--primary) 16%, transparent);
+  }
 }
 
 @keyframes fade-in {

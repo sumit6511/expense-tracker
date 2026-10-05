@@ -11,13 +11,18 @@ export function PageHeader({
   actions,
   className,
   documentTitle,
+  leading,
+  trailing,
 }: {
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
   className?: string;
-  /** The browser tab's title, when `title` isn't plain text (e.g. a month switcher). */
+  /** The browser tab's title, when `title` isn't plain text. */
   documentTitle?: string;
+  /** Beside the title, e.g. previous and next month buttons (kept out of the heading itself). */
+  leading?: ReactNode;
+  trailing?: ReactNode;
 }) {
   const tr = useTr();
   const plainTitle = typeof title === 'string' ? tr(title) : null;
@@ -25,9 +30,23 @@ export function PageHeader({
   return (
     <header className={cn('mb-5 flex flex-wrap items-end justify-between gap-3', className)}>
       <div className="min-w-0">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{tr(title)}</h1>
+        <div className="flex items-center gap-1">
+          {leading}
+          <h1 className={cn('text-xl font-semibold tracking-tight sm:text-2xl', leading && 'px-1')}>
+            {tr(title)}
+          </h1>
+          {trailing}
+        </div>
         {description && (
-          <p className="mt-0.5 max-w-3xl text-sm text-muted-foreground">{tr(description)}</p>
+          <p
+            className={cn(
+              'mt-0.5 max-w-3xl text-sm text-muted-foreground',
+              // Lined up with the title when buttons sit before it.
+              leading && 'pl-10',
+            )}
+          >
+            {tr(description)}
+          </p>
         )}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

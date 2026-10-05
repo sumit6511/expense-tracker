@@ -147,21 +147,16 @@ export function BudgetsPage() {
     <div className="pb-10">
       <PageHeader
         documentTitle="Budgets"
-        title={
-          <span className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => go(-1)}
-              aria-label="Previous month"
-            >
-              <ChevronLeft />
-            </Button>
-            <span>{f.month(period)}</span>
-            <Button variant="ghost" size="icon-sm" onClick={() => go(1)} aria-label="Next month">
-              <ChevronRight />
-            </Button>
-          </span>
+        title={f.month(period)}
+        leading={
+          <Button variant="ghost" size="icon-sm" onClick={() => go(-1)} aria-label="Previous month">
+            <ChevronLeft />
+          </Button>
+        }
+        trailing={
+          <Button variant="ghost" size="icon-sm" onClick={() => go(1)} aria-label="Next month">
+            <ChevronRight />
+          </Button>
         }
         description={`Budget month: ${f.date(period.start, 'short')} – ${f.date(period.end, 'medium')}`}
         actions={
@@ -602,6 +597,12 @@ function Figure({ label, minor, className }: { label: string; minor: number; cla
   );
 }
 
+// A row remounts when its amount changes (it's part of the key), which happens when the month
+// is refetched, before the save call returns. So saves are noted here as they start, and the
+// row that mounts for the new amount shows the tick.
+const justSaved = new Map<string, number>();
+const SAVED_TICK_MS = 1600;
+
 function BudgetRow({
   category,
   line,
@@ -627,6 +628,12 @@ function BudgetRow({
     : '';
   const [value, setValue] = useState(initial);
   const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState(() => Date.now() - (justSaved.get(category.id) ?? 0) < 5000);
+  useEffect(() => {
+    if (!saved) return;
+    const timer = setTimeout(() => setSaved(false), SAVED_TICK_MS);
+    return () => clearTimeout(timer);
+  }, [saved]);
 
   const available = line.availableMinor;
   const ratio = available > 0 ? (line.spentMinor / available) * 100 : line.spentMinor > 0 ? 101 : 0;
@@ -651,12 +658,15 @@ function BudgetRow({
       return;
     }
     if (parsed === line.budgetedMinor) return;
+    justSaved.set(category.id, Date.now());
     try {
       await setBudgets.mutateAsync({
         periodStart,
         items: [{ categoryId: category.id, amountMinor: parsed }],
       });
+      setSaved(true);
     } catch (err) {
+      justSaved.delete(category.id);
       toast.error(errorMessage(err));
       setValue(initial);
     }
@@ -698,34 +708,45 @@ function BudgetRow({
               periodStart={periodStart}
             />
           )}
-          <FilteredInput
-            value={
-              editing
-                ? value
-                : value
-                  ? f.money(parseAmountInput(value, digits) ?? 0, undefined, {
-                      display: 'none',
-                      trimZeroFraction: true,
-                    })
-                  : ''
-            }
-            onFocus={() => setEditing(true)}
-            filter={(text) => filterAmountInput(text)}
-            onValueChange={setValue}
-            onBlur={(e) => save(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-              if (e.key === 'Escape') {
-                setValue(initial);
-                setEditing(false);
+          <span className="relative">
+            {/* A brief tick once the amount is saved (it saves when you leave the field). */}
+            <span role="status" className="absolute top-1/2 left-2 -translate-y-1/2">
+              {saved && !editing && (
+                <>
+                  <Check className="size-4 text-positive" />
+                  <span className="sr-only">{category.name} saved</span>
+                </>
+              )}
+            </span>
+            <FilteredInput
+              value={
+                editing
+                  ? value
+                  : value
+                    ? f.money(parseAmountInput(value, digits) ?? 0, undefined, {
+                        display: 'none',
+                        trimZeroFraction: true,
+                      })
+                    : ''
               }
-            }}
-            inputMode="decimal"
-            placeholder="Budget"
-            disabled={!canWrite}
-            aria-label={`Budget for ${category.name}`}
-            className="h-8 w-28 text-right tabular"
-          />
+              onFocus={() => setEditing(true)}
+              filter={(text) => filterAmountInput(text)}
+              onValueChange={setValue}
+              onBlur={(e) => save(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                if (e.key === 'Escape') {
+                  setValue(initial);
+                  setEditing(false);
+                }
+              }}
+              inputMode="decimal"
+              placeholder="Budget"
+              disabled={!canWrite}
+              aria-label={`Budget for ${category.name}`}
+              className="h-8 w-28 text-right tabular"
+            />
+          </span>
         </div>
       </div>
       <div className="flex items-center gap-3 pl-10">

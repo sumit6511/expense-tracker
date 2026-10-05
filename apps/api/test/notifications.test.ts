@@ -85,6 +85,22 @@ describe('notifications', () => {
     expect((await inbox(f)).items).toHaveLength(1);
   });
 
+  it('names the date of a bill due today, so the reminder still reads right later', async () => {
+    const f = await setupWorkspace();
+    await f.client.post(`${f.base}/recurring`, {
+      name: 'Electricity',
+      kind: 'expense',
+      accountId: f.accounts.Bank,
+      amountMinor: 250_000,
+      frequency: 'monthly',
+      calendar: 'bs',
+      nextDate: today(),
+    });
+    const title = (await inbox(f)).items[0]!.title;
+    expect(title).toMatch(/^Electricity is due \d+ \w+$/);
+    expect(title).not.toContain('today');
+  });
+
   it('warns when a budget is almost used and again when it is over', async () => {
     const f = await setupWorkspace();
     await budget(f, 'Dining Out', 1_000_000);

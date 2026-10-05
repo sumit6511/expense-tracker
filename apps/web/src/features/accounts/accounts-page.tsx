@@ -140,7 +140,7 @@ function AccountRow({ account: a }: { account: Account }) {
     <Link
       to="/accounts/$accountId"
       params={{ accountId: a.id }}
-      className="flex items-center gap-3 px-4 py-3 hover:bg-muted/60"
+      className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/60"
     >
       <CategoryIcon icon={a.icon} color={a.color} />
       <span className="min-w-0 flex-1">
