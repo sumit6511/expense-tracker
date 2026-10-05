@@ -159,6 +159,18 @@ access. If the proxy runs on another machine, add its address to `TRUST_PROXY`; 
 visitor looks like the proxy and shares one sign-in rate limit. Passkeys are tied to the host name in `PUBLIC_URL`, so set it before people add them, and
 browsers only allow push notifications on https (or `localhost`).
 
+### If it doesn't start
+
+Compose reads `.env` in this folder (the same file `pnpm dev` uses), so check it first:
+
+- **`failed to read .env: line N: unexpected character`**: every line must be `NAME=value` or a
+  `# comment`. Commands pasted from elsewhere (e.g. SimpleFIN's `curl … base64 --decode`) don't
+  belong there; bank sync setup tokens are pasted in the app, under Settings → Integrations.
+- **The app keeps restarting**, and `docker compose logs app` says `AUTH_SECRET is the example
+  value`: set a real one, `AUTH_SECRET=` followed by the output of `openssl rand -base64 32`.
+- **Signing up or in fails with "Invalid origin"**: `PUBLIC_URL` must be the address you open,
+  e.g. `http://localhost:3000` for Docker (`http://localhost:5173` is only for `pnpm dev`).
+
 ### Forgotten passwords
 
 With `SMTP_URL` set, “Forgot password?” on the sign-in page emails a link that works for an hour;
