@@ -139,7 +139,7 @@ function RuleRow({
           ))}
           {rule.stopProcessing && <Badge>Stops here</Badge>}
         </div>
-        <p className="mt-1.5 text-[11px] text-muted-foreground">
+        <p className="mt-1.5 text-2xs text-muted-foreground">
           {rule.hitCount === 0
             ? 'Not used yet'
             : `Used on ${rule.hitCount} transaction${rule.hitCount === 1 ? '' : 's'}${

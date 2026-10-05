@@ -340,7 +340,7 @@ function CategoryDialog({
             </Select>
           </Field>
           <div className="grid grid-cols-1 gap-2">
-            <span className="text-[13px] font-medium">Icon</span>
+            <span className="text-compact font-medium">Icon</span>
             <div className="grid grid-cols-8 gap-1.5 sm:grid-cols-10">
               {ICON_NAMES.map((n) => {
                 const Icon = iconFor(n);
@@ -363,7 +363,7 @@ function CategoryDialog({
             </div>
           </div>
           <div className="grid grid-cols-1 gap-2">
-            <span className="text-[13px] font-medium">Colour</span>
+            <span className="text-compact font-medium">Colour</span>
             <div className="flex flex-wrap gap-1.5">
               {COLOR_SWATCHES.map((c) => (
                 <button

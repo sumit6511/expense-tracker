@@ -240,7 +240,7 @@ function InboxRow({
   return (
     <div className="flex flex-col sm:flex-row sm:items-center">
       <div className="min-w-0 flex-1">
-        <TransactionRow tx={tx} onOpen={() => openEdit(tx.id)} showDate />
+        <TransactionRow tx={tx} onOpen={() => openEdit(tx.id)} showDate showReviewHint={false} />
       </div>
       {canWrite && (
         <div className="flex items-center gap-2 px-3 pb-3 sm:w-80 sm:py-2 sm:pr-4 sm:pl-0">

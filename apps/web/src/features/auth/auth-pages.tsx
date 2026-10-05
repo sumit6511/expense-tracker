@@ -153,7 +153,7 @@ export function LoginPage() {
           <Link
             to="/forgot-password"
             search={{ email: email.trim() || undefined }}
-            className="justify-self-end text-xs font-medium text-primary hover:underline"
+            className="hit-area justify-self-end text-xs font-medium text-primary hover:underline"
           >
             Forgot password?
           </Link>

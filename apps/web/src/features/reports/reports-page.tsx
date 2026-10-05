@@ -95,7 +95,7 @@ export function ReportsPage() {
                 }
                 emptyLabel="All accounts"
                 includeArchived
-                className="h-8 text-[13px]"
+                className="h-8 text-compact"
                 aria-label="Account"
               />
             </div>

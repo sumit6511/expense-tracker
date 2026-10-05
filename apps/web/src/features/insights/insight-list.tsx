@@ -225,7 +225,7 @@ export function InsightList({ items, className }: { items: Insight[]; className?
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium">{w.title}</p>
-              <p className="mt-0.5 text-[13px] text-muted-foreground">{w.body}</p>
+              <p className="mt-0.5 text-compact text-muted-foreground">{w.body}</p>
               {act && <div className="mt-2 flex flex-wrap gap-2">{act}</div>}
             </div>
             <Button

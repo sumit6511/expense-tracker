@@ -23,6 +23,11 @@ export function Money({
   /** Green for positive amounts. */
   colored?: boolean;
   compact?: boolean;
+  /**
+   * Drop a ".00". The rule: a column of individual transaction amounts (transaction lists,
+   * scheduled items) shows exact decimals so the column lines up; totals, budgets, headline
+   * numbers, chart labels and amounts inside sentences drop a zero fraction.
+   */
   trimZero?: boolean;
 }) {
   const f = useFormat();

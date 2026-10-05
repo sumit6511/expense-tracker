@@ -215,7 +215,7 @@ export function TransactionsPage() {
               onChange={(id) => setSearch({ accountIds: id || undefined })}
               includeArchived
               emptyLabel="All accounts"
-              className="h-8 text-[13px]"
+              className="h-8 text-compact"
               aria-label="Account"
             />
           </div>
@@ -228,7 +228,7 @@ export function TransactionsPage() {
             <Select
               value={search.tagIds ?? ''}
               onValueChange={(v) => setSearch({ tagIds: v || undefined })}
-              className="h-8 w-36 text-[13px]"
+              className="h-8 w-36 text-compact"
               aria-label="Tag"
             >
               <SelectItem value="">All tags</SelectItem>
@@ -243,7 +243,7 @@ export function TransactionsPage() {
             <Select
               value={search.createdBy ?? ''}
               onValueChange={(v) => setSearch({ createdBy: v || undefined })}
-              className="h-8 w-36 text-[13px]"
+              className="h-8 w-36 text-compact"
               aria-label="Added by"
             >
               <SelectItem value="">Anyone</SelectItem>
@@ -572,7 +572,7 @@ function BulkCategorize({ onPick }: { onPick: (categoryId: string | null) => voi
           onPick(id);
         }}
         placeholder="Categorize…"
-        className="h-8 text-[13px]"
+        className="h-8 text-compact"
       />
     </div>
   );

@@ -256,7 +256,7 @@ function Thumb({
         {image ? (
           <img src={href} alt={name} className="size-full object-cover" loading="lazy" />
         ) : (
-          <span className="grid place-items-center gap-0.5 px-1 text-center text-[10px]">
+          <span className="grid place-items-center gap-0.5 px-1 text-center text-2xs">
             <FileText className="size-5" />
             <span className="line-clamp-1 break-all">{name}</span>
           </span>

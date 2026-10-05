@@ -3,8 +3,9 @@ import { ArrowLeftRight, Inbox, Lock, Paperclip, Repeat, Split } from 'lucide-re
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
 import { UserAvatar } from '@/components/person';
+import { TagChip } from '@/components/tag-chip';
 import { Badge } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/menu';
+import { Checkbox, Hint } from '@/components/ui/menu';
 import { useFormat } from '@/lib/format';
 import { useAccountMap, useCategoryMap, useMemberProfiles, useTags } from '@/lib/queries';
 import { useSession } from '@/lib/session';
@@ -19,6 +20,7 @@ export function TransactionRow({
   onSelect,
   showAccount = true,
   showDate = false,
+  showReviewHint = true,
 }: {
   tx: Transaction;
   onOpen: (tx: Transaction) => void;
@@ -27,6 +29,8 @@ export function TransactionRow({
   onSelect?: (selected: boolean) => void;
   showAccount?: boolean;
   showDate?: boolean;
+  /** Off where every row needs review anyway (the Review page). */
+  showReviewHint?: boolean;
 }) {
   const f = useFormat();
   const accounts = useAccountMap();
@@ -96,21 +100,28 @@ export function TransactionRow({
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
             <span className="truncate text-sm font-medium">{title}</span>
-            {tx.needsReview && (
-              <Inbox className="size-3.5 shrink-0 text-primary" aria-label="Needs review" />
+            {tx.needsReview && showReviewHint && (
+              <Hint label="Needs review">
+                <Inbox className="size-3.5 text-primary" />
+              </Hint>
             )}
             {tx.recurringId && (
-              <Repeat className="size-3.5 shrink-0 text-muted-foreground" aria-label="Recurring" />
+              <Hint label="From a recurring item">
+                <Repeat className="size-3.5 text-muted-foreground" />
+              </Hint>
             )}
             {tx.attachmentCount > 0 && (
-              <Paperclip
-                className="size-3.5 shrink-0 text-muted-foreground"
-                aria-label={`${tx.attachmentCount} attachment${tx.attachmentCount === 1 ? '' : 's'}`}
-              />
+              <Hint
+                label={`${tx.attachmentCount} attachment${tx.attachmentCount === 1 ? '' : 's'}`}
+              >
+                <Paperclip className="size-3.5 text-muted-foreground" />
+              </Hint>
             )}
             {tx.status === 'pending' && <Badge tone="warning">Pending</Badge>}
             {tx.status === 'reconciled' && (
-              <Lock className="size-3 shrink-0 text-muted-foreground/70" aria-label="Reconciled" />
+              <Hint label="Reconciled with a bank statement">
+                <Lock className="size-3 text-muted-foreground/70" />
+              </Hint>
             )}
             {addedBy && tx.createdBy && (
               <UserAvatar
@@ -129,13 +140,12 @@ export function TransactionRow({
             )}
             {showDate && <span className="truncate">· {f.relativeDate(tx.date)}</span>}
             {txTags.slice(0, 2).map((t) => (
-              <span
+              <TagChip
                 key={t.id}
+                name={t.name}
+                color={t.color}
                 className="hidden shrink-0 rounded px-1 sm:inline"
-                style={{ color: t.color }}
-              >
-                #{t.name}
-              </span>
+              />
             ))}
           </span>
         </span>
@@ -148,12 +158,12 @@ export function TransactionRow({
             className={cn('text-sm font-medium', tx.transfer && 'text-muted-foreground')}
           />
           {tx.runningBalanceMinor !== null && (
-            <span className="block text-[11px] text-muted-foreground tabular">
+            <span className="block text-2xs text-muted-foreground tabular">
               {f.money(tx.runningBalanceMinor, tx.currency)}
             </span>
           )}
           {tx.original && (
-            <span className="block text-[11px] text-muted-foreground tabular">
+            <span className="block text-2xs text-muted-foreground tabular">
               {f.money(tx.original.amountMinor, tx.original.currency)}
             </span>
           )}

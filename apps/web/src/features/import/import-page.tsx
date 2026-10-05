@@ -615,7 +615,7 @@ export function ImportPage() {
               </CardTitle>
               {(profiles.data?.length ?? 0) > 0 && (
                 <Select
-                  className="h-8 w-48 text-[13px]"
+                  className="h-8 w-48 text-compact"
                   value=""
                   placeholder="Apply saved mapping…"
                   aria-label="Apply saved mapping"
@@ -969,7 +969,7 @@ export function ImportPage() {
                               setCategories((list) => list.map((x, j) => (j === i ? id : x)))
                             }
                             kind={r.amountMinor < 0 ? 'expense' : 'income'}
-                            className="h-8 text-[13px]"
+                            className="h-8 text-compact"
                             placeholder={p.splitByRule ? 'Split by rule' : 'Choose category'}
                           />
                         </td>

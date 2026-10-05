@@ -24,6 +24,7 @@ import {
 } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { CategoryIcon } from './icons';
+import { TagChip } from './tag-chip';
 import { Button } from './ui/button';
 import { FilteredInput, Input } from './ui/input';
 import {
@@ -496,16 +497,7 @@ export function TagPicker({
           <TagIcon className="text-muted-foreground" />
           {selected.length === 0 && <span className="text-muted-foreground">Add tags</span>}
           {selected.map((t) => (
-            <span
-              key={t.id}
-              className="rounded-md px-1.5 py-0.5 text-xs font-medium"
-              style={{
-                backgroundColor: `color-mix(in oklch, ${t.color} 16%, transparent)`,
-                color: t.color,
-              }}
-            >
-              #{t.name}
-            </span>
+            <TagChip key={t.id} name={t.name} color={t.color} chip />
           ))}
         </Button>
       </PopoverTrigger>

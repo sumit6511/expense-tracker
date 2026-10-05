@@ -295,7 +295,7 @@ function Figure({
 }) {
   return (
     <div className="min-w-0">
-      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className="text-2xs text-muted-foreground">{label}</p>
       <p className={cn('truncate text-sm font-semibold tabular', className)}>
         <Money minor={minor} currency={currency} />
       </p>

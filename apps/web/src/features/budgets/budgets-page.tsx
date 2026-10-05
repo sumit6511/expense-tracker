@@ -625,7 +625,7 @@ function BudgetRow({
         <Link
           to="/transactions"
           search={{ categoryIds: category.id, from: periodStart, to: periodEnd }}
-          className="min-w-0 flex-1 truncate text-sm font-medium hover:underline"
+          className="min-w-0 flex-1 truncate py-2 -my-2 text-sm font-medium hover:underline"
         >
           {category.name}
         </Link>
@@ -721,7 +721,7 @@ function BudgetRow({
       {envelope && line.remainingMinor < 0 && canWrite && (
         <button
           type="button"
-          className="justify-self-start pl-10 text-xs font-medium text-primary hover:underline"
+          className="hit-area justify-self-start pl-10 text-xs font-medium text-primary hover:underline"
           onClick={() =>
             move.mutate(
               {
@@ -869,7 +869,7 @@ function MonthlyLimit({ data }: { data: BudgetMonth }) {
       <Card>
         <CardContent className="flex flex-wrap items-end gap-3 pt-4">
           <div className="grid min-w-48 flex-1 grid-cols-1 gap-1.5">
-            <label htmlFor="cap-amount" className="text-[13px] font-medium">
+            <label htmlFor="cap-amount" className="text-compact font-medium">
               Spend at most this much a month
             </label>
             <AmountInput
@@ -949,7 +949,7 @@ function MonthlyLimit({ data }: { data: BudgetMonth }) {
             <button
               type="button"
               onClick={start}
-              className="font-medium text-primary hover:underline"
+              className="hit-area font-medium text-primary hover:underline"
             >
               Change
             </button>

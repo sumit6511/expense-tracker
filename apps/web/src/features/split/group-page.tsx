@@ -52,6 +52,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  Hint,
   Segmented,
   Switch,
 } from '@/components/ui/menu';
@@ -96,7 +97,7 @@ export function SplitGroupPage() {
     <div className="pb-10">
       <Link
         to="/split"
-        className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        className="hit-area mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" /> Split
       </Link>
@@ -249,10 +250,9 @@ function ExpenseRow({ g, e, onOpen }: { g: SplitGroup; e: SplitExpense; onOpen?:
         <span className="flex items-center gap-1.5">
           <span className="truncate text-sm font-medium">{e.description}</span>
           {e.linkedTransactionId && (
-            <Link2
-              className="size-3.5 shrink-0 text-muted-foreground"
-              aria-label="Recorded in your accounts"
-            />
+            <Hint label="Recorded in your accounts">
+              <Link2 className="size-3.5 text-muted-foreground" />
+            </Hint>
           )}
         </span>
         <span className="block truncate text-xs text-muted-foreground">
@@ -260,7 +260,9 @@ function ExpenseRow({ g, e, onOpen }: { g: SplitGroup; e: SplitExpense; onOpen?:
           {yours && <span className={cn('ml-1', yours.tone)}>· {yours.text}</span>}
         </span>
       </span>
-      <span className="shrink-0 text-sm font-medium tabular">{money(e.amountMinor)}</span>
+      <span className="shrink-0 text-sm font-medium tabular">
+        {f.money(e.amountMinor, g.currency)}
+      </span>
     </>
   );
   return (
@@ -303,10 +305,9 @@ function SettlementRow({
             {nameOf(g, s.fromMemberId)} paid {nameOf(g, s.toMemberId, true)}
           </span>
           {s.linkedTransactionId && (
-            <Link2
-              className="size-3.5 shrink-0 text-muted-foreground"
-              aria-label="Recorded in your accounts"
-            />
+            <Hint label="Recorded in your accounts">
+              <Link2 className="size-3.5 text-muted-foreground" />
+            </Hint>
           )}
         </span>
         <span className="block truncate text-xs text-muted-foreground">
@@ -370,7 +371,11 @@ function DebtRow({
     <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2">
       <span className="min-w-0 flex-1 text-sm">
         <span className="font-medium">{nameOf(g, from)}</span>
-        <ArrowRight className="mx-1 inline size-3.5 text-muted-foreground" aria-label="pays" />
+        <ArrowRight
+          className="mx-1 inline size-3.5 text-muted-foreground"
+          role="img"
+          aria-label="pays"
+        />
         <span className="font-medium">{nameOf(g, to)}</span>
         <span className="block text-xs text-muted-foreground tabular">
           {f.money(amount, g.currency, { trimZeroFraction: true })}
@@ -679,7 +684,7 @@ function ExpenseDialog({
           </Field>
           <div className="grid grid-cols-1 gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[13px] font-medium">Split</span>
+              <span className="text-compact font-medium">Split</span>
               <Segmented
                 size="sm"
                 label="How to split"

@@ -43,7 +43,11 @@ export function ForgotPasswordPage() {
     return (
       <AuthShell title="Reset your password" subtitle="" footer={backToSignIn}>
         <div className="grid place-items-center py-6">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" aria-label="Loading" />
+          <Loader2
+            className="size-5 animate-spin text-muted-foreground"
+            role="img"
+            aria-label="Loading"
+          />
         </div>
       </AuthShell>
     );

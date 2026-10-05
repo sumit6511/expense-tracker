@@ -131,7 +131,7 @@ function MemberRow({ m, me }: { m: Member; me: Role }) {
         <Select
           value={m.role}
           aria-label={`Role for ${m.name}`}
-          className="h-8 w-28 text-[13px]"
+          className="h-8 w-28 text-compact"
           disabled={update.isPending}
           onValueChange={(v) =>
             update.mutate(

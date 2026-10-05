@@ -686,7 +686,7 @@ function EditorForm({
               {!splitMode && (
                 <div className="grid grid-cols-1 gap-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-medium">{t('Category')}</span>
+                    <span className="text-compact font-medium">{t('Category')}</span>
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
@@ -708,7 +708,7 @@ function EditorForm({
                           }}
                           aria-pressed={c.id === categoryId}
                           className={cn(
-                            'flex flex-col items-center gap-1 rounded-lg border border-transparent px-1 py-2 text-center text-[11px] leading-tight transition-colors hover:bg-muted',
+                            'flex flex-col items-center gap-1 rounded-lg border border-transparent px-1 py-2 text-center text-2xs leading-tight transition-colors hover:bg-muted',
                             c.id === categoryId && 'border-primary bg-accent',
                           )}
                         >
@@ -741,7 +741,7 @@ function EditorForm({
               {splitMode && (
                 <div className="grid grid-cols-1 gap-2 rounded-xl border p-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-medium">Split between categories</span>
+                    <span className="text-compact font-medium">Split between categories</span>
                     <Button
                       variant="ghost"
                       size="sm"

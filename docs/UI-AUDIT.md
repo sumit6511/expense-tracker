@@ -374,16 +374,16 @@ The target after phase 2 is **zero serious or critical axe violations**.
 
 | ID | Priority | Effort | Phase | Status |
 |---|---|---|---|---|
-| UX-C1 | Critical | S | 1 | Planned |
+| UX-C1 | Critical | S | 1 | Fixed (phase 1): 0 contrast violations on all routes, both themes, desktop and phone |
 | UX-C2 | Critical | M | 2 | Planned |
-| UX-C3 | Critical | M | 1 (hit areas) + 3 (selection mode) | Planned |
-| UX-H1 | High | S | 1 | Planned |
+| UX-C3 | Critical | M | 1 (hit areas) + 3 (selection mode) | Hit areas fixed (phase 1); phone selection mode in phase 3 |
+| UX-H1 | High | S | 1 | Fixed (phase 1): every label on one line at 1440 and 390 px except the calendar options on phones, which wrap as intended |
 | UX-H2 | High | M | 3 | Planned |
 | UX-H3 | High | S | 3 | Planned |
 | UX-H4 | High | S | 4 | Planned |
 | UX-H5 | High | S | 3 | Planned |
-| UX-H6 | High | S | 1 | Planned |
-| UX-H7 | High | S | 1 | Planned |
+| UX-H6 | High | S | 1 | Fixed (phase 1) |
+| UX-H7 | High | S | 1 | Fixed (phase 1) |
 | UX-M1 | Medium | S | 5 | Planned |
 | UX-M2 | Medium | S | 5 | Planned |
 | UX-M3 | Medium | S | 3 | Planned |
@@ -393,7 +393,7 @@ The target after phase 2 is **zero serious or critical axe violations**.
 | UX-M7 | Medium | S | 5 | Planned |
 | UX-M8 | Medium | S | 3 | Planned |
 | UX-M9 | Medium | S | 5 | Planned |
-| UX-L1 | Low | S | 1 | Planned |
+| UX-L1 | Low | S | 1 | Fixed (phase 1): no arbitrary pixel font sizes left |
 | UX-L2 | Low | S | 6 | Planned |
 | UX-L3 | Low | S | 5 | Planned |
 | UX-L4 | Low | S | 6 | Planned |

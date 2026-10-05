@@ -100,7 +100,7 @@ export function CalendarGrid({
         </Button>
         <div className="text-center">
           <div className="text-sm font-semibold">{title}</div>
-          {subtitle && <div className="text-[11px] text-muted-foreground">{subtitle}</div>}
+          {subtitle && <div className="text-2xs text-muted-foreground">{subtitle}</div>}
         </div>
         <Button
           variant="ghost"
@@ -113,7 +113,7 @@ export function CalendarGrid({
       </div>
       <div className="grid grid-cols-7 gap-0.5 text-center">
         {weekdays.map((d) => (
-          <div key={d} className="pb-1 text-[11px] font-medium text-muted-foreground">
+          <div key={d} className="pb-1 text-2xs font-medium text-muted-foreground">
             {d}
           </div>
         ))}
@@ -146,7 +146,7 @@ export function CalendarGrid({
                 {secondary !== null && (
                   <span
                     className={cn(
-                      'mt-0.5 text-[9px] leading-none opacity-60',
+                      'mt-0.5 text-2xs leading-none opacity-60',
                       selected && 'opacity-80',
                     )}
                   >

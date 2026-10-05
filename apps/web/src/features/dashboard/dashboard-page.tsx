@@ -367,7 +367,7 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
       <Card className="self-start">
         <CardHeader>
           <CardTitle>{t('Where it went')}</CardTitle>
-          <Link to="/reports" className="text-xs font-medium text-primary hover:underline">
+          <Link to="/reports" className="hit-area text-xs font-medium text-primary hover:underline">
             {t('Reports')}
           </Link>
         </CardHeader>
@@ -421,7 +421,10 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
         <Card>
           <CardHeader>
             <CardTitle>{t('Accounts')}</CardTitle>
-            <Link to="/accounts" className="text-xs font-medium text-primary hover:underline">
+            <Link
+              to="/accounts"
+              className="hit-area text-xs font-medium text-primary hover:underline"
+            >
               {t('Manage')}
             </Link>
           </CardHeader>
@@ -466,7 +469,10 @@ function DashboardBody({ data, isCurrent }: { data: Dashboard; isCurrent: boolea
         <Card>
           <CardHeader>
             <CardTitle>{t('Recent')}</CardTitle>
-            <Link to="/transactions" className="text-xs font-medium text-primary hover:underline">
+            <Link
+              to="/transactions"
+              className="hit-area text-xs font-medium text-primary hover:underline"
+            >
               {t('See all')}
             </Link>
           </CardHeader>
@@ -522,7 +528,7 @@ function GoalsCard() {
         <Link
           to="/budgets"
           search={{ view: 'goals' }}
-          className="text-xs font-medium text-primary hover:underline"
+          className="hit-area text-xs font-medium text-primary hover:underline"
         >
           {t('All goals')}
         </Link>
@@ -559,7 +565,7 @@ function InsightsCard() {
     <Card>
       <CardHeader>
         <CardTitle>{t('Worth knowing')}</CardTitle>
-        <Link to="/insights" className="text-xs font-medium text-primary hover:underline">
+        <Link to="/insights" className="hit-area text-xs font-medium text-primary hover:underline">
           {items.length > 2 ? t('See all {count}', { count: items.length }) : t('Insights')}
         </Link>
       </CardHeader>
@@ -578,7 +584,7 @@ function UpcomingCard() {
     <Card>
       <CardHeader>
         <CardTitle>{t('Coming up')}</CardTitle>
-        <Link to="/recurring" className="text-xs font-medium text-primary hover:underline">
+        <Link to="/recurring" className="hit-area text-xs font-medium text-primary hover:underline">
           {t('Recurring')}
         </Link>
       </CardHeader>
@@ -606,7 +612,6 @@ function UpcomingCard() {
               signed={i.amountMinor > 0}
               colored={i.kind !== 'transfer'}
               className="text-sm"
-              trimZero
             />
           </Link>
         ))}

@@ -100,7 +100,7 @@ function ReviewBadge() {
   const { data } = useReviewCounts();
   if (!data?.needsReview) return null;
   return (
-    <span className="ml-auto rounded-full bg-primary px-1.5 py-px text-[11px] font-semibold text-primary-foreground tabular">
+    <span className="ml-auto rounded-full bg-primary px-1.5 py-px text-2xs font-semibold text-primary-foreground tabular">
       {data.needsReview > 99 ? '99+' : data.needsReview}
     </span>
   );
@@ -165,7 +165,11 @@ export function AppLayout() {
 export function FullPageSpinner() {
   return (
     <div className="grid grid-cols-1 min-h-dvh place-items-center">
-      <Loader2 className="size-6 animate-spin text-muted-foreground" aria-label="Loading" />
+      <Loader2
+        className="size-6 animate-spin text-muted-foreground"
+        role="img"
+        aria-label="Loading"
+      />
     </div>
   );
 }
@@ -251,7 +255,7 @@ function Shell() {
         {canWrite && (
           <Button className="mt-4 w-full justify-start" onClick={() => openNew()} data-tour="add">
             <Plus /> {t('New transaction')}
-            <kbd className="ml-auto rounded bg-primary-foreground/20 px-1.5 text-[11px]">N</kbd>
+            <kbd className="ml-auto rounded bg-primary-foreground/20 px-1.5 text-2xs">N</kbd>
           </Button>
         )}
         <button
@@ -261,7 +265,7 @@ function Shell() {
           className="mt-2 flex h-9 items-center gap-2 rounded-lg border bg-card px-3 text-sm text-muted-foreground hover:bg-muted"
         >
           <Search className="size-4" /> {t('Search & jump')}
-          <kbd className="ml-auto text-[11px]">⌘K</kbd>
+          <kbd className="ml-auto text-2xs">⌘K</kbd>
         </button>
         <nav className="mt-4 grid grid-cols-1 gap-0.5" aria-label="Main">
           {NAV.map((item) => (
@@ -342,7 +346,7 @@ function Shell() {
           onClick={() => setMoreOpen(true)}
           data-tour="nav-more"
           className={cn(
-            'flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground',
+            'flex h-16 flex-col items-center justify-center gap-1 text-2xs font-medium text-muted-foreground',
             MORE_NAV.some((item) => isActive(pathname, item.to)) && 'text-primary',
           )}
         >
@@ -399,7 +403,7 @@ function BottomLink({ item, active }: { item: NavItem; active: boolean }) {
       to={item.to}
       data-tour={tourMark(item.to)}
       className={cn(
-        'flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground',
+        'flex h-16 flex-col items-center justify-center gap-1 text-2xs font-medium text-muted-foreground',
         active && 'text-primary',
       )}
     >

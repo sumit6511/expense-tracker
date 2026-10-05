@@ -35,7 +35,7 @@ export interface Formatters {
   date: (date: IsoDate, style?: 'short' | 'medium' | 'long') => string;
   /** The same date in the other calendar, for secondary display. */
   altDate: (date: IsoDate) => string;
-  /** "Today", "Yesterday", weekday within a week, otherwise the date. */
+  /** "Today", "Yesterday", "Thu, 15 Asoj" within a week, otherwise the date. */
   relativeDate: (date: IsoDate) => string;
   /** A budget month's name: "Asoj 2083" (or "Asoj" short); "असोज २०८३" in Nepali. */
   month: (period: MonthPeriod, style?: 'long' | 'short') => string;
@@ -74,7 +74,11 @@ export function makeFormatters(options: {
   const date = (d: IsoDate, style: 'short' | 'medium' | 'long' = 'medium') =>
     calendar === 'bs' ? bs(d, style) : ad(d, style);
   const numbers = (text: string) => (ne ? nepaliNumbers(text) : text);
-  const weekday = (d: IsoDate) => (ne ? WEEKDAY_NAMES_NE : WEEKDAY_NAMES)[dayOfWeek(d)];
+  // Short weekday names ("Thu", "बिही") keep relative dates from crowding compact lists.
+  const weekday = (d: IsoDate) =>
+    ne
+      ? WEEKDAY_NAMES_NE[dayOfWeek(d)]!.replace(/बार$/, '')
+      : WEEKDAY_NAMES[dayOfWeek(d)]!.slice(0, 3);
   return {
     base,
     calendar,

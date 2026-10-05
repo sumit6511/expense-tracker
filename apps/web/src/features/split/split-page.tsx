@@ -204,7 +204,7 @@ function NewGroupDialog({ onDone }: { onDone: (g: SplitGroup) => void }) {
             />
           </Field>
           <div className="grid grid-cols-1 gap-2">
-            <span className="text-[13px] font-medium">People (you’re included)</span>
+            <span className="text-compact font-medium">People (you’re included)</span>
             {people.map((p, i) => (
               <div key={p.key} className="flex gap-2">
                 <Input

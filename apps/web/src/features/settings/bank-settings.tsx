@@ -229,7 +229,7 @@ function LinkRow({ link: a, manager }: { link: BankAccountLink; manager: boolean
           <Select
             aria-label={`Account for ${a.name}`}
             value={a.accountId ?? ''}
-            className="h-9 text-[13px] sm:w-48"
+            className="h-9 text-compact sm:w-48"
             onValueChange={(v) =>
               update.mutate(
                 { id: a.id, accountId: v || null },
@@ -254,7 +254,7 @@ function LinkRow({ link: a, manager }: { link: BankAccountLink; manager: boolean
               aria-label={`Bring in ${a.name} transactions from`}
               value={a.syncFrom}
               max={f.today}
-              className="h-9 w-44 text-[13px] text-foreground"
+              className="h-9 w-44 text-compact text-foreground"
               onChange={(date) => update.mutate({ id: a.id, syncFrom: date }, { onError })}
             />
           </div>

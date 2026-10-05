@@ -95,7 +95,7 @@ function ForecastCard({
               value={accountIds ?? ''}
               onChange={onAccount}
               emptyLabel="Cash, bank & wallets"
-              className="h-8 text-[13px]"
+              className="h-8 text-compact"
               aria-label="Accounts"
             />
           </div>

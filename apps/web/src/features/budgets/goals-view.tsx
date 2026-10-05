@@ -427,7 +427,7 @@ function GoalDialog({ goal, onDone }: { goal?: Goal; onDone: () => void }) {
             {hasDate && <DatePicker value={targetDate} onChange={setTargetDate} id="goal-date" />}
           </div>
           <fieldset className="grid grid-cols-1 gap-2">
-            <legend className="mb-1.5 text-[13px] font-medium">Track progress with</legend>
+            <legend className="mb-1.5 text-compact font-medium">Track progress with</legend>
             <div className="grid grid-cols-3 gap-2">
               {KIND_OPTIONS.map((o) => (
                 <button
@@ -478,7 +478,7 @@ function GoalDialog({ goal, onDone }: { goal?: Goal; onDone: () => void }) {
             </Field>
           )}
           <fieldset>
-            <legend className="mb-1.5 text-[13px] font-medium">Colour</legend>
+            <legend className="mb-1.5 text-compact font-medium">Colour</legend>
             <div className="flex flex-wrap gap-2">
               {COLOR_SWATCHES.map((c) => (
                 <button

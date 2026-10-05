@@ -17,7 +17,7 @@ import {
 } from '@et/shared';
 import { Link } from '@tanstack/react-router';
 import { ArrowDown, ArrowUp, Hash, Users } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { type CSSProperties, useMemo, useState } from 'react';
 import { ChartLegend, NetWorthChart } from '@/components/charts';
 import { CategoryIcon } from '@/components/icons';
 import { Money } from '@/components/money';
@@ -196,8 +196,13 @@ export function GroupReport({ range, by }: { range: ReportRange; by: 'payee' | '
                 >
                   <span className="flex items-center gap-3 text-sm">
                     <span
-                      className="min-w-0 flex-1 truncate font-medium"
-                      style={color(item.id) ? { color: color(item.id) } : undefined}
+                      className={cn(
+                        'min-w-0 flex-1 truncate font-medium',
+                        color(item.id) && 'tag-text',
+                      )}
+                      style={
+                        color(item.id) ? ({ '--tag': color(item.id) } as CSSProperties) : undefined
+                      }
                     >
                       {name(item.id)}
                     </span>
@@ -337,9 +342,9 @@ export function CompareReport({ range }: { range: ReportRange }) {
                   >
                     <span className="inline-flex items-center gap-1">
                       {diff > 0 ? (
-                        <ArrowUp className="size-3" aria-label="up" />
+                        <ArrowUp className="size-3" role="img" aria-label="up" />
                       ) : diff < 0 ? (
-                        <ArrowDown className="size-3" aria-label="down" />
+                        <ArrowDown className="size-3" role="img" aria-label="down" />
                       ) : null}
                       {f.money(Math.abs(diff), undefined, { trimZeroFraction: true })}
                       {p !== null && (
@@ -453,7 +458,7 @@ export function CalendarReport({ range }: { range: ReportRange }) {
               return (
                 <span
                   key={`m${weekKey(week)}`}
-                  className="relative h-4 text-[10px] text-muted-foreground"
+                  className="relative h-4 text-2xs text-muted-foreground"
                 >
                   {firstOfMonth && (
                     <span className="absolute left-0 whitespace-nowrap">
@@ -555,7 +560,7 @@ function DayRow({
   const weekday = (weekStart + row) % 7;
   return (
     <>
-      <span className="sticky left-0 z-10 bg-card pr-1 text-right text-[10px] leading-[0.8rem] text-muted-foreground">
+      <span className="sticky left-0 z-10 bg-card pr-1 text-right text-2xs leading-[0.8rem] text-muted-foreground">
         {row % 2 === 0 ? WEEKDAY_NAMES[weekday]!.slice(0, 3) : ''}
       </span>
       {grid.weeks.map((week) => {

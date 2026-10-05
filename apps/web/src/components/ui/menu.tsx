@@ -23,11 +23,11 @@ export const menuItem =
 
 /** A group heading inside a floating list. */
 export const menuLabel =
-  'px-2.5 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase';
+  'px-2.5 pt-2 pb-1 text-2xs font-medium tracking-wide text-muted-foreground uppercase';
 
 /** For cmdk lists: styles its group headings like `menuLabel`. */
 export const commandGroups =
-  '[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:uppercase';
+  '[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:uppercase';
 
 // Dropdown menu -------------------------------------------------------------------------------
 
@@ -193,6 +193,28 @@ export function Tooltip({ content, children }: { content: ReactNode; children: R
   );
 }
 
+/**
+ * A small status icon (needs review, attachment, reconciled…) with its meaning shown on hover and
+ * read out as its name. Not focusable, so it can sit inside a clickable row.
+ */
+export function Hint({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <Tooltip content={label}>
+      <span role="img" aria-label={label} className={cn('inline-flex shrink-0', className)}>
+        {children}
+      </span>
+    </Tooltip>
+  );
+}
+
 // Segmented control ---------------------------------------------------------------------------
 
 export function Segmented<T extends string>({
@@ -216,7 +238,9 @@ export function Segmented<T extends string>({
     <fieldset
       disabled={disabled}
       className={cn(
-        'inline-flex min-w-0 rounded-lg bg-muted p-1',
+        // Equal columns sized to the longest label: no wrapping when there's room, an even split
+        // at full width, and balanced wrapping only on screens too narrow for the labels.
+        'inline-grid min-w-0 auto-cols-fr grid-flow-col rounded-lg bg-muted p-1',
         disabled && 'opacity-60',
         className,
       )}
@@ -229,7 +253,7 @@ export function Segmented<T extends string>({
           aria-pressed={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            'flex-1 rounded-md leading-tight font-medium text-balance text-muted-foreground transition-colors hover:text-foreground',
+            'rounded-md leading-tight font-medium text-balance text-muted-foreground transition-colors hover:text-foreground',
             size === 'md' ? 'min-h-8 px-3 py-1 text-sm' : 'min-h-7 px-2.5 py-1 text-xs',
             value === o.value && 'bg-card text-foreground shadow-sm',
           )}

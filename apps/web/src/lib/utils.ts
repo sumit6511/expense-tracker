@@ -1,6 +1,10 @@
 import { type ClassValue, clsx } from 'clsx';
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
+
+// Our extra font sizes (styles.css): without this, tailwind-merge would take `text-2xs` or
+// `text-compact` for a text colour and drop the element's real colour class.
+const twMerge = extendTailwindMerge({ extend: { theme: { text: ['2xs', 'compact'] } } });
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

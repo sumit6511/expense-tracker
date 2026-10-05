@@ -54,7 +54,7 @@ export function Textarea({ className, ...props }: ComponentProps<'textarea'>) {
 export function Label({ className, ...props }: ComponentProps<typeof LabelPrimitive.Root>) {
   return (
     <LabelPrimitive.Root
-      className={cn('text-[13px] font-medium text-foreground/90 leading-none', className)}
+      className={cn('text-compact font-medium text-foreground/90 leading-none', className)}
       {...props}
     />
   );

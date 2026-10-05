@@ -59,7 +59,7 @@ export function PersonAvatar({
     <span
       className={cn(
         'person-avatar grid shrink-0 place-items-center rounded-full font-semibold',
-        size === 'xs' ? 'size-4 text-[8px]' : 'size-8 text-xs',
+        size === 'xs' ? 'size-5 text-2xs' : 'size-8 text-xs',
         className,
       )}
       style={{ '--hue': hue } as CSSProperties}
@@ -94,7 +94,7 @@ export const AVATAR_LOOKS: Record<
 };
 
 const SIZES = {
-  xs: { box: 'size-4 text-[8px]', icon: 'size-2.5' },
+  xs: { box: 'size-5 text-2xs', icon: 'size-3' },
   sm: { box: 'size-7 text-xs', icon: 'size-4' },
   md: { box: 'size-8 text-xs', icon: 'size-4' },
   lg: { box: 'size-10 text-sm', icon: 'size-5' },

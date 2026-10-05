@@ -268,7 +268,7 @@ function UpcomingRow({
           colored={item.kind !== 'transfer'}
           className="text-sm font-medium"
         />
-        {item.variableAmount && <p className="text-[11px] text-muted-foreground">usually</p>}
+        {item.variableAmount && <p className="text-2xs text-muted-foreground">usually</p>}
       </div>
       {actions && series && (
         <div className="flex w-full gap-2 sm:w-auto">
@@ -333,7 +333,7 @@ function SeriesRow({ r, canWrite }: { r: Recurring; canWrite: boolean }) {
           colored={r.kind !== 'transfer'}
           className="text-sm font-medium"
         />
-        {r.variableAmount && <p className="text-[11px] text-muted-foreground">varies</p>}
+        {r.variableAmount && <p className="text-2xs text-muted-foreground">varies</p>}
       </div>
       {canWrite && (
         <DropdownMenu>

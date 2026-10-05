@@ -219,7 +219,7 @@ export function AccountFormDialog({
             />
           </Field>
           <div className="grid grid-cols-1 gap-2">
-            <span className="text-[13px] font-medium">Icon & colour</span>
+            <span className="text-compact font-medium">Icon & colour</span>
             <div className="flex flex-wrap gap-1.5">
               {ACCOUNT_ICONS.filter((n) => ICON_NAMES.includes(n)).map((n) => {
                 const Icon = iconFor(n);

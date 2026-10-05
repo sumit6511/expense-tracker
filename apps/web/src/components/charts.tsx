@@ -454,7 +454,7 @@ export function MiniColumns({
           />
         </BarChart>
       </ResponsiveContainer>
-      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground" aria-hidden>
+      <div className="mt-1 flex justify-between text-2xs text-muted-foreground" aria-hidden>
         <span>{labels[0]}</span>
         <span>{labels.at(-1)}</span>
       </div>

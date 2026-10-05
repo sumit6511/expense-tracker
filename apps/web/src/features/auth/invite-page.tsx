@@ -68,7 +68,11 @@ export function InvitePage() {
   if (preview.isPending || me.isPending) {
     return (
       <div className="grid min-h-dvh grid-cols-1 place-items-center">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" aria-label="Loading" />
+        <Loader2
+          className="size-6 animate-spin text-muted-foreground"
+          role="img"
+          aria-label="Loading"
+        />
       </div>
     );
   }
