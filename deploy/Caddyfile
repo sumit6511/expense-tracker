@@ -1,0 +1,6 @@
+# Caddy in front of the app: it gets and renews the HTTPS certificate on its own.
+# SITE_ADDRESS is the host name people open, e.g. money.example.com or 203-0-113-7.sslip.io.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}

@@ -1,0 +1,23 @@
+# A computer without a public IP (at home, behind a router): Cloudflare Tunnel makes an outgoing
+# connection to Cloudflare, which serves your domain over HTTPS. No ports are opened.
+#
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.tunnel.yml up -d --build
+#
+# Needs TUNNEL_TOKEN and PUBLIC_URL (https://your-host-name) in .env. In the tunnel's settings,
+# point the public host name at http://app:3000. See docs/DEPLOY.md.
+
+services:
+  app:
+    # Only the tunnel talks to the app.
+    ports: !reset []
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:?Set PUBLIC_URL in .env, e.g. https://money.example.com}
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?Set TUNNEL_TOKEN in .env (from the Cloudflare dashboard)}
+    depends_on:
+      - app

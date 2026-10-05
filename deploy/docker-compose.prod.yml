@@ -1,0 +1,33 @@
+# A server on the internet with its own public IP (e.g. an Oracle Cloud VM): Caddy in front,
+# with automatic HTTPS. Use it together with the main file, from the repository folder:
+#
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build
+#
+# Needs SITE_ADDRESS (and AUTH_SECRET, POSTGRES_PASSWORD) in .env. See docs/DEPLOY.md.
+
+services:
+  app:
+    # Only Caddy talks to the app; port 3000 isn't published to the internet.
+    ports: !reset []
+    environment:
+      PUBLIC_URL: https://${SITE_ADDRESS:?Set SITE_ADDRESS in .env, e.g. money.example.com}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -154,6 +154,10 @@ Useful settings (environment variables, see [`.env.example`](.env.example)):
 | `TRUST_PROXY` | Which reverse proxies' `X-Forwarded-For` to believe when working out a visitor's address (for sign-in rate limits and the signed-in devices list). Default `loopback,private`: a proxy on the same machine or Docker network. Use `none`, or list your proxy's addresses or CIDR ranges. |
 | `POSTGRES_PASSWORD` | Database password used by compose. |
 
+To put it on the internet for free (Oracle Cloud, or a computer at home), follow
+[docs/DEPLOY.md](docs/DEPLOY.md): it compares the free hosts and walks through the setup, with
+ready-made files in [`deploy/`](deploy) for Caddy (automatic HTTPS) and Cloudflare Tunnel.
+
 Put a TLS-terminating reverse proxy (Caddy, nginx, Cloudflare Tunnel) in front for internet
 access. If the proxy runs on another machine, add its address to `TRUST_PROXY`; otherwise every
 visitor looks like the proxy and shares one sign-in rate limit. Passkeys are tied to the host name in `PUBLIC_URL`, so set it before people add them, and

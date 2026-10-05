@@ -14,3 +14,6 @@ blob-report/
 .pgdata/
 *.log
 apps/web/dev-dist/
+
+# Database dumps copied out of the backup volume (docs/DEPLOY.md)
+db-backups/
