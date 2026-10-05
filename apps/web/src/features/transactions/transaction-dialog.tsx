@@ -494,6 +494,8 @@ function EditorForm({
           });
         } else {
           const body = { id: uuidv7(), ...common };
+          // Before sending: the list refetches, showing the new row, before the call returns.
+          markFresh(body.id);
           const summary = `${f.money(sign * parsed, currency)}${payee.trim() ? ` · ${payee.trim()}` : ''}`;
           let created: Transaction | null = null;
           try {
@@ -504,7 +506,6 @@ function EditorForm({
           if (created) {
             const id = created.id;
             if (queuedFiles.length) await uploadAll(upload, id, queuedFiles);
-            markFresh(id);
             defaults.onCreated?.(created);
             toast.success(mode === 'expense' ? t('Expense added') : t('Income added'), {
               description: summary,
