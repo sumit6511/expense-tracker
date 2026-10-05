@@ -64,7 +64,9 @@ export function RatesSettings() {
                     <th className="py-2 text-right font-medium">Rate</th>
                     <th className="py-2 text-left font-medium pl-4">Source</th>
                     <th className="py-2 text-left font-medium">Date</th>
-                    <th />
+                    <th>
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">

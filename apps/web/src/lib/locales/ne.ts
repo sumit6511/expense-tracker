@@ -19,6 +19,7 @@ export const NE: Record<string, string> = {
   Goals: 'लक्ष्य',
   'New transaction': 'नयाँ कारोबार',
   'Search & jump': 'खोज्नुहोस्',
+  'Skip to content': 'मुख्य भागमा जानुहोस्',
   Search: 'खोज्नुहोस्',
   'Add transaction': 'कारोबार थप्नुहोस्',
 

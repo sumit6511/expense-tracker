@@ -21,6 +21,7 @@ export function RouteError({ error, reset }: ErrorComponentProps) {
   return (
     <div className="grid grid-cols-1 min-h-[60dvh] place-items-center p-6" role="alert">
       <EmptyState
+        as="h1"
         icon={stale ? RefreshCw : TriangleAlert}
         title={stale ? 'A new version is available' : 'Something went wrong'}
         description={

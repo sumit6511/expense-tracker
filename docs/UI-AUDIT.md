@@ -375,7 +375,7 @@ The target after phase 2 is **zero serious or critical axe violations**.
 | ID | Priority | Effort | Phase | Status |
 |---|---|---|---|---|
 | UX-C1 | Critical | S | 1 | Fixed (phase 1): 0 contrast violations on all routes, both themes, desktop and phone |
-| UX-C2 | Critical | M | 2 | Planned |
+| UX-C2 | Critical | M | 2 | Fixed (phase 2): full axe WCAG 2.2 AA and best-practice run reports no violations on any route (desktop and phone, both themes); E2E test covers the skip link, titles and focus after navigating. The Payees/Tags bars are hidden from screen readers rather than named, since each row already reads out its name and amount |
 | UX-C3 | Critical | M | 1 (hit areas) + 3 (selection mode) | Hit areas fixed (phase 1); phone selection mode in phase 3 |
 | UX-H1 | High | S | 1 | Fixed (phase 1): every label on one line at 1440 and 390 px except the calendar options on phones, which wrap as intended |
 | UX-H2 | High | M | 3 | Planned |

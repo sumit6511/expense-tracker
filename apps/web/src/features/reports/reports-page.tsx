@@ -318,7 +318,7 @@ function CashFlowReport({ range }: { range: ReportRange }) {
           <CashFlowChart data={data} />
         </CardContent>
       </Card>
-      <Card className="overflow-x-auto">
+      <Card className="overflow-x-auto" tabIndex={0} role="region" aria-label="Cash flow per month">
         <table className="w-full text-sm tabular">
           <caption className="sr-only">Cash flow per month</caption>
           <thead className="border-b text-xs text-muted-foreground">
@@ -490,7 +490,12 @@ function BudgetReport({ to }: { to: string }) {
           <BudgetVsActualChart data={data} />
         </CardContent>
       </Card>
-      <Card className="overflow-x-auto">
+      <Card
+        className="overflow-x-auto"
+        tabIndex={0}
+        role="region"
+        aria-label="Budget and spending per month"
+      >
         <table className="w-full text-sm tabular">
           <caption className="sr-only">Budget and spending per month</caption>
           <thead className="border-b text-xs text-muted-foreground">

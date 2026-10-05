@@ -27,7 +27,7 @@ import {
   Target,
   Upload,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { UserAvatar } from '@/components/person';
 import { Button } from '@/components/ui/button';
 import {
@@ -162,6 +162,27 @@ export function AppLayout() {
   );
 }
 
+/** Focuses the page's heading (or the main area): the start of the content. */
+function focusPageStart() {
+  const main = document.getElementById('main');
+  const target = main?.querySelector<HTMLElement>('h1') ?? main;
+  if (!target) return false;
+  if (target !== main && !target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
+  target.focus({ preventScroll: true });
+  return target !== main;
+}
+
+/** The same once a newly opened page has rendered (pages load lazily); returns a cancel. */
+function focusPageStartSoon() {
+  let tries = 0;
+  const timer = window.setInterval(() => {
+    // A dialog opened in the meantime keeps its focus.
+    if (document.querySelector('[role="dialog"]')) return window.clearInterval(timer);
+    if (focusPageStart() || ++tries > 20) window.clearInterval(timer);
+  }, 50);
+  return () => window.clearInterval(timer);
+}
+
 export function FullPageSpinner() {
   return (
     <div className="grid grid-cols-1 min-h-dvh place-items-center">
@@ -229,6 +250,15 @@ function Shell() {
     return () => window.removeEventListener('keydown', onKey);
   }, [openNew, canWrite]);
 
+  // After moving to another page, put focus on its heading so screen readers announce where you
+  // are (and Tab continues from the content, not the menu you clicked). Not on the first load.
+  const seenPath = useRef(pathname);
+  useEffect(() => {
+    if (seenPath.current === pathname) return;
+    seenPath.current = pathname;
+    return focusPageStartSoon();
+  }, [pathname]);
+
   // A receipt shared to the installed app (public/share-sw.js) starts a new expense with it.
   const router = useRouter();
   useEffect(() => {
@@ -244,6 +274,13 @@ function Shell() {
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_1fr] print:block">
+      <button
+        type="button"
+        onClick={() => focusPageStart()}
+        className="fixed top-3 left-3 z-[70] -translate-y-24 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-md focus:translate-y-0 print:hidden"
+      >
+        {t('Skip to content')}
+      </button>
       {/* Sidebar (desktop) */}
       <aside className="sticky top-0 hidden h-dvh flex-col border-r bg-card/50 px-3 py-4 lg:flex print:hidden">
         <div className="flex items-center gap-1">
@@ -313,7 +350,11 @@ function Shell() {
             <Search />
           </Button>
         </header>
-        <main className="mx-auto w-full max-w-[100rem] px-4 pt-5 sm:px-6 lg:px-8 lg:pt-8 print:max-w-none print:p-0">
+        <main
+          id="main"
+          tabIndex={-1}
+          className="mx-auto w-full max-w-[100rem] px-4 pt-5 outline-none sm:px-6 lg:px-8 lg:pt-8 print:max-w-none print:p-0"
+        >
           <OutboxBanner />
           <Outlet />
         </main>

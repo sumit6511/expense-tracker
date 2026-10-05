@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FilteredInput, Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/menu';
 import { ApiError, authApi, errorMessage } from '@/lib/api';
+import { usePageTitle } from '@/lib/page-title';
 import { isCancelled, passkeysSupported, signInWithPasskey } from '@/lib/passkeys';
 import { meKey } from '@/lib/queries';
 
@@ -29,8 +30,9 @@ export function AuthShell({
   children: ReactNode;
   footer: ReactNode;
 }) {
+  usePageTitle(title);
   return (
-    <div className="grid grid-cols-1 min-h-dvh place-items-center bg-[radial-gradient(ellipse_at_top,var(--accent),transparent_60%)] px-4 py-10">
+    <main className="grid grid-cols-1 min-h-dvh place-items-center bg-[radial-gradient(ellipse_at_top,var(--accent),transparent_60%)] px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center text-center">
           <img src="/favicon.svg" alt="" className="mb-4 size-12 rounded-2xl shadow-sm" />
@@ -40,7 +42,7 @@ export function AuthShell({
         <div className="rounded-2xl border bg-card p-6 shadow-sm">{children}</div>
         <p className="mt-4 text-center text-sm text-muted-foreground">{footer}</p>
       </div>
-    </div>
+    </main>
   );
 }
 

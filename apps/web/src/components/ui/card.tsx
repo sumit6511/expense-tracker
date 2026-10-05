@@ -74,11 +74,14 @@ export function Progress({
   className,
   tone = 'primary',
   label,
+  decorative = false,
 }: {
   value: number;
   className?: string;
   tone?: 'primary' | 'positive' | 'warning' | 'destructive' | 'muted';
   label?: string;
+  /** The same number is already written next to the bar: hide the bar from screen readers. */
+  decorative?: boolean;
 }) {
   const colors = {
     primary: 'bg-primary',
@@ -91,11 +94,15 @@ export function Progress({
   return (
     <div
       className={cn('h-2 w-full overflow-hidden rounded-full bg-muted', className)}
-      role="progressbar"
-      aria-valuenow={Math.round(clamped)}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-label={label}
+      {...(decorative
+        ? { 'aria-hidden': true }
+        : {
+            role: 'progressbar',
+            'aria-valuenow': Math.round(clamped),
+            'aria-valuemin': 0,
+            'aria-valuemax': 100,
+            'aria-label': label,
+          })}
     >
       <div
         className={cn('h-full rounded-full transition-[width] duration-500', colors[tone])}

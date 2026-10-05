@@ -33,6 +33,7 @@ import { useTransactionDialog } from '@/features/transactions/transaction-dialog
 import { TransactionRow } from '@/features/transactions/transaction-row';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
+import { usePageTitle } from '@/lib/page-title';
 import { useAccounts, useDeleteAccount, useTransactions, useUpdateAccount } from '@/lib/queries';
 import { useCanWrite } from '@/lib/session';
 import { AccountFormDialog } from './account-form';
@@ -52,6 +53,7 @@ export function AccountPage() {
   const [editing, setEditing] = useState(false);
   const [reconciling, setReconciling] = useState(false);
   const account = accounts?.find((a) => a.id === accountId);
+  usePageTitle(account?.name ?? 'Account');
   const filters = useMemo(() => ({ accountIds: accountId }), [accountId]);
   const list = useTransactions(filters);
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];

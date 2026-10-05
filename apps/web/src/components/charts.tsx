@@ -148,14 +148,23 @@ export function PaceChart({
   const scale = niceTicks(
     Math.max(0, ...data.flatMap((d) => [major(d.spent) ?? 0, major(d.pace) ?? 0])),
   );
+  // What a sighted person reads off the chart, for screen readers.
+  // Up to today: a future-dated transaction later in the month isn't "spent so far".
+  const latest = data.findLast((d) => d.spent !== null && d.date <= f.today);
+  const summary = latest
+    ? `Spending this month: by ${f.date(latest.date, 'short')}, ${f.money(latest.spent!, undefined, { trimZeroFraction: true })} spent` +
+      (latest.pace !== null
+        ? `; an even pace would be ${f.money(latest.pace, undefined, { trimZeroFraction: true })}.`
+        : '.')
+    : 'Spending this month compared with an even pace';
   return (
-    <div
-      role="img"
-      aria-label="Cumulative spending this month compared with an even pace"
-      className={fill ? 'h-full min-h-52' : undefined}
-    >
+    <div role="img" aria-label={summary} className={fill ? 'h-full min-h-52' : undefined}>
       <ResponsiveContainer width="100%" height={fill ? '100%' : height}>
-        <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+        <ComposedChart
+          accessibilityLayer={false}
+          data={data}
+          margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+        >
           <defs>
             <linearGradient id="pace-fill" x1="0" x2="0" y1="0" y2="1">
               <stop offset="0%" stopColor="var(--series-1)" stopOpacity={0.14} />
@@ -251,6 +260,7 @@ export function CashFlowChart({ data, height = 260 }: { data: CashFlowPoint[]; h
     <div role="img" aria-label="Income and spending per month">
       <ResponsiveContainer width="100%" height={height}>
         <BarChart
+          accessibilityLayer={false}
           data={data}
           barGap={2}
           barCategoryGap="28%"
@@ -338,7 +348,11 @@ export function BudgetVsActualChart({
   return (
     <div role="img" aria-label="Spending compared with budget per month">
       <ResponsiveContainer width="100%" height={height}>
-        <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+        <ComposedChart
+          accessibilityLayer={false}
+          data={data}
+          margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+        >
           <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
           <XAxis
             dataKey="shortLabel"
@@ -420,6 +434,7 @@ export function MiniColumns({
     <div role="img" aria-label={ariaLabel}>
       <ResponsiveContainer width="100%" height={height}>
         <BarChart
+          accessibilityLayer={false}
           data={data}
           barCategoryGap="18%"
           margin={{ top: 2, right: 0, bottom: 0, left: 0 }}
@@ -486,6 +501,7 @@ export function NetWorthChart({ data, height = 280 }: { data: NetWorthPoint[]; h
     <div role="img" aria-label="Net worth at the end of each month">
       <ResponsiveContainer width="100%" height={height}>
         <ComposedChart
+          accessibilityLayer={false}
           data={data}
           barGap={2}
           barCategoryGap="28%"
@@ -579,10 +595,25 @@ export function ForecastChart({
   const values = data.flatMap((d) => [major(d.low) ?? 0, major(d.high) ?? 0]);
   const scale = niceRange(Math.min(...values), Math.max(...values));
   const dips = values.some((v) => v < 0);
+  const first = data[0];
+  const last = data.at(-1);
+  const lowest = data.reduce<ForecastChartPoint | undefined>(
+    (low, d) => (!low || d.expected < low.expected ? d : low),
+    undefined,
+  );
+  const money = (m: number) => f.money(m, undefined, { trimZeroFraction: true });
+  const summary =
+    first && last && lowest
+      ? `Expected balance: ${money(first.expected)} on ${first.label}, ${money(last.expected)} by ${last.label}; lowest about ${money(lowest.expected)} around ${lowest.label}.`
+      : 'Expected balance for the coming days, with a likely range';
   return (
-    <div role="img" aria-label="Expected balance for the coming days, with a likely range">
+    <div role="img" aria-label={summary}>
       <ResponsiveContainer width="100%" height={height}>
-        <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+        <ComposedChart
+          accessibilityLayer={false}
+          data={data}
+          margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+        >
           <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
           <XAxis
             dataKey="label"

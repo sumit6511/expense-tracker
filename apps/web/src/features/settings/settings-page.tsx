@@ -40,6 +40,20 @@ type Tab =
   | 'data'
   | 'profile';
 
+const TAB_TITLES: Record<Tab, string> = {
+  general: 'General',
+  members: 'Members',
+  categories: 'Categories',
+  payees: 'Payees',
+  tags: 'Tags',
+  rules: 'Rules',
+  rates: 'Exchange rates',
+  notifications: 'Notifications',
+  integrations: 'Integrations',
+  data: 'Data',
+  profile: 'Profile',
+};
+
 export function SettingsPage() {
   const search = useSearch({ from: '/app/settings' });
   const navigate = useNavigate({ from: '/settings' });
@@ -48,7 +62,7 @@ export function SettingsPage() {
   const wide = useMediaQuery('(min-width: 1024px)');
   return (
     <div className="pb-10">
-      <PageHeader title="Settings" />
+      <PageHeader title="Settings" documentTitle={`${TAB_TITLES[tab]} · Settings`} />
       <Tabs
         value={tab}
         onValueChange={(v) => navigate({ search: { tab: v as Tab }, replace: true })}

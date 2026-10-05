@@ -154,6 +154,10 @@
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
+  /* Headings receive focus after navigation only so screen readers announce the page. */
+  h1[tabindex="-1"]:focus {
+    outline: none;
+  }
   @media (prefers-reduced-motion: reduce) {
     *,
     ::before,

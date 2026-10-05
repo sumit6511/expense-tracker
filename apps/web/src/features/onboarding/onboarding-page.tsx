@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FilteredInput, Input } from '@/components/ui/input';
 import { Checkbox, Segmented, Switch } from '@/components/ui/menu';
 import { ApiError, errorMessage } from '@/lib/api';
+import { usePageTitle } from '@/lib/page-title';
 import { useCreateWorkspace, useMeQuery, useUpdateMe } from '@/lib/queries';
 import { rememberWorkspace } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -54,6 +55,7 @@ export function OnboardingPage() {
     })),
   );
 
+  usePageTitle((me.data?.workspaces.length ?? 0) === 0 ? 'Welcome' : 'New workspace');
   if (me.isPending) return <FullPageSpinner />;
   if (me.error instanceof ApiError && me.error.status === 401)
     return <Navigate to="/login" search={{}} />;
@@ -110,7 +112,7 @@ export function OnboardingPage() {
   const sampleMinor = 1234567890;
 
   return (
-    <div className="min-h-dvh bg-[radial-gradient(ellipse_at_top,var(--accent),transparent_55%)] px-4 py-8">
+    <main className="min-h-dvh bg-[radial-gradient(ellipse_at_top,var(--accent),transparent_55%)] px-4 py-8">
       <div className="mx-auto w-full max-w-xl">
         <div className="mb-6 flex items-center gap-3">
           <img src="/favicon.svg" alt="" className="size-10 rounded-xl" />
@@ -339,6 +341,6 @@ export function OnboardingPage() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

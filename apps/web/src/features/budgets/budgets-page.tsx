@@ -136,6 +136,7 @@ export function BudgetsPage() {
   return (
     <div className="pb-10">
       <PageHeader
+        documentTitle="Budgets"
         title={
           <span className="flex items-center gap-1">
             <Button

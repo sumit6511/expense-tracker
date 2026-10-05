@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTr } from '@/lib/i18n';
+import { usePageTitle } from '@/lib/page-title';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from './ui/card';
 
@@ -9,13 +10,18 @@ export function PageHeader({
   description,
   actions,
   className,
+  documentTitle,
 }: {
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
   className?: string;
+  /** The browser tab's title, when `title` isn't plain text (e.g. a month switcher). */
+  documentTitle?: string;
 }) {
   const tr = useTr();
+  const plainTitle = typeof title === 'string' ? tr(title) : null;
+  usePageTitle(documentTitle ?? (typeof plainTitle === 'string' ? plainTitle : null));
   return (
     <header className={cn('mb-5 flex flex-wrap items-end justify-between gap-3', className)}>
       <div className="min-w-0">
@@ -35,12 +41,15 @@ export function EmptyState({
   description,
   action,
   className,
+  as: Heading = 'h3',
 }: {
   icon: LucideIcon;
   title: ReactNode;
   description?: ReactNode;
   action?: ReactNode;
   className?: string;
+  /** The heading level: h1 when the empty state is the whole page (404, crash). */
+  as?: 'h1' | 'h2' | 'h3';
 }) {
   const tr = useTr();
   return (
@@ -48,7 +57,7 @@ export function EmptyState({
       <span className="mb-3 grid grid-cols-1 size-12 place-items-center rounded-full bg-accent text-accent-foreground">
         <Icon className="size-6" />
       </span>
-      <h3 className="font-medium">{tr(title)}</h3>
+      <Heading className="font-medium">{tr(title)}</Heading>
       {description && (
         <p className="mt-1 max-w-sm text-sm text-muted-foreground">{tr(description)}</p>
       )}

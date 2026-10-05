@@ -59,6 +59,7 @@ import {
 import { Select, SelectItem } from '@/components/ui/select';
 import { errorMessage } from '@/lib/api';
 import { useFormat } from '@/lib/format';
+import { usePageTitle } from '@/lib/page-title';
 import {
   useAddSplitMember,
   useCreateSettlement,
@@ -84,6 +85,7 @@ type Dialogs =
 export function SplitGroupPage() {
   const { groupId } = useParams({ from: '/app/split/$groupId' });
   const group = useSplitGroup(groupId);
+  usePageTitle(group.data?.name ?? 'Split');
   const canWrite = useCanWrite();
   const [dialog, setDialog] = useState<Dialogs>(null);
   const close = () => setDialog(null);

@@ -93,7 +93,7 @@ export function NetWorthReport({ range }: { range: ReportRange }) {
           </p>
         </CardContent>
       </Card>
-      <Card className="overflow-x-auto">
+      <Card className="overflow-x-auto" tabIndex={0} role="region" aria-label="Net worth per month">
         <table className="w-full text-sm tabular">
           <caption className="sr-only">Net worth per month</caption>
           <thead className="border-b text-xs text-muted-foreground">
@@ -211,7 +211,7 @@ export function GroupReport({ range, by }: { range: ReportRange; by: 'payee' | '
                     </span>
                     <Money minor={item.amountMinor} className="w-28 text-right" trimZero />
                   </span>
-                  <Progress value={(item.amountMinor / max) * 100} className="h-1.5" />
+                  <Progress value={(item.amountMinor / max) * 100} className="h-1.5" decorative />
                 </Link>
               </li>
             ))}
@@ -304,7 +304,12 @@ export function CompareReport({ range }: { range: ReportRange }) {
         <Tile label="Income now" value={<Money minor={d.current.incomeMinor} trimZero />} />
         <Tile label="Income before" value={<Money minor={d.previous.incomeMinor} trimZero />} />
       </div>
-      <Card className="overflow-x-auto">
+      <Card
+        className="overflow-x-auto"
+        tabIndex={0}
+        role="region"
+        aria-label="Spending per category in both periods"
+      >
         <table className="w-full text-sm tabular">
           <caption className="sr-only">Spending per category in both periods</caption>
           <thead className="border-b text-xs text-muted-foreground">
@@ -438,6 +443,9 @@ export function CalendarReport({ range }: { range: ReportRange }) {
         </CardHeader>
         <CardContent
           className="overflow-x-auto"
+          tabIndex={0}
+          role="region"
+          aria-label="Spending by day"
           // Start at the most recent weeks when the year doesn't fit (phones).
           ref={(el) => {
             if (el) el.scrollLeft = el.scrollWidth;

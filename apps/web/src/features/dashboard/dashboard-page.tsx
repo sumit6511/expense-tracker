@@ -32,6 +32,7 @@ import { useTransactionDialog } from '@/features/transactions/transaction-dialog
 import { TransactionRow } from '@/features/transactions/transaction-row';
 import { useFormat } from '@/lib/format';
 import { useT } from '@/lib/i18n';
+import { usePageTitle } from '@/lib/page-title';
 import {
   useAccounts,
   useCategoryMap,
@@ -46,6 +47,7 @@ import { cn } from '@/lib/utils';
 
 export function DashboardPage() {
   const t = useT();
+  usePageTitle(t('Home'));
   const search = useSearch({ from: '/app/' });
   const navigate = useNavigate();
   const ws = useWorkspace();

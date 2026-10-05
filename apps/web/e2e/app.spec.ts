@@ -1184,6 +1184,22 @@ test.describe('everyday use', () => {
     await page.getByRole('tab', { name: 'Categories' }).click();
     await expect(page.getByText('Remittance')).toBeVisible();
   });
+
+  test('keyboard: skip link, page titles and focus after navigating', async ({
+    signedIn: page,
+  }) => {
+    await page.goto('/transactions');
+    await expect(page).toHaveTitle(/^Transactions · .+ · Expense Tracker$/);
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('button', { name: 'Skip to content' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('heading', { level: 1, name: 'Transactions' })).toBeFocused();
+
+    // A new page puts focus on its heading, so screen readers announce where you are.
+    await page.getByRole('link', { name: 'Accounts', exact: true }).first().click();
+    await expect(page).toHaveTitle(/^Accounts · /);
+    await expect(page.getByRole('heading', { level: 1, name: 'Accounts' })).toBeFocused();
+  });
 });
 
 test.describe('dark mode', () => {
