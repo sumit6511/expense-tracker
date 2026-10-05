@@ -384,18 +384,18 @@ The target after phase 2 is **zero serious or critical axe violations**.
 | UX-H5 | High | S | 3 | Fixed (phase 3): phones show hero, review, Recent (5), Coming up, then the rest, in DOM order; Worth knowing folds away |
 | UX-H6 | High | S | 1 | Fixed (phase 1) |
 | UX-H7 | High | S | 1 | Fixed (phase 1) |
-| UX-M1 | Medium | S | 5 | Planned |
-| UX-M2 | Medium | S | 5 | Planned |
+| UX-M1 | Medium | S | 5 | Fixed (phase 5): settings grouped under Workspace and You; a Security tab (password, two-step sign-in, passkeys, devices); the phone More sheet shows who's signed in, with Profile and Sign out |
+| UX-M2 | Medium | S | 5 | Fixed (phase 5): workspace settings (shared by everyone) keep Save, disabled until something changes, with "Unsaved changes", Discard, and a prompt before leaving; personal display settings say they apply right away; E2E test |
 | UX-M3 | Medium | S | 3 | Fixed (phase 3): chart 240 px; Where it went and Accounts start at 576 px instead of 814 px at 1440×900 |
-| UX-M4 | Medium | M | 5 | Planned |
+| UX-M4 | Medium | M | 5 | Fixed (phase 5): from 768 px the dashboard is a full-width headline over two columns, and settings and reports use two columns (settings drop to one at 1024–1279 px, where the sidebar leaves too little room) |
 | UX-M5 | Medium | S | 4 | Fixed (phase 4): month titles are worked out on the device; list skeletons are shaped like rows (dashboard, transactions, account, review, budgets) and announced once; Budgets actions wait for data |
 | UX-M6 | Medium | S | 4 | Fixed (phase 4): an empty Transactions page hides filters, totals and export and offers Add or Import; Reports shows the same above its tabs (Net worth still works from account balances); E2E test |
-| UX-M7 | Medium | S | 5 | Planned |
+| UX-M7 | Medium | S | 5 | Fixed (phase 5): the "/" shortcut is a key badge shown only with a mouse and keyboard, until you type; sideways-scrolling rows (filters, report and settings tabs) fade where there's more, and keep the chosen tab in view |
 | UX-M8 | Medium | S | 3 | Fixed (phase 3): "Record" on due and overdue reminders in Coming up, sharing the Recurring page's code; E2E test |
-| UX-M9 | Medium | S | 5 | Planned |
+| UX-M9 | Medium | S | 5 | Fixed (phase 5): the sticky weekday labels cover the gutter to their left |
 | UX-L1 | Low | S | 1 | Fixed (phase 1): no arbitrary pixel font sizes left |
 | UX-L2 | Low | S | 6 | Planned |
-| UX-L3 | Low | S | 5 | Planned |
+| UX-L3 | Low | S | 5 | Fixed (phase 5): on phones, Export CSV and Trash move into a "⋯" menu |
 | UX-L4 | Low | S | 6 | Planned |
 | UX-L5 | Low | S | 6 | Planned |
 
